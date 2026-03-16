@@ -1,2 +1,40 @@
 # Crush AI assistant
 .crush/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Coverage
+coverage/
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test artifacts
+tmp/
+temp/
+
+# OpenCode workflow
+.opencode/
+opencode.json
+opnecode.json
+.serena/
+.pi/
