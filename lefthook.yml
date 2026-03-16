@@ -1,0 +1,11 @@
+pre-push:
+  parallel: false
+  commands:
+    lint:
+      run: bun run check
+    typecheck:
+      run: bun run typecheck
+    test:
+      run: bun run test
+    build:
+      run: bun run build

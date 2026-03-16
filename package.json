@@ -1,0 +1,36 @@
+{
+	"name": "taskp",
+	"version": "0.1.0",
+	"description": "Markdown-defined skill runner with interactive argument collection and LLM execution",
+	"license": "MIT",
+	"type": "module",
+	"engines": {
+		"bun": ">=1.2.0"
+	},
+	"bin": {
+		"taskp": "./dist/cli.js"
+	},
+	"files": [
+		"dist/"
+	],
+	"scripts": {
+		"prepare": "lefthook install",
+		"dev": "bun run src/cli.ts",
+		"build": "bun build src/cli.ts --outdir dist --target bun",
+		"check": "biome check .",
+		"fix": "biome check --write .",
+		"typecheck": "tsc --noEmit",
+		"test": "bun x vitest run",
+		"test:watch": "bun x vitest"
+	},
+	"dependencies": {
+		"zod": "^4.3.6"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.0.0",
+		"@types/bun": "^1.2.0",
+		"lefthook": "^1.0.0",
+		"typescript": "^5.8.0",
+		"vitest": "^4.0.0"
+	}
+}
