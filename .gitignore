@@ -38,3 +38,10 @@ opencode.json
 opnecode.json
 .serena/
 .pi/
+
+# Worktrees (runtime)
+.worktrees/
+
+# Isuner specific
+.isuner/
+.isuner-prompt.md
