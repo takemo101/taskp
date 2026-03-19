@@ -3,10 +3,10 @@ import { Cli, z } from "incur";
 import { createCommandRunner } from "./adapter/command-runner";
 import { createPromptRunner } from "./adapter/prompt-runner";
 import { createSkillInitializer } from "./adapter/skill-initializer";
-import { createDefaultSkillLoader, createSkillLoader } from "./adapter/skill-loader";
+import { createDefaultSkillLoader } from "./adapter/skill-loader";
 import type { SkillScope } from "./core/skill/skill";
 import { type DomainError, EXIT_CODE } from "./core/types/errors";
-import { initSkill } from "./usecase/init-skill";
+import { type InitOutput, initSkill } from "./usecase/init-skill";
 import { createListSkillsUseCase } from "./usecase/list-skills";
 import type { RunOutput } from "./usecase/run-skill";
 import { runSkill } from "./usecase/run-skill";
@@ -51,6 +51,10 @@ function formatRunOutput(output: RunOutput): string {
 	);
 
 	return lines.join("\n");
+}
+
+function formatInitOutput(output: InitOutput): string {
+	return `Created ${output.mode} skill "${output.name}" at ${output.path}`;
 }
 
 function formatError(error: DomainError): string {
@@ -153,18 +157,12 @@ const cli = Cli.create("taskp", {
 			mode: "m",
 		},
 		async run(c) {
-			const cwd = process.cwd();
-			const mode = c.options.mode ?? "template";
 			const isGlobal = c.options.global ?? false;
+			const baseDir = isGlobal ? homedir() : process.cwd();
+			const mode = c.options.mode ?? "template";
 
-			const localRoot = cwd;
-			const globalRoot = homedir();
-			const skillRepository = createSkillLoader({ localRoot, globalRoot });
-			const initializer = createSkillInitializer({ localRoot, globalRoot });
-
-			const skillInitializer = isGlobal
-				? { create: initializer.createGlobal }
-				: { create: initializer.create };
+			const skillRepository = createDefaultSkillLoader(process.cwd());
+			const skillInitializer = createSkillInitializer({ baseDir });
 
 			const result = await initSkill(
 				{ skillRepository, skillInitializer },
@@ -176,7 +174,7 @@ const cli = Cli.create("taskp", {
 				process.exit(EXIT_CODE[result.error.type]);
 			}
 
-			console.log(`Created ${result.value.mode} skill: ${result.value.path}`);
+			console.log(formatInitOutput(result.value));
 		},
 	});
 

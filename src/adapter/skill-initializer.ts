@@ -1,59 +1,66 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
-import type { ExecutionMode } from "../core/execution/execution-mode";
+import { join } from "node:path";
+
 import type { Result } from "../core/types/result";
-import { err, ok } from "../core/types/result";
+import { ok } from "../core/types/result";
 import type { InitOptions, SkillInitializer } from "../usecase/port/skill-initializer";
 
 const SKILL_DIR_NAME = ".taskp/skills";
 const SKILL_FILE_NAME = "SKILL.md";
 
 type SkillInitializerDeps = {
-	readonly localRoot: string;
-	readonly globalRoot: string;
+	readonly baseDir: string;
 };
 
-export function createSkillInitializer(deps: SkillInitializerDeps): SkillInitializer & {
-	readonly createGlobal: (name: string, options: InitOptions) => Promise<Result<string, Error>>;
-} {
-	return {
-		create: (name, options) => createSkillScaffold(deps.localRoot, name, options),
-		createGlobal: (name, options) => createSkillScaffold(deps.globalRoot, name, options),
-	};
-}
-
-async function createSkillScaffold(
-	root: string,
-	name: string,
-	options: InitOptions,
-): Promise<Result<string, Error>> {
-	const dir = resolve(root, SKILL_DIR_NAME, name);
-	const filePath = join(dir, SKILL_FILE_NAME);
-
-	try {
-		await mkdir(dir, { recursive: true });
-		await writeFile(filePath, generateScaffold(name, options.mode, options.description));
-		return ok(filePath);
-	} catch (error) {
-		return err(error instanceof Error ? error : new Error(String(error)));
-	}
-}
-
-function generateScaffold(name: string, mode: ExecutionMode, description: string): string {
-	const lines = [
+function generateTemplateContent(name: string, description: string): string {
+	return [
 		"---",
 		`name: ${name}`,
-		`description: "${description}"`,
-		`mode: ${mode}`,
+		`description: ${description}`,
+		"mode: template",
+		"inputs: []",
 		"---",
 		"",
 		`# ${name}`,
 		"",
-	];
+		"```bash",
+		`echo "Hello from ${name}"`,
+		"```",
+		"",
+	].join("\n");
+}
 
-	if (mode === "template") {
-		lines.push("```bash", `echo "Hello from ${name}"`, "```", "");
-	}
+function generateAgentContent(name: string, description: string): string {
+	return [
+		"---",
+		`name: ${name}`,
+		`description: ${description}`,
+		"mode: agent",
+		"---",
+		"",
+		`# ${name}`,
+		"",
+		"Describe what this skill should do.",
+		"",
+	].join("\n");
+}
 
-	return lines.join("\n");
+function generateSkillContent(name: string, options: InitOptions): string {
+	return options.mode === "agent"
+		? generateAgentContent(name, options.description)
+		: generateTemplateContent(name, options.description);
+}
+
+export function createSkillInitializer(deps: SkillInitializerDeps): SkillInitializer {
+	return {
+		create: async (name: string, options: InitOptions): Promise<Result<string, Error>> => {
+			const skillDir = join(deps.baseDir, SKILL_DIR_NAME, name);
+			const skillPath = join(skillDir, SKILL_FILE_NAME);
+
+			await mkdir(skillDir, { recursive: true });
+			await writeFile(skillPath, generateSkillContent(name, options), "utf-8");
+
+			return ok(skillPath);
+		},
+	};
 }
