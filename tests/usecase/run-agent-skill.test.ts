@@ -101,7 +101,7 @@ describe("runAgentSkill", () => {
 		);
 
 		// Context should include both system prompt and collected context
-		const executorCall = vi.mocked(deps.agentExecutor.execute).mock.calls[0][0];
+		const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
 		expect(executorCall.context).toContain("You are a helpful assistant.");
 		expect(executorCall.context).toContain("collected context");
 	});
@@ -187,7 +187,7 @@ describe("runAgentSkill", () => {
 
 		await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
 
-		const executorCall = vi.mocked(deps.agentExecutor.execute).mock.calls[0][0];
+		const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
 		expect(executorCall.model).toBe(mockModel);
 	});
 });

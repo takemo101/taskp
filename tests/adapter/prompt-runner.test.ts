@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SkillInput } from "../../src/core/skill/skill-input";
 
 vi.mock("@inquirer/prompts", () => ({
@@ -12,14 +12,18 @@ vi.mock("@inquirer/prompts", () => ({
 import { confirm, input, number, password, select } from "@inquirer/prompts";
 import { createPromptRunner } from "../../src/adapter/prompt-runner";
 
-const mockedInput = vi.mocked(input);
-const mockedSelect = vi.mocked(select);
-const mockedConfirm = vi.mocked(confirm);
-const mockedNumber = vi.mocked(number);
-const mockedPassword = vi.mocked(password);
+const mockedInput = input as ReturnType<typeof vi.fn>;
+const mockedSelect = select as ReturnType<typeof vi.fn>;
+const mockedConfirm = confirm as ReturnType<typeof vi.fn>;
+const mockedNumber = number as ReturnType<typeof vi.fn>;
+const mockedPassword = password as ReturnType<typeof vi.fn>;
 
 describe("PromptRunner", () => {
 	const runner = createPromptRunner();
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
 
 	it("collects text input", async () => {
 		mockedInput.mockResolvedValueOnce("hello");
