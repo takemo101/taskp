@@ -1,8 +1,11 @@
+import { homedir } from "node:os";
 import { Cli, z } from "incur";
 import { createCommandRunner } from "./adapter/command-runner";
 import { createPromptRunner } from "./adapter/prompt-runner";
+import { createSkillInitializer } from "./adapter/skill-initializer";
 import { createDefaultSkillLoader } from "./adapter/skill-loader";
 import { type DomainError, EXIT_CODE } from "./core/types/errors";
+import { type InitOutput, initSkill } from "./usecase/init-skill";
 import type { RunOutput } from "./usecase/run-skill";
 import { runSkill } from "./usecase/run-skill";
 
@@ -46,6 +49,10 @@ function formatRunOutput(output: RunOutput): string {
 	);
 
 	return lines.join("\n");
+}
+
+function formatInitOutput(output: InitOutput): string {
+	return `Created ${output.mode} skill "${output.name}" at ${output.path}`;
 }
 
 function formatError(error: DomainError): string {
@@ -137,8 +144,25 @@ const cli = Cli.create("taskp", {
 			global: "g",
 			mode: "m",
 		},
-		run(_c) {
-			throw new Error("Not implemented");
+		async run(c) {
+			const isGlobal = c.options.global ?? false;
+			const baseDir = isGlobal ? homedir() : process.cwd();
+			const mode = c.options.mode ?? "template";
+
+			const skillRepository = createDefaultSkillLoader(process.cwd());
+			const skillInitializer = createSkillInitializer({ baseDir });
+
+			const result = await initSkill(
+				{ skillRepository, skillInitializer },
+				{ name: c.args.name, global: isGlobal, mode },
+			);
+
+			if (!result.ok) {
+				console.error(formatError(result.error));
+				process.exit(EXIT_CODE[result.error.type]);
+			}
+
+			console.log(formatInitOutput(result.value));
 		},
 	});
 
