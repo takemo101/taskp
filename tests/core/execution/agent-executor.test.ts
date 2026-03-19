@@ -2,20 +2,7 @@ import type { LanguageModelV3FinishReason, LanguageModelV3StreamPart } from "@ai
 import { simulateReadableStream } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	type AgentExecutorDeps,
-	createAgentExecutor,
-} from "../../../src/core/execution/agent-executor";
-
-function stubDeps(overrides?: Partial<AgentExecutorDeps>): AgentExecutorDeps {
-	return {
-		executeCommand:
-			overrides?.executeCommand ??
-			vi.fn().mockResolvedValue({ stdout: "", stderr: "", exitCode: 0 }),
-		readFile: overrides?.readFile ?? vi.fn().mockResolvedValue(""),
-		writeFile: overrides?.writeFile ?? vi.fn().mockResolvedValue(undefined),
-	};
-}
+import { createAgentExecutor } from "../../../src/core/execution/agent-executor";
 
 function mockUsage() {
 	return {
@@ -61,13 +48,12 @@ describe("AgentExecutor", () => {
 				}),
 			});
 
-			const executor = createAgentExecutor(stubDeps());
+			const executor = createAgentExecutor();
 			const result = await executor.execute({
 				model,
 				systemPrompt: "You are helpful.",
 				context: "Say hello",
-				toolNames: ["bash", "read"],
-				cwd: "/tmp",
+				toolNames: [],
 			});
 
 			expect(result.ok).toBe(true);
@@ -91,13 +77,12 @@ describe("AgentExecutor", () => {
 				}),
 			});
 
-			const executor = createAgentExecutor(stubDeps());
+			const executor = createAgentExecutor();
 			await executor.execute({
 				model,
 				systemPrompt: "test",
 				context: "test",
 				toolNames: [],
-				cwd: "/tmp",
 			});
 
 			expect(stdoutWriteSpy).toHaveBeenCalledWith("chunk1");
@@ -108,12 +93,6 @@ describe("AgentExecutor", () => {
 	describe("tool call flow", () => {
 		it("executes tool call and returns final text response", async () => {
 			let callCount = 0;
-
-			const executeCommand = vi.fn().mockResolvedValue({
-				stdout: "tool output",
-				stderr: "",
-				exitCode: 0,
-			});
 
 			const model = new MockLanguageModelV3({
 				doStream: async () => {
@@ -149,20 +128,18 @@ describe("AgentExecutor", () => {
 				},
 			});
 
-			const executor = createAgentExecutor(stubDeps({ executeCommand }));
+			const executor = createAgentExecutor();
 			const result = await executor.execute({
 				model,
 				systemPrompt: "You are an agent.",
 				context: "Run echo hello",
 				toolNames: ["bash"],
-				cwd: "/tmp",
 			});
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) return;
 			expect(result.value.output).toBe("Done!");
 			expect(result.value.steps).toBe(2);
-			expect(executeCommand).toHaveBeenCalledWith("echo hello", "/tmp", 30_000);
 		});
 	});
 
@@ -185,13 +162,12 @@ describe("AgentExecutor", () => {
 				}),
 			});
 
-			const executor = createAgentExecutor(stubDeps());
+			const executor = createAgentExecutor();
 			const result = await executor.execute({
 				model,
 				systemPrompt: "test",
 				context: "test",
 				toolNames: ["bash"],
-				cwd: "/tmp",
 			});
 
 			expect(result.ok).toBe(false);
