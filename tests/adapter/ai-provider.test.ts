@@ -198,7 +198,55 @@ describe("createLanguageModel", () => {
 		expect(result.value.modelId).toBe("llama3");
 	});
 
-	it("returns error for unknown provider", () => {
+	it("creates omlx model with default base URL", () => {
+		const config: AiConfig = {};
+
+		const result = createLanguageModel({ provider: "omlx", model: "qwen2.5-coder:32b" }, config);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.modelId).toBe("qwen2.5-coder:32b");
+	});
+
+	it("creates omlx model with custom base URL", () => {
+		const config: AiConfig = {
+			providers: {
+				omlx: { base_url: "http://custom:8000/v1" },
+			},
+		};
+
+		const result = createLanguageModel({ provider: "omlx", model: "llama3" }, config);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.modelId).toBe("llama3");
+	});
+
+	it("creates lmstudio model with default base URL", () => {
+		const config: AiConfig = {};
+
+		const result = createLanguageModel({ provider: "lmstudio", model: "deepseek-r1" }, config);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.modelId).toBe("deepseek-r1");
+	});
+
+	it("creates custom openai-compatible provider with base_url in config", () => {
+		const config: AiConfig = {
+			providers: {
+				"my-server": { base_url: "http://192.168.1.100:8080/v1" },
+			},
+		};
+
+		const result = createLanguageModel({ provider: "my-server", model: "llama3" }, config);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.modelId).toBe("llama3");
+	});
+
+	it("returns error for unknown provider without base_url", () => {
 		const result = createLanguageModel({ provider: "unknown", model: "some-model" }, {});
 
 		expect(result.ok).toBe(false);
@@ -206,6 +254,7 @@ describe("createLanguageModel", () => {
 		expect(result.error.type).toBe("CONFIG_ERROR");
 		expect(result.error.message).toContain("Unknown provider");
 		expect(result.error.message).toContain("unknown");
+		expect(result.error.message).toContain("base_url");
 	});
 
 	it("returns error when API key is missing", () => {
