@@ -15,6 +15,7 @@ import { createListSkillsUseCase } from "./usecase/list-skills";
 import { prepareAgentSkill } from "./usecase/run-agent-skill";
 import type { RunOutput } from "./usecase/run-skill";
 import { runSkill } from "./usecase/run-skill";
+import { type ShowOutput, showSkill } from "./usecase/show-skill";
 
 function parsePresets(pairs: readonly string[]): Readonly<Record<string, string>> {
 	const result: Record<string, string> = {};
@@ -60,6 +61,47 @@ function formatRunOutput(output: RunOutput): string {
 
 function formatInitOutput(output: InitOutput): string {
 	return `Created ${output.mode} skill "${output.name}" at ${output.path}`;
+}
+
+function formatShowOutput(output: ShowOutput): string {
+	const lines: string[] = [
+		`Skill: ${output.name}`,
+		`Description: ${output.description}`,
+		`Mode: ${output.mode}`,
+		`Location: ${output.location}`,
+	];
+
+	if (output.inputs.length > 0) {
+		lines.push("");
+		lines.push("Inputs:");
+		for (const input of output.inputs) {
+			const parts = [`  ${input.name}`, input.type, input.message];
+			if (input.choices && input.choices.length > 0) {
+				parts.push(`[${input.choices.join(", ")}]`);
+			} else if (input.default !== undefined) {
+				parts.push(`(default: ${String(input.default)})`);
+			}
+			lines.push(parts.join("  "));
+		}
+	}
+
+	if (output.context.length > 0) {
+		lines.push("");
+		lines.push("Context:");
+		for (const ctx of output.context) {
+			const source =
+				ctx.type === "file"
+					? ctx.path
+					: ctx.type === "glob"
+						? ctx.pattern
+						: ctx.type === "command"
+							? ctx.run
+							: ctx.url;
+			lines.push(`  ${ctx.type}  ${source}`);
+		}
+	}
+
+	return lines.join("\n");
 }
 
 function formatError(error: DomainError): string {
@@ -192,6 +234,29 @@ const cli = Cli.create("taskp", {
 			}
 
 			console.log(formatInitOutput(result.value));
+		},
+	})
+	.command("show", {
+		description: "Show skill details",
+		args: z.object({
+			skill: z.string().describe("Skill name to show"),
+		}),
+		async run(c) {
+			const repository = createDefaultSkillLoader(process.cwd());
+			const result = await showSkill(c.args.skill, repository);
+
+			if (!result.ok) {
+				console.error(formatError(result.error));
+				process.exit(EXIT_CODE[result.error.type]);
+			}
+
+			console.log(formatShowOutput(result.value));
+		},
+	})
+	.command("serve", {
+		description: "Start as MCP stdio server",
+		async run() {
+			await cli.serve(["--mcp"]);
 		},
 	});
 
