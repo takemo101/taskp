@@ -1,51 +1,10 @@
-import { parseArgs } from "node:util";
+import { Cli, z } from "incur";
 import { createCommandRunner } from "./adapter/command-runner";
 import { createPromptRunner } from "./adapter/prompt-runner";
 import { createDefaultSkillLoader } from "./adapter/skill-loader";
 import { type DomainError, EXIT_CODE } from "./core/types/errors";
 import type { RunOutput } from "./usecase/run-skill";
 import { runSkill } from "./usecase/run-skill";
-
-type CliArgs = {
-	readonly command: string;
-	readonly skillName: string;
-	readonly model: string | undefined;
-	readonly dryRun: boolean;
-	readonly force: boolean;
-	readonly verbose: boolean;
-	readonly noInput: boolean;
-	readonly presets: Readonly<Record<string, string>>;
-};
-
-function parseCliArgs(argv: readonly string[]): CliArgs {
-	const { values, positionals } = parseArgs({
-		args: argv.slice(2),
-		options: {
-			model: { type: "string", short: "m" },
-			"dry-run": { type: "boolean", default: false },
-			force: { type: "boolean", short: "f", default: false },
-			verbose: { type: "boolean", short: "v", default: false },
-			"no-input": { type: "boolean", default: false },
-			set: { type: "string", short: "s", multiple: true, default: [] },
-		},
-		allowPositionals: true,
-	});
-
-	const command = positionals[0] ?? "";
-	const skillName = positionals[1] ?? "";
-	const presets = parsePresets(values.set as string[]);
-
-	return {
-		command,
-		skillName,
-		model: values.model as string | undefined,
-		dryRun: values["dry-run"] as boolean,
-		force: values.force as boolean,
-		verbose: values.verbose as boolean,
-		noInput: values["no-input"] as boolean,
-		presets,
-	};
-}
 
 function parsePresets(pairs: readonly string[]): Readonly<Record<string, string>> {
 	const result: Record<string, string> = {};
@@ -104,66 +63,83 @@ function formatError(error: DomainError): string {
 	}
 }
 
-function showUsage(): void {
-	console.log("Usage: taskp <command> [args] [options]");
-	console.log("");
-	console.log("Commands:");
-	console.log("  run <skill>   Run a skill");
-	console.log("");
-	console.log("Options:");
-	console.log("  --model, -m      LLM model to use");
-	console.log("  --dry-run        Show execution plan without running");
-	console.log("  --force, -f      Continue on error (template mode)");
-	console.log("  --verbose, -v    Show detailed logs");
-	console.log("  --no-input       Disable interactive prompts (use defaults)");
-	console.log("  --set, -s        Set variable (--set key=value)");
-}
-
-async function runCommand(args: CliArgs): Promise<number> {
-	if (!args.skillName) {
-		console.error("Error: skill name is required");
-		console.error("Usage: taskp run <skill>");
-		return 1;
-	}
-
-	const skillRepository = createDefaultSkillLoader(process.cwd());
-	const promptCollector = createPromptRunner();
-	const commandExecutor = createCommandRunner();
-
-	const result = await runSkill(
-		{
-			name: args.skillName,
-			presets: args.presets,
-			dryRun: args.dryRun,
-			force: args.force,
+const cli = Cli.create("taskp", {
+	version: "0.1.0",
+	description:
+		"Markdown-defined skill runner with interactive argument collection and LLM execution",
+})
+	.command("run", {
+		description: "Execute a skill",
+		args: z.object({
+			skill: z.string().describe("Skill name to execute"),
+		}),
+		options: z.object({
+			model: z.string().optional().describe("LLM model to use"),
+			provider: z.string().optional().describe("LLM provider"),
+			dryRun: z.boolean().optional().describe("Show execution plan without running"),
+			force: z.boolean().optional().describe("Continue on error (template mode)"),
+			verbose: z.boolean().optional().describe("Show detailed logs"),
+			noInput: z.boolean().optional().describe("Disable interactive prompts (use defaults)"),
+			set: z.array(z.string()).optional().describe("Set variables directly (key=value)"),
+		}),
+		alias: {
+			model: "m",
+			provider: "p",
+			force: "f",
+			verbose: "v",
+			set: "s",
 		},
-		{ skillRepository, promptCollector, commandExecutor },
-	);
+		async run(c) {
+			const presets = parsePresets(c.options.set ?? []);
 
-	if (!result.ok) {
-		console.error(formatError(result.error));
-		return EXIT_CODE[result.error.type];
-	}
+			const skillRepository = createDefaultSkillLoader(process.cwd());
+			const promptCollector = createPromptRunner();
+			const commandExecutor = createCommandRunner();
 
-	console.log(formatRunOutput(result.value));
-	return 0;
-}
+			const result = await runSkill(
+				{
+					name: c.args.skill,
+					presets,
+					dryRun: c.options.dryRun ?? false,
+					force: c.options.force ?? false,
+				},
+				{ skillRepository, promptCollector, commandExecutor },
+			);
 
-async function main(): Promise<void> {
-	const args = parseCliArgs(process.argv);
+			if (!result.ok) {
+				console.error(formatError(result.error));
+				process.exit(EXIT_CODE[result.error.type]);
+			}
 
-	let exitCode: number;
-	switch (args.command) {
-		case "run":
-			exitCode = await runCommand(args);
-			break;
-		default:
-			showUsage();
-			exitCode = args.command ? 1 : 0;
-			break;
-	}
+			console.log(formatRunOutput(result.value));
+		},
+	})
+	.command("list", {
+		description: "List available skills",
+		options: z.object({
+			global: z.boolean().optional().describe("Show global skills only"),
+			local: z.boolean().optional().describe("Show project-local skills only"),
+		}),
+		run(_c) {
+			throw new Error("Not implemented");
+		},
+	})
+	.command("init", {
+		description: "Create a skill scaffold",
+		args: z.object({
+			name: z.string().describe("Skill name"),
+		}),
+		options: z.object({
+			global: z.boolean().optional().describe("Create in global directory"),
+			mode: z.enum(["template", "agent"]).optional().describe("Execution mode"),
+		}),
+		alias: {
+			global: "g",
+			mode: "m",
+		},
+		run(_c) {
+			throw new Error("Not implemented");
+		},
+	});
 
-	process.exit(exitCode);
-}
-
-main();
+cli.serve();
