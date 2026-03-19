@@ -6,7 +6,9 @@ import { type ConfigError, configError } from "../core/types/errors";
 import { err, ok, type Result } from "../core/types/result";
 import type { AiConfig, ProviderConfig } from "./config-loader";
 
-const KNOWN_PROVIDERS = ["anthropic", "openai", "google", "ollama"] as const;
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export type ModelSpec = {
 	readonly provider: string;
@@ -18,6 +20,121 @@ export type ModelSource = {
 	readonly skillModel?: string;
 	readonly config: AiConfig;
 };
+
+type ProviderFactory = (
+	model: string,
+	config: ProviderConfig | undefined,
+) => Result<LanguageModelV3, ConfigError>;
+
+// ---------------------------------------------------------------------------
+// Provider Registry
+// ---------------------------------------------------------------------------
+
+const providerRegistry = new Map<string, ProviderFactory>();
+
+function registerProvider(name: string, factory: ProviderFactory): void {
+	providerRegistry.set(name, factory);
+}
+
+function resolveProvider(
+	providerName: string,
+	model: string,
+	providerConfig: ProviderConfig | undefined,
+): Result<LanguageModelV3, ConfigError> {
+	const factory = providerRegistry.get(providerName);
+	if (factory !== undefined) {
+		return factory(model, providerConfig);
+	}
+
+	// Fallback: config に base_url があれば OpenAI 互換として扱う
+	if (providerConfig?.base_url !== undefined) {
+		return createLocalFactory()(model, providerConfig);
+	}
+
+	const knownNames = [...providerRegistry.keys()].join(", ");
+	return err(
+		configError(
+			`Unknown provider: "${providerName}". Built-in: ${knownNames}. ` +
+				`For custom OpenAI-compatible servers, set base_url in [ai.providers.${providerName}].`,
+		),
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Factory builders
+// ---------------------------------------------------------------------------
+
+function createCloudFactory(
+	defaultEnvVar: string,
+	sdkFactory: (opts: { apiKey: string; baseURL?: string }) => (model: string) => LanguageModelV3,
+): ProviderFactory {
+	return (model, config) => {
+		const apiKey = resolveApiKey(config?.api_key_env, defaultEnvVar);
+		if (!apiKey.ok) {
+			return apiKey;
+		}
+
+		const provider = sdkFactory({
+			apiKey: apiKey.value,
+			...(config?.base_url !== undefined && { baseURL: config.base_url }),
+		});
+
+		return ok(provider(model));
+	};
+}
+
+function createLocalFactory(defaultBaseUrl?: string): ProviderFactory {
+	return (model, config) => {
+		const baseUrl = config?.base_url ?? defaultBaseUrl;
+
+		if (baseUrl === undefined) {
+			return err(configError("No base_url configured for this provider."));
+		}
+
+		const apiKey = config?.api_key_env ? (process.env[config.api_key_env] ?? "local") : "local";
+
+		const provider = createOpenAI({ apiKey, baseURL: baseUrl });
+		return ok(provider(model));
+	};
+}
+
+// ---------------------------------------------------------------------------
+// Built-in provider registration
+// ---------------------------------------------------------------------------
+
+// Cloud providers
+registerProvider(
+	"anthropic",
+	createCloudFactory("ANTHROPIC_API_KEY", (opts) => {
+		const p = createAnthropic(opts);
+		return (model) => p(model);
+	}),
+);
+
+registerProvider(
+	"openai",
+	createCloudFactory("OPENAI_API_KEY", (opts) => {
+		const p = createOpenAI(opts);
+		return (model) => p(model);
+	}),
+);
+
+registerProvider(
+	"google",
+	createCloudFactory("GOOGLE_GENERATIVE_AI_KEY", (opts) => {
+		const p = createGoogleGenerativeAI(opts);
+		return (model) => p(model);
+	}),
+);
+
+// Local providers (OpenAI-compatible)
+registerProvider("ollama", createLocalFactory("http://localhost:11434/v1"));
+registerProvider("omlx", createLocalFactory("http://localhost:8000/v1"));
+registerProvider("lmstudio", createLocalFactory("http://localhost:1234/v1"));
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 export function parseModelSpec(spec: string): Result<ModelSpec, ConfigError> {
 	const slashIndex = spec.indexOf("/");
@@ -72,96 +189,12 @@ export function createLanguageModel(
 	config: AiConfig,
 ): Result<LanguageModelV3, ConfigError> {
 	const providerConfig = config.providers?.[spec.provider];
-	return createModelForProvider(spec.provider, spec.model, providerConfig);
+	return resolveProvider(spec.provider, spec.model, providerConfig);
 }
 
-function createModelForProvider(
-	providerName: string,
-	model: string,
-	providerConfig: ProviderConfig | undefined,
-): Result<LanguageModelV3, ConfigError> {
-	switch (providerName) {
-		case "anthropic":
-			return createAnthropicModel(model, providerConfig);
-		case "openai":
-			return createOpenAIModel(model, providerConfig);
-		case "google":
-			return createGoogleModel(model, providerConfig);
-		case "ollama":
-			return createOllamaModel(model, providerConfig);
-		default:
-			return err(
-				configError(
-					`Unknown provider: "${providerName}". Supported: ${KNOWN_PROVIDERS.join(", ")}.`,
-				),
-			);
-	}
-}
-
-function createAnthropicModel(
-	model: string,
-	config: ProviderConfig | undefined,
-): Result<LanguageModelV3, ConfigError> {
-	const apiKey = resolveApiKey(config?.api_key_env, "ANTHROPIC_API_KEY");
-	if (!apiKey.ok) {
-		return apiKey;
-	}
-
-	const provider = createAnthropic({
-		apiKey: apiKey.value,
-		...(config?.base_url !== undefined && { baseURL: config.base_url }),
-	});
-
-	return ok(provider(model));
-}
-
-function createOpenAIModel(
-	model: string,
-	config: ProviderConfig | undefined,
-): Result<LanguageModelV3, ConfigError> {
-	const apiKey = resolveApiKey(config?.api_key_env, "OPENAI_API_KEY");
-	if (!apiKey.ok) {
-		return apiKey;
-	}
-
-	const provider = createOpenAI({
-		apiKey: apiKey.value,
-		...(config?.base_url !== undefined && { baseURL: config.base_url }),
-	});
-
-	return ok(provider(model));
-}
-
-function createGoogleModel(
-	model: string,
-	config: ProviderConfig | undefined,
-): Result<LanguageModelV3, ConfigError> {
-	const apiKey = resolveApiKey(config?.api_key_env, "GOOGLE_GENERATIVE_AI_KEY");
-	if (!apiKey.ok) {
-		return apiKey;
-	}
-
-	const provider = createGoogleGenerativeAI({
-		apiKey: apiKey.value,
-		...(config?.base_url !== undefined && { baseURL: config.base_url }),
-	});
-
-	return ok(provider(model));
-}
-
-function createOllamaModel(
-	model: string,
-	config: ProviderConfig | undefined,
-): Result<LanguageModelV3, ConfigError> {
-	const baseUrl = config?.base_url ?? "http://localhost:11434/v1";
-
-	const provider = createOpenAI({
-		apiKey: "ollama",
-		baseURL: baseUrl,
-	});
-
-	return ok(provider(model));
-}
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function resolveApiKey(
 	envVarName: string | undefined,
