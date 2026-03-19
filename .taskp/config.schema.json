@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ai": {
+      "description": "AI/LLM 設定",
+      "type": "object",
+      "properties": {
+        "default_provider": {
+          "description": "デフォルトプロバイダ (anthropic | openai | google | ollama | omlx | lmstudio)",
+          "type": "string",
+          "minLength": 1
+        },
+        "default_model": {
+          "description": "デフォルトモデル名",
+          "type": "string",
+          "minLength": 1
+        },
+        "providers": {
+          "description": "プロバイダ別設定",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "api_key_env": {
+                "description": "APIキーの環境変数名",
+                "type": "string",
+                "minLength": 1
+              },
+              "base_url": {
+                "description": "カスタムエンドポイントURL",
+                "type": "string",
+                "minLength": 1
+              },
+              "default_model": {
+                "description": "プロバイダ別デフォルトモデル",
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,5 @@
+[[rule]]
+include = [".taskp/config.toml"]
+
+[rule.schema]
+path = ".taskp/config.schema.json"
