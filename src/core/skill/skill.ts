@@ -4,6 +4,7 @@ import { parseError } from "../types/errors";
 import type { Result } from "../types/result";
 import { err, ok } from "../types/result";
 import type { SkillBody } from "./skill-body";
+import { createSkillBody } from "./skill-body";
 import type { SkillMetadata } from "./skill-metadata";
 import { parseSkillMetadata } from "./skill-metadata";
 
@@ -35,7 +36,7 @@ export function parseSkill(raw: string, location: string): Result<Skill, ParseEr
 
 	return ok({
 		metadata,
-		body: { raw: parsed.content },
+		body: createSkillBody(raw),
 		location,
 		scope: resolveScope(location),
 	});

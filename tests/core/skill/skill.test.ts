@@ -32,8 +32,8 @@ describe("parseSkill", () => {
 		expect(result.value.metadata.name).toBe("deploy");
 		expect(result.value.metadata.description).toBe("アプリケーションをデプロイする");
 		expect(result.value.metadata.mode).toBe("template");
-		expect(result.value.body.raw).toContain("# Deploy");
-		expect(result.value.body.raw).toContain("npm run deploy");
+		expect(result.value.body.content).toContain("# Deploy");
+		expect(result.value.body.content).toContain("npm run deploy");
 		expect(result.value.location).toBe("/home/user/global-skills/deploy/SKILL.md");
 		expect(result.value.scope).toBe("global");
 	});
@@ -69,7 +69,7 @@ describe("parseSkill", () => {
 			expect(result.value.metadata.name).toBe("deploy");
 			expect(result.value.metadata.mode).toBe("template");
 			expect(result.value.metadata.inputs).toHaveLength(2);
-			expect(result.value.body.raw).toContain("Deploy to {{environment}}");
+			expect(result.value.body.content).toContain("Deploy to {{environment}}");
 		});
 
 		it("valid-agent フィクスチャをパースできる", () => {
