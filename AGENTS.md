@@ -55,3 +55,24 @@ AI SDK の実装時は必要なトピックを参照すること。
 | [advanced](docs/references/ai-sdk/09-advanced.md) | マイグレーション・トラブルシューティング | 7KB |
 
 > ファイルが大きいため `read` の `offset`/`limit` や `grep` で必要箇所のみ参照すること。
+
+### OpenTUI（TUI フレームワーク）
+
+TUI 実装時は必要なトピックを参照すること。
+
+| ファイル | 内容 | サイズ |
+|---|---|---|
+| [getting-started](docs/references/opentui/01-getting-started.md) | インストール・Hello World・概要 | 8KB |
+| [renderer](docs/references/opentui/02-renderer.md) | CliRenderer・設定・レンダーループ・イベント | 10KB |
+| [renderables](docs/references/opentui/03-renderables.md) | Renderable ツリー・レイアウト・フォーカス・Renderables vs Constructs | 22KB |
+| [constructs](docs/references/opentui/04-constructs.md) | VNode・Construct API・delegate・カスタム Construct | 10KB |
+| [layout](docs/references/opentui/05-layout.md) | Flexbox・サイジング・ポジショニング・レスポンシブ | 11KB |
+| [keyboard-console-colors](docs/references/opentui/06-keyboard-console-colors.md) | キーボード入力・コンソールオーバーレイ・カラー | 18KB |
+| [lifecycle](docs/references/opentui/07-lifecycle.md) | クリーンアップ・シグナル・destroy | 6KB |
+| [components-display](docs/references/opentui/08-components-display.md) | Text・Box | 16KB |
+| [components-input](docs/references/opentui/09-components-input.md) | Input・Textarea・Select・TabSelect | 18KB |
+| [components-scroll](docs/references/opentui/10-components-scroll.md) | ScrollBox・ScrollBar・Slider | 15KB |
+| [components-code](docs/references/opentui/11-components-code.md) | Code・Markdown・LineNumber・FrameBuffer・ASCIIFont・Diff | 38KB |
+| [bindings-solid](docs/references/opentui/12-bindings-solid.md) | SolidJS バインディング | 17KB |
+| [bindings-react](docs/references/opentui/13-bindings-react.md) | React バインディング | 16KB |
+| [reference](docs/references/opentui/14-reference.md) | 環境変数・Tree-sitter | 6KB |
