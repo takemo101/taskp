@@ -17,7 +17,11 @@ export type Skill = {
 	readonly scope: SkillScope;
 };
 
-export function parseSkill(raw: string, location: string): Result<Skill, ParseError> {
+export function parseSkill(
+	raw: string,
+	location: string,
+	scope?: SkillScope,
+): Result<Skill, ParseError> {
 	let parsed: matter.GrayMatterFile<string>;
 	try {
 		parsed = matter(raw);
@@ -38,10 +42,10 @@ export function parseSkill(raw: string, location: string): Result<Skill, ParseEr
 		metadata,
 		body: createSkillBody(raw),
 		location,
-		scope: resolveScope(location),
+		scope: scope ?? inferScope(location),
 	});
 }
 
-function resolveScope(location: string): SkillScope {
+function inferScope(location: string): SkillScope {
 	return location.includes("/.taskp/skills/") ? "local" : "global";
 }
