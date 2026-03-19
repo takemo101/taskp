@@ -1,5 +1,8 @@
 // Use cases
 
+export type { InitOutput, InitSkillInput } from "./init-skill";
+export { initSkill } from "./init-skill";
+
 // Ports (interfaces for adapters)
 export type {
 	CommandExecutor,
