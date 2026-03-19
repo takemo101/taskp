@@ -6,6 +6,8 @@ export {
 	isRetryableAgentError,
 	toExecutionError,
 } from "./agent-error-handler";
+export type { AgentResult } from "./agent-executor";
+export { executeAgent } from "./agent-executor";
 export type { ModelSource, ModelSpec } from "./ai-provider";
 export { createLanguageModel, parseModelSpec, resolveModelSpec } from "./ai-provider";
 export { createCommandRunner } from "./command-runner";
@@ -18,3 +20,5 @@ export type { RetryConfig } from "./retry";
 export { calculateDelay, withRetry } from "./retry";
 export { createSkillInitializer } from "./skill-initializer";
 export { createDefaultSkillLoader, createSkillLoader } from "./skill-loader";
+export type { StreamWriter, StreamWriterOptions } from "./stream-writer";
+export { createStreamWriter } from "./stream-writer";

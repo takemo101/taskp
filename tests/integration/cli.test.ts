@@ -24,7 +24,7 @@ describe("CLI E2E: init → list → run", () => {
 	it("init creates a skill, list shows it, run executes it", async () => {
 		const initResult = await run("init hello", projectDir);
 		expect(initResult.exitCode).toBe(0);
-		expect(initResult.stdout).toContain("Created template skill:");
+		expect(initResult.stdout).toContain("Created template skill");
 
 		const listResult = await run("list", projectDir);
 		expect(listResult.exitCode).toBe(0);

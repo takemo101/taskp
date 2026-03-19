@@ -15,5 +15,11 @@ export type {
 	SkillInitializer,
 	SkillRepository,
 } from "./port";
+export type {
+	AgentSkillConfig,
+	RunAgentSkillDeps,
+	RunAgentSkillInput,
+} from "./run-agent-skill";
+export { prepareAgentSkill } from "./run-agent-skill";
 export type { CommandResult, RunOutput, RunSkillDeps, RunSkillInput } from "./run-skill";
 export { runSkill } from "./run-skill";
