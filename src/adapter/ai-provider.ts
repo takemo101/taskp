@@ -46,7 +46,9 @@ function resolveProvider(
 		return factory(model, providerConfig);
 	}
 
-	// Fallback: config に base_url があれば OpenAI 互換として扱う
+	// 未知のプロバイダ名でも base_url があれば OpenAI 互換プロトコルで接続を試みる。
+	// LM Studio や vLLM など、OpenAI API 互換のローカルサーバーを
+	// 事前登録なしで利用可能にするため
 	if (providerConfig?.base_url !== undefined) {
 		return createLocalFactory()(model, providerConfig);
 	}
@@ -91,6 +93,8 @@ function createLocalFactory(defaultBaseUrl?: string): ProviderFactory {
 			return err(configError("No base_url configured for this provider."));
 		}
 
+		// ローカル LLM サーバーは認証不要だが、OpenAI SDK が apiKey 必須のため
+		// ダミー値 "local" を渡す
 		const apiKey = config?.api_key_env ? (process.env[config.api_key_env] ?? "local") : "local";
 
 		const provider = createOpenAI({ apiKey, baseURL: baseUrl });
@@ -136,6 +140,8 @@ registerProvider("lmstudio", createLocalFactory("http://localhost:1234/v1"));
 // Public API
 // ---------------------------------------------------------------------------
 
+// "provider/model" 形式を分割する。スラッシュなしの場合は
+// provider を空にして、後段の resolveModelSpec で default_provider を適用させる
 export function parseModelSpec(spec: string): Result<ModelSpec, ConfigError> {
 	const slashIndex = spec.indexOf("/");
 	if (slashIndex === -1) {

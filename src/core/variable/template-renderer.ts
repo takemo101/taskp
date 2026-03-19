@@ -10,6 +10,7 @@ export type ReservedVars = {
 
 const VARIABLE_PATTERN = /\{\{(\w+)\}\}/g;
 
+// 予約変数は __ で囲むことでユーザー定義変数との衝突を防止
 const RESERVED_VAR_MAP: Record<string, keyof ReservedVars> = {
 	__cwd__: "cwd",
 	__skill_dir__: "skillDir",
@@ -49,6 +50,8 @@ export function renderTemplate(
 	variables: Record<string, string>,
 	reserved: ReservedVars,
 ): Result<string, RenderError> {
+	// 未定義変数を事前チェックし、部分的にレンダリングされた不完全な出力を防ぐ
+	// （Parse, Don't Validate の原則: docs/arch/design-principles.md）
 	const undefinedVars = findUndefinedVariables(template, variables, reserved);
 	if (undefinedVars.length > 0) {
 		return err(renderError(`Undefined variables: ${undefinedVars.join(", ")}`));

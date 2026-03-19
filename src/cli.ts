@@ -21,6 +21,8 @@ import { runSkill } from "./usecase/run-skill";
 import type { ShowOutput } from "./usecase/show-skill";
 import { showSkill } from "./usecase/show-skill";
 
+// --set key=value 形式の引数を Record に変換する。
+// "=" を含む値をサポートするため、最初の "=" のみで分割する
 function parsePresets(pairs: readonly string[]): Readonly<Record<string, string>> {
 	const result: Record<string, string> = {};
 	for (const pair of pairs) {
@@ -113,6 +115,8 @@ const cli = Cli.create("taskp", {
 			const skillRepository = createDefaultSkillLoader(process.cwd());
 			const promptCollector = createPromptRunner();
 
+			// まずスキルを読み込んで mode を判定し、agent/template で処理を分岐する。
+			// agent モードは LLM 接続が必要なため、設定の読み込みやモデル解決が追加で発生する
 			const findResult = await skillRepository.findByName(c.args.skill);
 			if (!findResult.ok) {
 				console.error(formatError(findResult.error));
@@ -379,4 +383,6 @@ function contextSourceValue(ctx: ContextSource): string {
 	}
 }
 
+// incur の serve() はコマンドライン引数を自動パースして適切なコマンドを実行する。
+// --mcp フラグ付きの場合は MCP stdio サーバーとして起動する
 cli.serve();

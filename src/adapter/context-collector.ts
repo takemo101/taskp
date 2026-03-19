@@ -29,6 +29,8 @@ export function createContextCollector(deps: ContextCollectorDeps) {
 	};
 }
 
+// コンテキストソースを直列で処理する（並列にしないのは、
+// command タイプが副作用を持つ可能性があり、実行順序を保証するため）
 async function collectAll(
 	sources: readonly ContextSource[],
 	cwd: string,

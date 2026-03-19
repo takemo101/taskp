@@ -4,6 +4,8 @@ import { type ExecutionError, executionError } from "../types/errors";
 import { err, ok, type Result } from "../types/result";
 import { buildTools } from "./agent-tools";
 
+// エージェントの無限ループを防ぐための安全装置。
+// 50 ステップは複雑なタスクでも十分だが、暴走時のコスト爆発を防げる値
 const MAX_STEPS = 50;
 
 export type AgentResult = {
@@ -56,6 +58,8 @@ async function executeAgentLoop(
 }
 
 function isMaxStepsExceeded(steps: readonly { readonly finishReason: string }[]): boolean {
+	// finishReason が "tool-calls" = モデルがまだツールを呼ぼうとしていた
+	// = stepCountIs で強制停止された = 上限到達と判定できる
 	const lastStep = steps.at(-1);
 	return lastStep?.finishReason === "tool-calls";
 }

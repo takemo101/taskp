@@ -13,6 +13,8 @@ export interface SkillBody {
 }
 
 export function createSkillBody(rawMarkdown: string): SkillBody {
+	// frontmatter を除いた本文のみを保持する
+	// （メタデータは SkillMetadata 側で管理するため分離）
 	const { content } = matter(rawMarkdown);
 
 	return {
@@ -22,6 +24,8 @@ export function createSkillBody(rawMarkdown: string): SkillBody {
 }
 
 function extractCodeBlocks(markdownContent: string, lang: string): readonly CodeBlock[] {
+	// 正規表現ではなく remark AST を使うことで、
+	// ネストされたコードブロックや特殊な Markdown 構文を正確に処理する
 	const tree = unified().use(remarkParse).parse(markdownContent);
 	const blocks: CodeBlock[] = [];
 

@@ -1,3 +1,6 @@
+// 例外ではなく Result 型でエラーを表現することで、
+// エラーハンドリングの漏れを型レベルで検出できるようにしている
+// （docs/arch/error-handling.md 参照）
 export type Result<T, E> =
 	| { readonly ok: true; readonly value: T }
 	| { readonly ok: false; readonly error: E };
