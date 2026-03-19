@@ -215,6 +215,12 @@ const cli = Cli.create("taskp", {
 
 			console.log(formatShowOutput(result.value));
 		},
+	})
+	.command("serve", {
+		description: "Start as MCP stdio server",
+		async run() {
+			await cli.serve(["--mcp"]);
+		},
 	});
 
 type RunCommandContext = {
