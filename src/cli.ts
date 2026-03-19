@@ -1,21 +1,25 @@
 import { homedir } from "node:os";
 import { Cli, z } from "incur";
-import { executeAgent } from "./adapter/agent-executor";
+import { createAgentExecutor } from "./adapter/agent-executor";
 import { createLanguageModel, resolveModelSpec } from "./adapter/ai-provider";
 import { createCommandRunner } from "./adapter/command-runner";
 import { createDefaultConfigLoader } from "./adapter/config-loader";
+import { createContextCollector } from "./adapter/context-collector";
 import { createPromptRunner } from "./adapter/prompt-runner";
 import { createSkillInitializer } from "./adapter/skill-initializer";
 import { createDefaultSkillLoader } from "./adapter/skill-loader";
 import { createStreamWriter } from "./adapter/stream-writer";
+import type { ContextSource } from "./core/skill/context-source";
 import type { SkillScope } from "./core/skill/skill";
 import { type DomainError, EXIT_CODE } from "./core/types/errors";
+import { ok } from "./core/types/result";
 import { type InitOutput, initSkill } from "./usecase/init-skill";
 import { createListSkillsUseCase } from "./usecase/list-skills";
-import { prepareAgentSkill } from "./usecase/run-agent-skill";
+import { runAgentSkill } from "./usecase/run-agent-skill";
 import type { RunOutput } from "./usecase/run-skill";
 import { runSkill } from "./usecase/run-skill";
-import { type ShowOutput, showSkill } from "./usecase/show-skill";
+import type { ShowOutput } from "./usecase/show-skill";
+import { showSkill } from "./usecase/show-skill";
 
 function parsePresets(pairs: readonly string[]): Readonly<Record<string, string>> {
 	const result: Record<string, string> = {};
@@ -61,47 +65,6 @@ function formatRunOutput(output: RunOutput): string {
 
 function formatInitOutput(output: InitOutput): string {
 	return `Created ${output.mode} skill "${output.name}" at ${output.path}`;
-}
-
-function formatShowOutput(output: ShowOutput): string {
-	const lines: string[] = [
-		`Skill: ${output.name}`,
-		`Description: ${output.description}`,
-		`Mode: ${output.mode}`,
-		`Location: ${output.location}`,
-	];
-
-	if (output.inputs.length > 0) {
-		lines.push("");
-		lines.push("Inputs:");
-		for (const input of output.inputs) {
-			const parts = [`  ${input.name}`, input.type, input.message];
-			if (input.choices && input.choices.length > 0) {
-				parts.push(`[${input.choices.join(", ")}]`);
-			} else if (input.default !== undefined) {
-				parts.push(`(default: ${String(input.default)})`);
-			}
-			lines.push(parts.join("  "));
-		}
-	}
-
-	if (output.context.length > 0) {
-		lines.push("");
-		lines.push("Context:");
-		for (const ctx of output.context) {
-			const source =
-				ctx.type === "file"
-					? ctx.path
-					: ctx.type === "glob"
-						? ctx.pattern
-						: ctx.type === "command"
-							? ctx.run
-							: ctx.url;
-			lines.push(`  ${ctx.type}  ${source}`);
-		}
-	}
-
-	return lines.join("\n");
 }
 
 function formatError(error: DomainError): string {
@@ -297,35 +260,45 @@ async function runAgentMode(
 		process.exit(EXIT_CODE[languageModelResult.error.type]);
 	}
 
-	const prepareResult = await prepareAgentSkill(
-		{
-			name: c.args.skill,
-			presets,
-			model: languageModelResult.value,
-		},
-		{ skillRepository, promptCollector },
-	);
-	if (!prepareResult.ok) {
-		console.error(formatError(prepareResult.error));
-		process.exit(EXIT_CODE[prepareResult.error.type]);
-	}
-
-	const config = prepareResult.value;
 	const writer = createStreamWriter({
 		verbose: c.options.verbose ?? false,
 		output: process.stdout,
 	});
 
-	await executeAgent(
-		{
-			model: config.model,
-			systemPrompt: config.systemPrompt,
-			context: config.context,
-			toolNames: config.toolNames,
-			maxSteps: config.maxSteps,
+	const contextCollector = createContextCollector({
+		executeCommand: async (command, cwd) => {
+			const { execa } = await import("execa");
+			const result = await execa(command, { shell: true, cwd, reject: false });
+			return ok(result.stdout);
 		},
-		writer,
+		fetchUrl: async (url) => {
+			const response = await fetch(url);
+			return ok(await response.text());
+		},
+		scanGlob: async (pattern, cwd) => {
+			const { glob } = await import("node:fs/promises");
+			const matches: string[] = [];
+			for await (const entry of glob(pattern, { cwd })) {
+				matches.push(entry);
+			}
+			return matches;
+		},
+	});
+
+	const agentExecutor = createAgentExecutor(writer);
+
+	const result = await runAgentSkill(
+		{
+			name: c.args.skill,
+			presets,
+			model: languageModelResult.value,
+		},
+		{ skillRepository, promptCollector, contextCollector, agentExecutor },
 	);
+	if (!result.ok) {
+		console.error(formatError(result.error));
+		process.exit(EXIT_CODE[result.error.type]);
+	}
 }
 
 function resolveScope(
@@ -356,6 +329,53 @@ function printSkillTable(
 	console.log(formatRow(header.name, header.description, header.location));
 	for (const row of rows) {
 		console.log(formatRow(row.name, row.description, row.location));
+	}
+}
+
+function formatShowOutput(output: ShowOutput): string {
+	const lines: string[] = [
+		`Skill: ${output.name}`,
+		`Description: ${output.description}`,
+		`Mode: ${output.mode}`,
+		`Location: ${output.location}`,
+	];
+
+	if (output.inputs.length > 0) {
+		lines.push("");
+		lines.push("Inputs:");
+		for (const input of output.inputs) {
+			const parts = [`  ${input.name}`, input.type, input.message];
+			if (input.choices && input.choices.length > 0) {
+				parts.push(`[${input.choices.join(", ")}]`);
+			} else if (input.default !== undefined) {
+				parts.push(`(default: ${String(input.default)})`);
+			}
+			lines.push(parts.join("  "));
+		}
+	}
+
+	if (output.context.length > 0) {
+		lines.push("");
+		lines.push("Context:");
+		for (const ctx of output.context) {
+			const source = contextSourceValue(ctx);
+			lines.push(`  ${ctx.type}  ${source}`);
+		}
+	}
+
+	return lines.join("\n");
+}
+
+function contextSourceValue(ctx: ContextSource): string {
+	switch (ctx.type) {
+		case "file":
+			return ctx.path;
+		case "glob":
+			return ctx.pattern;
+		case "command":
+			return ctx.run;
+		case "url":
+			return ctx.url;
 	}
 }
 
