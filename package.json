@@ -24,6 +24,10 @@
 		"test:watch": "bun x vitest"
 	},
 	"dependencies": {
+		"gray-matter": "^4.0.3",
+		"remark-parse": "^11.0.0",
+		"remark-stringify": "^11.0.0",
+		"unified": "^11.0.5",
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {
