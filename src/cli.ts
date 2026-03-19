@@ -1,9 +1,12 @@
+import { homedir } from "node:os";
 import { Cli, z } from "incur";
 import { createCommandRunner } from "./adapter/command-runner";
 import { createPromptRunner } from "./adapter/prompt-runner";
-import { createDefaultSkillLoader } from "./adapter/skill-loader";
+import { createSkillInitializer } from "./adapter/skill-initializer";
+import { createDefaultSkillLoader, createSkillLoader } from "./adapter/skill-loader";
 import type { SkillScope } from "./core/skill/skill";
 import { type DomainError, EXIT_CODE } from "./core/types/errors";
+import { initSkill } from "./usecase/init-skill";
 import { createListSkillsUseCase } from "./usecase/list-skills";
 import type { RunOutput } from "./usecase/run-skill";
 import { runSkill } from "./usecase/run-skill";
@@ -149,8 +152,31 @@ const cli = Cli.create("taskp", {
 			global: "g",
 			mode: "m",
 		},
-		run(_c) {
-			throw new Error("Not implemented");
+		async run(c) {
+			const cwd = process.cwd();
+			const mode = c.options.mode ?? "template";
+			const isGlobal = c.options.global ?? false;
+
+			const localRoot = cwd;
+			const globalRoot = homedir();
+			const skillRepository = createSkillLoader({ localRoot, globalRoot });
+			const initializer = createSkillInitializer({ localRoot, globalRoot });
+
+			const skillInitializer = isGlobal
+				? { create: initializer.createGlobal }
+				: { create: initializer.create };
+
+			const result = await initSkill(
+				{ skillRepository, skillInitializer },
+				{ name: c.args.name, global: isGlobal, mode },
+			);
+
+			if (!result.ok) {
+				console.error(formatError(result.error));
+				process.exit(EXIT_CODE[result.error.type]);
+			}
+
+			console.log(`Created ${result.value.mode} skill: ${result.value.path}`);
 		},
 	});
 
