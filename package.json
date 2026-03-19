@@ -10,8 +10,15 @@
 	"bin": {
 		"taskp": "./dist/cli.js"
 	},
+	"exports": {
+		".": {
+			"import": "./src/index.ts",
+			"default": "./src/index.ts"
+		}
+	},
 	"files": [
-		"dist/"
+		"dist/",
+		"src/"
 	],
 	"scripts": {
 		"prepare": "lefthook install",
