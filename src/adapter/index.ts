@@ -1,4 +1,6 @@
 // Interface adapters
+export type { ModelSource, ModelSpec } from "./ai-provider";
+export { createLanguageModel, parseModelSpec, resolveModelSpec } from "./ai-provider";
 export { createCommandRunner } from "./command-runner";
 
 export type { AiConfig, Config, ProviderConfig } from "./config-loader";
