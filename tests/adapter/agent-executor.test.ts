@@ -14,10 +14,17 @@ function createMockWriter(): StreamWriter & {
 	};
 }
 
-describe("agent-executor", () => {
-	it("exports executeAgent function", async () => {
-		const { executeAgent } = await import("../../src/adapter/agent-executor");
-		expect(typeof executeAgent).toBe("function");
+describe("agent-executor adapter", () => {
+	it("exports createAgentExecutor function", async () => {
+		const { createAgentExecutor } = await import("../../src/adapter/agent-executor");
+		expect(typeof createAgentExecutor).toBe("function");
+	});
+
+	it("createAgentExecutor returns an executor with execute method", async () => {
+		const { createAgentExecutor } = await import("../../src/adapter/agent-executor");
+		const writer = createMockWriter();
+		const executor = createAgentExecutor(writer);
+		expect(typeof executor.execute).toBe("function");
 	});
 
 	it("StreamWriter mock captures calls correctly", () => {
