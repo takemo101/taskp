@@ -1,13 +1,18 @@
 import { homedir } from "node:os";
 import { Cli, z } from "incur";
+import { executeAgent } from "./adapter/agent-executor";
+import { createLanguageModel, resolveModelSpec } from "./adapter/ai-provider";
 import { createCommandRunner } from "./adapter/command-runner";
+import { createDefaultConfigLoader } from "./adapter/config-loader";
 import { createPromptRunner } from "./adapter/prompt-runner";
 import { createSkillInitializer } from "./adapter/skill-initializer";
 import { createDefaultSkillLoader } from "./adapter/skill-loader";
+import { createStreamWriter } from "./adapter/stream-writer";
 import type { SkillScope } from "./core/skill/skill";
 import { type DomainError, EXIT_CODE } from "./core/types/errors";
 import { type InitOutput, initSkill } from "./usecase/init-skill";
 import { createListSkillsUseCase } from "./usecase/list-skills";
+import { prepareAgentSkill } from "./usecase/run-agent-skill";
 import type { RunOutput } from "./usecase/run-skill";
 import { runSkill } from "./usecase/run-skill";
 
@@ -100,11 +105,23 @@ const cli = Cli.create("taskp", {
 		},
 		async run(c) {
 			const presets = parsePresets(c.options.set ?? []);
-
 			const skillRepository = createDefaultSkillLoader(process.cwd());
 			const promptCollector = createPromptRunner();
-			const commandExecutor = createCommandRunner();
 
+			const findResult = await skillRepository.findByName(c.args.skill);
+			if (!findResult.ok) {
+				console.error(formatError(findResult.error));
+				process.exit(EXIT_CODE[findResult.error.type]);
+			}
+
+			const skill = findResult.value;
+
+			if (skill.metadata.mode === "agent") {
+				await runAgentMode(c, presets, skillRepository, promptCollector);
+				return;
+			}
+
+			const commandExecutor = createCommandRunner();
 			const result = await runSkill(
 				{
 					name: c.args.skill,
@@ -177,6 +194,74 @@ const cli = Cli.create("taskp", {
 			console.log(formatInitOutput(result.value));
 		},
 	});
+
+type RunCommandContext = {
+	readonly args: { readonly skill: string };
+	readonly options: {
+		readonly model?: string;
+		readonly verbose?: boolean;
+	};
+};
+
+async function runAgentMode(
+	c: RunCommandContext,
+	presets: Readonly<Record<string, string>>,
+	skillRepository: ReturnType<typeof createDefaultSkillLoader>,
+	promptCollector: ReturnType<typeof createPromptRunner>,
+): Promise<void> {
+	const configLoader = createDefaultConfigLoader(process.cwd());
+	const configResult = await configLoader.load();
+	if (!configResult.ok) {
+		console.error(formatError(configResult.error));
+		process.exit(EXIT_CODE[configResult.error.type]);
+	}
+
+	const aiConfig = configResult.value.ai ?? {};
+	const modelSpecResult = resolveModelSpec({
+		cliModel: c.options.model,
+		config: aiConfig,
+	});
+	if (!modelSpecResult.ok) {
+		console.error(formatError(modelSpecResult.error));
+		process.exit(EXIT_CODE[modelSpecResult.error.type]);
+	}
+
+	const languageModelResult = createLanguageModel(modelSpecResult.value, aiConfig);
+	if (!languageModelResult.ok) {
+		console.error(formatError(languageModelResult.error));
+		process.exit(EXIT_CODE[languageModelResult.error.type]);
+	}
+
+	const prepareResult = await prepareAgentSkill(
+		{
+			name: c.args.skill,
+			presets,
+			model: languageModelResult.value,
+		},
+		{ skillRepository, promptCollector },
+	);
+	if (!prepareResult.ok) {
+		console.error(formatError(prepareResult.error));
+		process.exit(EXIT_CODE[prepareResult.error.type]);
+	}
+
+	const config = prepareResult.value;
+	const writer = createStreamWriter({
+		verbose: c.options.verbose ?? false,
+		output: process.stdout,
+	});
+
+	await executeAgent(
+		{
+			model: config.model,
+			systemPrompt: config.systemPrompt,
+			context: config.context,
+			toolNames: config.toolNames,
+			maxSteps: config.maxSteps,
+		},
+		writer,
+	);
+}
 
 function resolveScope(
 	global: boolean | undefined,
