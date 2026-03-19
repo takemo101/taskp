@@ -1,27 +1,8 @@
 import { z } from "zod";
-
-const inputTypeSchema = z.enum(["text", "select", "confirm", "number", "password"]);
-
-const skillInputSchema = z
-	.object({
-		name: z.string().min(1),
-		type: inputTypeSchema,
-		message: z.string().min(1),
-		default: z.union([z.string(), z.number(), z.boolean()]).optional(),
-		choices: z.array(z.string()).optional(),
-		required: z.boolean().optional(),
-		validate: z.string().optional(),
-	})
-	.refine((input) => input.type !== "select" || (input.choices && input.choices.length > 0), {
-		message: "choices is required for select type",
-	});
-
-const contextSourceSchema = z.discriminatedUnion("type", [
-	z.object({ type: z.literal("file"), path: z.string().min(1) }),
-	z.object({ type: z.literal("glob"), pattern: z.string().min(1) }),
-	z.object({ type: z.literal("command"), run: z.string().min(1) }),
-	z.object({ type: z.literal("url"), url: z.string().min(1) }),
-]);
+import type { ContextSource } from "./context-source";
+import { contextSourceSchema } from "./context-source";
+import type { SkillInput } from "./skill-input";
+import { skillInputSchema } from "./skill-input";
 
 const skillModeSchema = z.enum(["template", "agent"]);
 
@@ -37,8 +18,6 @@ const skillMetadataSchema = z.object({
 	context: z.array(contextSourceSchema).default([]),
 });
 
-type SkillInput = z.infer<typeof skillInputSchema>;
-type ContextSource = z.infer<typeof contextSourceSchema>;
 type SkillMode = z.infer<typeof skillModeSchema>;
 type SkillMetadata = z.infer<typeof skillMetadataSchema>;
 
