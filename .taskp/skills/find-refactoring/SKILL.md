@@ -184,8 +184,16 @@ tools:
 
 create_issues の値: **{{create_issues}}**
 
-create_issues が「true」の場合のみ、検出した問題を GitHub Issue として起票してください。
+create_issues が「true」の場合のみ、以下の手順で GitHub Issue を起票してください。
 「false」の場合は Issue 作成をスキップし、上記レポートのみを出力してください。
+
+### Issue 起票手順
+
+**必ず `bash` ツールで `gh issue create` コマンドを実行して Issue を作成してください。**
+
+1. レポート出力後、Issue 本文をシェル変数に格納する
+2. `gh issue create` コマンドを `bash` ツールで実行する
+3. 作成された Issue の URL を出力する
 
 ### Issue 分割ルール
 
@@ -195,22 +203,21 @@ create_issues が「true」の場合のみ、検出した問題を GitHub Issue 
 | 11〜20 件 | P0-P1 と P2-P3 で分割 |
 | 20 件以上 | カテゴリ別に分割 |
 
-### Issue テンプレート
+### gh コマンド実行例
+
+以下のように `bash` ツールで実行してください:
 
 ```bash
 gh issue create \
-  --title "refactor({{perspective}}): [タイトル]" \
+  --title "refactor({{perspective}}): [具体的なタイトル]" \
   --label "refactoring" \
-  --body "$BODY"
-```
-
-Issue 本文には以下を含めてください:
-
-```markdown
+  --body "$(cat <<'ISSUE_EOF'
 ## 概要
+
 `{{target}}` の {{perspective}} 観点でのリファクタリング。
 
 ## 変更対象ファイル
+
 - `path/to/file1.ts` — N 箇所
 - `path/to/file2.ts` — N 箇所
 
@@ -221,15 +228,30 @@ Issue 本文には以下を含めてください:
 **ファイル**: `path/to/file.ts` L42-L58
 
 **現状**:
-（問題のあるコード）
+
+```typescript
+// 問題のあるコード
+```
 
 **改善案**:
-（改善後のコード例）
+
+```typescript
+// 改善後のコード例
+```
 
 ---
 
 ## 受け入れ条件
+
 - [ ] 上記箇所を修正
 - [ ] 既存テストがパス
 - [ ] biome check がパス
+ISSUE_EOF
+)"
 ```
+
+### 注意事項
+
+- `gh` コマンドが認証済みであることを前提とする
+- Issue 本文にはレポートで出力した具体的なコード例・ファイルパス・行番号を含めること
+- ラベル `refactoring` が存在しない場合はラベルオプションを省略すること
