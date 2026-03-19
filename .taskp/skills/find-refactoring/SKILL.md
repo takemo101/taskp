@@ -122,9 +122,7 @@ tools:
 
 ### custom — 自由記述
 
-{{#if custom_perspective}}
 ユーザー指定の観点: **{{custom_perspective}}**
-{{/if}}
 
 ---
 
@@ -184,8 +182,10 @@ tools:
 
 ## GitHub Issue 作成
 
-{{#if create_issues}}
-検出した問題を GitHub Issue として起票してください。
+create_issues の値: **{{create_issues}}**
+
+create_issues が「true」の場合のみ、検出した問題を GitHub Issue として起票してください。
+「false」の場合は Issue 作成をスキップし、上記レポートのみを出力してください。
 
 ### Issue 分割ルール
 
@@ -233,6 +233,3 @@ Issue 本文には以下を含めてください:
 - [ ] 既存テストがパス
 - [ ] biome check がパス
 ```
-{{else}}
-Issue 作成はスキップします。上記レポートのみを出力してください。
-{{/if}}
