@@ -10,3 +10,5 @@ export type {
 	SkillInitializer,
 	SkillRepository,
 } from "./port";
+export type { CommandResult, RunOutput, RunSkillDeps, RunSkillInput } from "./run-skill";
+export { runSkill } from "./run-skill";
