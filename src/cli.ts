@@ -1,4 +1,67 @@
 import { Cli, z } from "incur";
+import { createCommandRunner } from "./adapter/command-runner";
+import { createPromptRunner } from "./adapter/prompt-runner";
+import { createDefaultSkillLoader } from "./adapter/skill-loader";
+import { type DomainError, EXIT_CODE } from "./core/types/errors";
+import type { RunOutput } from "./usecase/run-skill";
+import { runSkill } from "./usecase/run-skill";
+
+function parsePresets(pairs: readonly string[]): Readonly<Record<string, string>> {
+	const result: Record<string, string> = {};
+	for (const pair of pairs) {
+		const eqIndex = pair.indexOf("=");
+		if (eqIndex === -1) {
+			continue;
+		}
+		const key = pair.slice(0, eqIndex);
+		const value = pair.slice(eqIndex + 1);
+		result[key] = value;
+	}
+	return result;
+}
+
+function formatRunOutput(output: RunOutput): string {
+	const lines: string[] = [];
+
+	if (output.dryRun) {
+		lines.push("[dry-run] Rendered template:");
+		lines.push(output.rendered);
+		return lines.join("\n");
+	}
+
+	for (const cmd of output.commands) {
+		lines.push(`$ ${cmd.command}`);
+		if (cmd.result.stdout) {
+			lines.push(cmd.result.stdout);
+		}
+		if (cmd.result.stderr) {
+			lines.push(cmd.result.stderr);
+		}
+	}
+
+	const failed = output.commands.filter((c) => c.result.exitCode !== 0);
+	lines.push("");
+	lines.push(
+		`✔ ${output.skillName} completed (${output.commands.length} steps, ${failed.length} failed)`,
+	);
+
+	return lines.join("\n");
+}
+
+function formatError(error: DomainError): string {
+	switch (error.type) {
+		case "SKILL_NOT_FOUND":
+			return `Error: Skill "${error.name}" not found`;
+		case "PARSE_ERROR":
+			return `Error: ${error.message}`;
+		case "RENDER_ERROR":
+			return `Error: ${error.message}`;
+		case "EXECUTION_ERROR":
+			return `Error: ${error.message}`;
+		case "CONFIG_ERROR":
+			return `Error: ${error.message}`;
+	}
+}
 
 const cli = Cli.create("taskp", {
 	version: "0.1.0",
@@ -26,8 +89,29 @@ const cli = Cli.create("taskp", {
 			verbose: "v",
 			set: "s",
 		},
-		run(_c) {
-			throw new Error("Not implemented");
+		async run(c) {
+			const presets = parsePresets(c.options.set ?? []);
+
+			const skillRepository = createDefaultSkillLoader(process.cwd());
+			const promptCollector = createPromptRunner();
+			const commandExecutor = createCommandRunner();
+
+			const result = await runSkill(
+				{
+					name: c.args.skill,
+					presets,
+					dryRun: c.options.dryRun ?? false,
+					force: c.options.force ?? false,
+				},
+				{ skillRepository, promptCollector, commandExecutor },
+			);
+
+			if (!result.ok) {
+				console.error(formatError(result.error));
+				process.exit(EXIT_CODE[result.error.type]);
+			}
+
+			console.log(formatRunOutput(result.value));
 		},
 	})
 	.command("list", {
