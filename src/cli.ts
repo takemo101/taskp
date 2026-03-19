@@ -1,18 +1,20 @@
 import { homedir } from "node:os";
 import { Cli, z } from "incur";
-import { executeAgent } from "./adapter/agent-executor";
+import { createAgentExecutor } from "./adapter/agent-executor";
 import { createLanguageModel, resolveModelSpec } from "./adapter/ai-provider";
 import { createCommandRunner } from "./adapter/command-runner";
 import { createDefaultConfigLoader } from "./adapter/config-loader";
+import { createContextCollector } from "./adapter/context-collector";
 import { createPromptRunner } from "./adapter/prompt-runner";
 import { createSkillInitializer } from "./adapter/skill-initializer";
 import { createDefaultSkillLoader } from "./adapter/skill-loader";
 import { createStreamWriter } from "./adapter/stream-writer";
 import type { SkillScope } from "./core/skill/skill";
 import { type DomainError, EXIT_CODE } from "./core/types/errors";
+import { ok } from "./core/types/result";
 import { type InitOutput, initSkill } from "./usecase/init-skill";
 import { createListSkillsUseCase } from "./usecase/list-skills";
-import { prepareAgentSkill } from "./usecase/run-agent-skill";
+import { runAgentSkill } from "./usecase/run-agent-skill";
 import type { RunOutput } from "./usecase/run-skill";
 import { runSkill } from "./usecase/run-skill";
 
@@ -232,35 +234,45 @@ async function runAgentMode(
 		process.exit(EXIT_CODE[languageModelResult.error.type]);
 	}
 
-	const prepareResult = await prepareAgentSkill(
-		{
-			name: c.args.skill,
-			presets,
-			model: languageModelResult.value,
-		},
-		{ skillRepository, promptCollector },
-	);
-	if (!prepareResult.ok) {
-		console.error(formatError(prepareResult.error));
-		process.exit(EXIT_CODE[prepareResult.error.type]);
-	}
-
-	const config = prepareResult.value;
 	const writer = createStreamWriter({
 		verbose: c.options.verbose ?? false,
 		output: process.stdout,
 	});
 
-	await executeAgent(
-		{
-			model: config.model,
-			systemPrompt: config.systemPrompt,
-			context: config.context,
-			toolNames: config.toolNames,
-			maxSteps: config.maxSteps,
+	const contextCollector = createContextCollector({
+		executeCommand: async (command, cwd) => {
+			const { execa } = await import("execa");
+			const result = await execa(command, { shell: true, cwd, reject: false });
+			return ok(result.stdout);
 		},
-		writer,
+		fetchUrl: async (url) => {
+			const response = await fetch(url);
+			return ok(await response.text());
+		},
+		scanGlob: async (pattern, cwd) => {
+			const { glob } = await import("node:fs/promises");
+			const matches: string[] = [];
+			for await (const entry of glob(pattern, { cwd })) {
+				matches.push(entry);
+			}
+			return matches;
+		},
+	});
+
+	const agentExecutor = createAgentExecutor(writer);
+
+	const result = await runAgentSkill(
+		{
+			name: c.args.skill,
+			presets,
+			model: languageModelResult.value,
+		},
+		{ skillRepository, promptCollector, contextCollector, agentExecutor },
 	);
+	if (!result.ok) {
+		console.error(formatError(result.error));
+		process.exit(EXIT_CODE[result.error.type]);
+	}
 }
 
 function resolveScope(

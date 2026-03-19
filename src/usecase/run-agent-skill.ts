@@ -4,6 +4,8 @@ import type { Result } from "../core/types/result";
 import { ok } from "../core/types/result";
 import type { ReservedVars } from "../core/variable/template-renderer";
 import { renderTemplate } from "../core/variable/template-renderer";
+import type { AgentExecutorPort, AgentExecutorResult } from "./port/agent-executor";
+import type { ContextCollectorPort } from "./port/context-collector";
 import type { PromptCollector } from "./port/prompt-collector";
 import type { SkillRepository } from "./port/skill-repository";
 
@@ -15,24 +17,22 @@ export type RunAgentSkillInput = {
 	readonly model: LanguageModelV3;
 };
 
-export type AgentSkillConfig = {
-	readonly model: LanguageModelV3;
-	readonly systemPrompt: string;
-	readonly context: string;
-	readonly toolNames: readonly string[];
-	readonly maxSteps: number;
+export type RunAgentSkillOutput = {
 	readonly skillName: string;
+	readonly result: AgentExecutorResult;
 };
 
 export type RunAgentSkillDeps = {
 	readonly skillRepository: SkillRepository;
 	readonly promptCollector: PromptCollector;
+	readonly contextCollector: ContextCollectorPort;
+	readonly agentExecutor: AgentExecutorPort;
 };
 
-export async function prepareAgentSkill(
+export async function runAgentSkill(
 	input: RunAgentSkillInput,
 	deps: RunAgentSkillDeps,
-): Promise<Result<AgentSkillConfig, DomainError>> {
+): Promise<Result<RunAgentSkillOutput, DomainError>> {
 	const findResult = await deps.skillRepository.findByName(input.name);
 	if (!findResult.ok) {
 		return findResult;
@@ -53,12 +53,36 @@ export async function prepareAgentSkill(
 		return renderResult;
 	}
 
-	return ok({
+	const systemPrompt = renderResult.value;
+
+	const contextParts: string[] = [systemPrompt];
+
+	if (skill.metadata.context.length > 0) {
+		const contextResult = await deps.contextCollector.collect(
+			skill.metadata.context,
+			process.cwd(),
+		);
+		if (!contextResult.ok) {
+			return contextResult;
+		}
+		contextParts.push(contextResult.value);
+	}
+
+	const context = contextParts.join("\n\n");
+
+	const executeResult = await deps.agentExecutor.execute({
 		model: input.model,
-		systemPrompt: renderResult.value,
-		context: renderResult.value,
+		systemPrompt,
+		context,
 		toolNames: skill.metadata.tools,
 		maxSteps: MAX_STEPS,
+	});
+	if (!executeResult.ok) {
+		return executeResult;
+	}
+
+	return ok({
 		skillName: skill.metadata.name,
+		result: executeResult.value,
 	});
 }

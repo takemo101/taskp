@@ -7,7 +7,11 @@ export { createListSkillsUseCase } from "./list-skills";
 
 // Ports (interfaces for adapters)
 export type {
+	AgentExecutorInput,
+	AgentExecutorPort,
+	AgentExecutorResult,
 	CommandExecutor,
+	ContextCollectorPort,
 	ExecOptions,
 	ExecResult,
 	InitOptions,
@@ -16,10 +20,10 @@ export type {
 	SkillRepository,
 } from "./port";
 export type {
-	AgentSkillConfig,
 	RunAgentSkillDeps,
 	RunAgentSkillInput,
+	RunAgentSkillOutput,
 } from "./run-agent-skill";
-export { prepareAgentSkill } from "./run-agent-skill";
+export { runAgentSkill } from "./run-agent-skill";
 export type { CommandResult, RunOutput, RunSkillDeps, RunSkillInput } from "./run-skill";
 export { runSkill } from "./run-skill";

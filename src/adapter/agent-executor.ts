@@ -1,27 +1,25 @@
-import type { LanguageModelV3 } from "@ai-sdk/provider";
 import type { ToolSet } from "ai";
 import { stepCountIs, streamText } from "ai";
 import { buildTools } from "../core/execution/agent-tools";
+import { executionError } from "../core/types/errors";
+import { err, ok } from "../core/types/result";
+import type {
+	AgentExecutorInput,
+	AgentExecutorPort,
+	AgentExecutorResult,
+} from "../usecase/port/agent-executor";
 import type { StreamWriter } from "./stream-writer";
 
-export type AgentExecutorInput = {
-	readonly model: LanguageModelV3;
-	readonly systemPrompt: string;
-	readonly context: string;
-	readonly toolNames: readonly string[];
-	readonly maxSteps: number;
-};
+export function createAgentExecutor(writer: StreamWriter): AgentExecutorPort {
+	return {
+		execute: async (input) => executeAgentLoop(input, writer),
+	};
+}
 
-export type AgentResult = {
-	readonly output: string;
-	readonly steps: number;
-	readonly elapsedMs: number;
-};
-
-export async function executeAgent(
+async function executeAgentLoop(
 	input: AgentExecutorInput,
 	writer: StreamWriter,
-): Promise<AgentResult> {
+): ReturnType<AgentExecutorPort["execute"]> {
 	const startTime = Date.now();
 	const tools = buildTools(input.toolNames) as ToolSet;
 
@@ -45,7 +43,7 @@ export async function executeAgent(
 				writer.writeToolResult(part.toolName, part.output);
 				break;
 			case "error":
-				throw new Error(String(part.error));
+				return err(executionError(String(part.error)));
 		}
 	}
 
@@ -55,9 +53,11 @@ export async function executeAgent(
 
 	writer.writeSummary(elapsedMs, steps.length);
 
-	return {
+	const agentResult: AgentExecutorResult = {
 		output: text,
 		steps: steps.length,
 		elapsedMs,
 	};
+
+	return ok(agentResult);
 }
