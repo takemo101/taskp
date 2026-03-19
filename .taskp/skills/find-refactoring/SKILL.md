@@ -30,17 +30,7 @@ inputs:
     type: confirm
     message: "検出後に GitHub Issue を作成しますか？（No ならレポートのみ）"
     default: false
-context:
-  - type: glob
-    pattern: "{{target}}/**/*.ts"
-  - type: file
-    path: "AGENTS.md"
-  - type: file
-    path: "docs/ARCHITECTURE.md"
-  - type: file
-    path: "docs/arch/coding-rules.md"
-  - type: file
-    path: "docs/arch/design-principles.md"
+context: []
 tools:
   - bash
   - read
@@ -128,10 +118,11 @@ tools:
 
 ## 分析手順
 
-1. **対象ファイルの走査**: `{{target}}` 配下の全 TypeScript ファイルを `read` で読み込む
-2. **問題の検出**: 選択された観点 `{{perspective}}` の基準に照らして問題箇所を特定する
-3. **プロジェクト規約との照合**: AGENTS.md・設計ドキュメントの規約に反していないか確認する
-4. **重要度の判定**: 各問題を P0〜P3 に分類する
+1. **ファイル一覧の取得**: `bash` ツールで `find {{target}} -name "*.ts" -not -path "*/node_modules/*"` を実行し、対象ファイルを把握する
+2. **ファイルの読み込み**: `read` ツールで各ファイルを **1つずつ** 読み込む（コンテキスト制限があるため一括読み込みしないこと）
+3. **プロジェクト規約の確認**: `read` ツールで `AGENTS.md`、`docs/arch/coding-rules.md`、`docs/arch/design-principles.md` を必要に応じて参照する
+4. **問題の検出**: 選択された観点 `{{perspective}}` の基準に照らして問題箇所を特定する
+5. **重要度の判定**: 各問題を P0〜P3 に分類する
 
 ### 重要度の基準
 
