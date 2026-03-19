@@ -2,7 +2,9 @@ import { Cli, z } from "incur";
 import { createCommandRunner } from "./adapter/command-runner";
 import { createPromptRunner } from "./adapter/prompt-runner";
 import { createDefaultSkillLoader } from "./adapter/skill-loader";
+import type { SkillScope } from "./core/skill/skill";
 import { type DomainError, EXIT_CODE } from "./core/types/errors";
+import { createListSkillsUseCase } from "./usecase/list-skills";
 import type { RunOutput } from "./usecase/run-skill";
 import { runSkill } from "./usecase/run-skill";
 
@@ -120,8 +122,18 @@ const cli = Cli.create("taskp", {
 			global: z.boolean().optional().describe("Show global skills only"),
 			local: z.boolean().optional().describe("Show project-local skills only"),
 		}),
-		run(_c) {
-			throw new Error("Not implemented");
+		async run(c) {
+			const scope = resolveScope(c.options.global, c.options.local);
+			const repository = createDefaultSkillLoader(process.cwd());
+			const usecase = createListSkillsUseCase(repository);
+			const { skills } = await usecase.execute({ scope });
+
+			if (skills.length === 0) {
+				console.log("No skills found.");
+				return;
+			}
+
+			printSkillTable(skills);
 		},
 	})
 	.command("init", {
@@ -141,5 +153,36 @@ const cli = Cli.create("taskp", {
 			throw new Error("Not implemented");
 		},
 	});
+
+function resolveScope(
+	global: boolean | undefined,
+	local: boolean | undefined,
+): SkillScope | undefined {
+	if (global) return "global";
+	if (local) return "local";
+	return undefined;
+}
+
+function printSkillTable(
+	skills: ReadonlyArray<{ metadata: { name: string; description: string }; location: string }>,
+): void {
+	const header = { name: "Name", description: "Description", location: "Location" };
+	const rows = skills.map((s) => ({
+		name: s.metadata.name,
+		description: s.metadata.description,
+		location: s.location,
+	}));
+
+	const nameWidth = Math.max(header.name.length, ...rows.map((r) => r.name.length));
+	const descWidth = Math.max(header.description.length, ...rows.map((r) => r.description.length));
+
+	const formatRow = (name: string, desc: string, loc: string): string =>
+		`${name.padEnd(nameWidth)}  ${desc.padEnd(descWidth)}  ${loc}`;
+
+	console.log(formatRow(header.name, header.description, header.location));
+	for (const row of rows) {
+		console.log(formatRow(row.name, row.description, row.location));
+	}
+}
 
 cli.serve();
