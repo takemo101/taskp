@@ -9,6 +9,7 @@ import { createPromptRunner } from "./adapter/prompt-runner";
 import { createSkillInitializer } from "./adapter/skill-initializer";
 import { createDefaultSkillLoader } from "./adapter/skill-loader";
 import { createStreamWriter } from "./adapter/stream-writer";
+import type { ContextSource } from "./core/skill/context-source";
 import type { SkillScope } from "./core/skill/skill";
 import { type DomainError, EXIT_CODE } from "./core/types/errors";
 import { ok } from "./core/types/result";
@@ -17,6 +18,8 @@ import { createListSkillsUseCase } from "./usecase/list-skills";
 import { runAgentSkill } from "./usecase/run-agent-skill";
 import type { RunOutput } from "./usecase/run-skill";
 import { runSkill } from "./usecase/run-skill";
+import type { ShowOutput } from "./usecase/show-skill";
+import { showSkill } from "./usecase/show-skill";
 
 function parsePresets(pairs: readonly string[]): Readonly<Record<string, string>> {
 	const result: Record<string, string> = {};
@@ -195,6 +198,23 @@ const cli = Cli.create("taskp", {
 
 			console.log(formatInitOutput(result.value));
 		},
+	})
+	.command("show", {
+		description: "Show skill details",
+		args: z.object({
+			skill: z.string().describe("Skill name to show"),
+		}),
+		async run(c) {
+			const repository = createDefaultSkillLoader(process.cwd());
+			const result = await showSkill(c.args.skill, repository);
+
+			if (!result.ok) {
+				console.error(formatError(result.error));
+				process.exit(EXIT_CODE[result.error.type]);
+			}
+
+			console.log(formatShowOutput(result.value));
+		},
 	});
 
 type RunCommandContext = {
@@ -303,6 +323,53 @@ function printSkillTable(
 	console.log(formatRow(header.name, header.description, header.location));
 	for (const row of rows) {
 		console.log(formatRow(row.name, row.description, row.location));
+	}
+}
+
+function formatShowOutput(output: ShowOutput): string {
+	const lines: string[] = [
+		`Skill: ${output.name}`,
+		`Description: ${output.description}`,
+		`Mode: ${output.mode}`,
+		`Location: ${output.location}`,
+	];
+
+	if (output.inputs.length > 0) {
+		lines.push("");
+		lines.push("Inputs:");
+		for (const input of output.inputs) {
+			const parts = [`  ${input.name}`, input.type, input.message];
+			if (input.choices && input.choices.length > 0) {
+				parts.push(`[${input.choices.join(", ")}]`);
+			} else if (input.default !== undefined) {
+				parts.push(`(default: ${String(input.default)})`);
+			}
+			lines.push(parts.join("  "));
+		}
+	}
+
+	if (output.context.length > 0) {
+		lines.push("");
+		lines.push("Context:");
+		for (const ctx of output.context) {
+			const source = contextSourceValue(ctx);
+			lines.push(`  ${ctx.type}  ${source}`);
+		}
+	}
+
+	return lines.join("\n");
+}
+
+function contextSourceValue(ctx: ContextSource): string {
+	switch (ctx.type) {
+		case "file":
+			return ctx.path;
+		case "glob":
+			return ctx.pattern;
+		case "command":
+			return ctx.run;
+		case "url":
+			return ctx.url;
 	}
 }
 

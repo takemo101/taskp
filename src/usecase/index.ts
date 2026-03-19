@@ -27,3 +27,5 @@ export type {
 export { runAgentSkill } from "./run-agent-skill";
 export type { CommandResult, RunOutput, RunSkillDeps, RunSkillInput } from "./run-skill";
 export { runSkill } from "./run-skill";
+export type { ShowOutput } from "./show-skill";
+export { showSkill } from "./show-skill";
