@@ -1,3 +1,5 @@
+// 文字列リテラル型ではなく const オブジェクトで定義することで、
+// エラー型の判別と EXIT_CODE マッピングの両方で単一の定義を参照できる
 export const ErrorType = {
 	SkillNotFound: "SKILL_NOT_FOUND",
 	Parse: "PARSE_ERROR",
@@ -40,6 +42,8 @@ export type DomainError =
 	| ExecutionError
 	| ConfigError;
 
+// 終了コードを種別ごとに分けることで、シェルスクリプトから
+// エラー原因を判別できるようにしている（Render は Execution と同系統なので 1）
 export const EXIT_CODE: Record<ErrorType, number> = {
 	[ErrorType.Execution]: 1,
 	[ErrorType.SkillNotFound]: 2,

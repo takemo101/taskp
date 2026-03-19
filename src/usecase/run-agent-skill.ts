@@ -55,6 +55,8 @@ export async function runAgentSkill(
 
 	const systemPrompt = renderResult.value;
 
+	// systemPrompt（スキル本文をレンダリングしたもの）を context の先頭に含め、
+	// 追加の context ソース（ファイル・コマンド出力等）をその後に結合する
 	const contextParts: string[] = [systemPrompt];
 
 	if (skill.metadata.context.length > 0) {

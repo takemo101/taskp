@@ -12,6 +12,9 @@ const skillInputSchema = z
 		required: z.boolean().optional(),
 		validate: z.string().optional(),
 	})
+	// select 型は choices 必須だが、他の型では不要。
+	// zod の discriminatedUnion ではなく refine を使うのは、
+	// 共通フィールドが多く union にすると定義が冗長になるため
 	.refine((input) => input.type !== "select" || (input.choices && input.choices.length > 0), {
 		message: "choices is required for select type",
 	})

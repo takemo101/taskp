@@ -61,6 +61,7 @@ async function listAll(localSkillsDir: string, globalSkillsDir: string): Promise
 		scanDirectory(globalSkillsDir, "global"),
 	]);
 
+	// 同名スキルはローカルが優先（プロジェクト固有のカスタマイズを可能にする）
 	const localNames = new Set(localSkills.map((s) => s.metadata.name));
 	const uniqueGlobalSkills = globalSkills.filter((s) => !localNames.has(s.metadata.name));
 
@@ -84,6 +85,8 @@ async function scanDirectory(skillsDir: string, scope: SkillScope): Promise<Skil
 		.map((r) => r.value);
 }
 
+// ファイル不在・パースエラーのいずれも undefined を返す（エラーを握りつぶす）。
+// スキル一覧のスキャン時に、壊れた1ファイルが全体の読み込みを止めないようにするため
 async function tryLoadSkill(
 	path: string,
 	scope: SkillScope,

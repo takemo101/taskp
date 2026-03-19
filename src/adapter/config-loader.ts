@@ -49,6 +49,8 @@ export function createDefaultConfigLoader(projectRoot: string) {
 	});
 }
 
+// グローバル（~/.taskp/config.toml）→ プロジェクト（.taskp/config.toml）の順で読み込み、
+// プロジェクト設定が優先されるようマージする（git config と同じ戦略）
 async function loadConfig(
 	globalPath: string,
 	projectPath: string,
@@ -67,6 +69,8 @@ async function loadConfig(
 }
 
 async function loadSingleConfig(path: string): Promise<Result<Config, ConfigError>> {
+	// 設定ファイルが存在しないのは正常（デフォルト値で動作する）。
+	// ファイルが存在するが内容が不正な場合のみエラーにする
 	const raw = await readFile(path, "utf-8").catch(() => undefined);
 	if (raw === undefined) {
 		return ok({});

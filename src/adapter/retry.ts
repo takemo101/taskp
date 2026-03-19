@@ -13,6 +13,8 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
 	maxDelayMs: 30000,
 };
 
+// 指数バックオフ: 1s → 2s → 4s → ... (maxDelayMs で上限キャップ)
+// レートリミット時に API サーバーへの負荷を段階的に下げる
 export function calculateDelay(attempt: number, config: RetryConfig): number {
 	const delay = config.baseDelayMs * 2 ** attempt;
 	return Math.min(delay, config.maxDelayMs);

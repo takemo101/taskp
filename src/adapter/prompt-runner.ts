@@ -21,6 +21,8 @@ export function createPromptRunner(): PromptCollector {
 			const results: Record<string, string> = {};
 
 			for (const skillInput of inputs) {
+				// --set key=value で事前指定された値はプロンプトをスキップする
+				// （CI/スクリプトからの非対話実行を可能にするため）
 				if (skillInput.name in presets) {
 					results[skillInput.name] = presets[skillInput.name];
 					continue;

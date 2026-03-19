@@ -70,6 +70,8 @@ export async function runSkill(
 		});
 	}
 
+	// template モードではマークダウン内の bash コードブロックを順に実行する。
+	// force=true なら1つ失敗しても残りを続行する（CI パイプライン的な使い方に対応）
 	const commandResults = await executeCommands(
 		codeBlocks,
 		variables,

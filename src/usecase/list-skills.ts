@@ -36,6 +36,8 @@ async function fetchByScope(
 	}
 }
 
+// listAll は loader 側でも重複除去しているが、usecase 層でも保証する
+// （ポートの実装が変わっても usecase の契約を維持するため）
 function deduplicateByLocalPriority(skills: readonly Skill[]): readonly Skill[] {
 	const seen = new Map<string, Skill>();
 	for (const skill of skills) {

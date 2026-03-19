@@ -5,6 +5,9 @@ import { jsonSchema } from "ai";
 import { execa } from "execa";
 import { toJSONSchema, z } from "zod";
 
+// Vercel AI SDK は JSONSchema7 形式のツール定義を要求するが、
+// zod スキーマから直接変換する公式 API がないため、
+// toJSONSchema → jsonSchema のブリッジが必要
 function zodToJsonSchema<T extends z.ZodType>(schema: T) {
 	return jsonSchema<z.infer<T>>(toJSONSchema(schema) as JSONSchema7);
 }
@@ -98,6 +101,8 @@ const askUserTool: Tool<AskUserInput, string> = {
 	},
 };
 
+// Tool<I, O> のジェネリクスが共変でないため、異なる I/O を持つツールを
+// 1つの Record にまとめるには any が必要（AI SDK の型設計上の制約）
 // biome-ignore lint/suspicious/noExplicitAny: Tool generic variance prevents strict typing with Record<ToolName, Tool>
 const allTools: Record<ToolName, Tool<any, any>> = {
 	bash: bashTool,

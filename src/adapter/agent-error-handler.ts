@@ -15,6 +15,8 @@ export type ClassifiedError = {
 	readonly retryable: boolean;
 };
 
+// エラーをカテゴリ分類することで、リトライ可否の判定と
+// ユーザーへの具体的な対処法メッセージの出し分けを実現する
 export function classifyAgentError(error: unknown, provider: string): ClassifiedError {
 	if (APICallError.isInstance(error)) {
 		return classifyApiCallError(error, provider);
@@ -88,6 +90,8 @@ function classifyApiCallError(error: APICallError, provider: string): Classified
 function isNetworkError(error: unknown): boolean {
 	if (!(error instanceof Error)) return false;
 
+	// Node.js のネットワークエラーは error.cause.code に格納されることが多いが、
+	// undici（fetch 内部）は UND_ERR_* 形式の独自コードを使うため両方チェックする
 	const networkCodes = [
 		"ECONNREFUSED",
 		"ECONNRESET",

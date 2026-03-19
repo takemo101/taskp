@@ -22,6 +22,8 @@ export function parseSkill(
 	location: string,
 	scope?: SkillScope,
 ): Result<Skill, ParseError> {
+	// gray-matter は不正な frontmatter に対して例外を投げるため、
+	// try-catch で捕捉して Result 型に変換する
 	let parsed: matter.GrayMatterFile<string>;
 	try {
 		parsed = matter(raw);
