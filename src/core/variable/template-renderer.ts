@@ -10,6 +10,37 @@ export type ReservedVars = {
 
 const VARIABLE_PATTERN = /\{\{(\w+)\}\}/g;
 
+// {{#if var}}...{{else}}...{{/if}} のパターン（else 節は省略可能）
+// ネスト非対応: 内側に別の {{#if}} を含めることはできない（KISS）
+const CONDITIONAL_PATTERN = /\{\{#if\s+(\w+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g;
+
+const NESTED_IF_PATTERN = /\{\{#if\s+\w+\}\}/;
+
+// 閉じタグ忘れ・孤立した {{else}} / {{/if}} を検出するためのパターン
+const OPENING_IF_PATTERN = /\{\{#if\s+\w+\}\}/g;
+const CLOSING_IF_PATTERN = /\{\{\/if\}\}/g;
+const ELSE_PATTERN = /\{\{else\}\}/g;
+
+// 条件ブロックの構文バリデーション。
+// CONDITIONAL_PATTERN による展開はペアが揃った場合のみマッチするため、
+// 不正な構文がサイレントに残るのを防ぐ。
+function validateConditionalSyntax(template: string): RenderError | undefined {
+	const opens = [...template.matchAll(OPENING_IF_PATTERN)].length;
+	const closes = [...template.matchAll(CLOSING_IF_PATTERN)].length;
+	const elses = [...template.matchAll(ELSE_PATTERN)].length;
+
+	if (opens > closes) {
+		return renderError("Unclosed {{#if}} block: missing {{/if}}");
+	}
+	if (opens < closes) {
+		return renderError("Unexpected {{/if}} without matching {{#if}}");
+	}
+	if (elses > opens) {
+		return renderError("Unexpected {{else}} without matching {{#if}}");
+	}
+	return undefined;
+}
+
 // 予約変数は __ で囲むことでユーザー定義変数との衝突を防止
 const RESERVED_VAR_MAP: Record<string, keyof ReservedVars> = {
 	__cwd__: "cwd",
@@ -28,6 +59,53 @@ function resolveVariable(
 		return reserved[reservedKey];
 	}
 	return variables[name];
+}
+
+// confirm 型は "true"/"false"、required: false は空文字になるため、
+// 両方を自然に扱えるよう空文字と "false" を falsy とする
+function isTruthy(value: string): boolean {
+	return value !== "" && value !== "false";
+}
+
+// {{#if var}}...{{else}}...{{/if}} を展開する。
+// 条件変数が未定義の場合やネストが検出された場合はエラーとして報告する。
+function expandConditionals(
+	template: string,
+	variables: Record<string, string>,
+	reserved: ReservedVars,
+): Result<string, RenderError> {
+	const undefinedConditionVars: string[] = [];
+
+	const expanded = template.replace(
+		CONDITIONAL_PATTERN,
+		(_match, name: string, ifBlock: string, elseBlock: string | undefined) => {
+			// ネストされた {{#if}} はサポートしない。
+			// サイレントに壊れるのを防ぐため、分岐内にネストを検出したらエラーにする。
+			const selectedBlock = elseBlock ?? "";
+			if (NESTED_IF_PATTERN.test(ifBlock) || NESTED_IF_PATTERN.test(selectedBlock)) {
+				undefinedConditionVars.push("__nested_if__");
+				return "";
+			}
+
+			const value = resolveVariable(name, variables, reserved);
+			if (value === undefined) {
+				undefinedConditionVars.push(name);
+				return "";
+			}
+			return isTruthy(value) ? ifBlock : (elseBlock ?? "");
+		},
+	);
+
+	if (undefinedConditionVars.includes("__nested_if__")) {
+		return err(renderError("Nested {{#if}} blocks are not supported"));
+	}
+
+	if (undefinedConditionVars.length > 0) {
+		const unique = [...new Set(undefinedConditionVars)];
+		return err(renderError(`Undefined variables: ${unique.join(", ")}`));
+	}
+
+	return ok(expanded);
 }
 
 function findUndefinedVariables(
@@ -50,14 +128,27 @@ export function renderTemplate(
 	variables: Record<string, string>,
 	reserved: ReservedVars,
 ): Result<string, RenderError> {
-	// 未定義変数を事前チェックし、部分的にレンダリングされた不完全な出力を防ぐ
+	// 1. 条件ブロックの構文バリデーション（閉じタグ忘れ等を早期検出）
+	const syntaxError = validateConditionalSyntax(template);
+	if (syntaxError !== undefined) {
+		return err(syntaxError);
+	}
+
+	// 2. 条件ブロックを展開し、選択されなかった分岐内の変数を除外する
+	const conditionalResult = expandConditionals(template, variables, reserved);
+	if (!conditionalResult.ok) {
+		return conditionalResult;
+	}
+	const expanded = conditionalResult.value;
+
+	// 3. 残りの変数で未定義チェック
 	// （Parse, Don't Validate の原則: docs/arch/design-principles.md）
-	const undefinedVars = findUndefinedVariables(template, variables, reserved);
+	const undefinedVars = findUndefinedVariables(expanded, variables, reserved);
 	if (undefinedVars.length > 0) {
 		return err(renderError(`Undefined variables: ${undefinedVars.join(", ")}`));
 	}
 
-	const rendered = template.replace(VARIABLE_PATTERN, (_, name: string) => {
+	const rendered = expanded.replace(VARIABLE_PATTERN, (_, name: string) => {
 		const value = resolveVariable(name, variables, reserved);
 		return value as string;
 	});

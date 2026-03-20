@@ -64,4 +64,142 @@ describe("renderTemplate", () => {
 			error: { type: "RENDER_ERROR", message: "Undefined variables: a, b" },
 		});
 	});
+
+	describe("conditional blocks ({{#if}}/{{else}}/{{/if}})", () => {
+		it("renders if-block when variable is truthy", () => {
+			const result = renderTemplate("{{#if flag}}YES{{/if}}", { flag: "true" }, RESERVED);
+			expect(result).toEqual({ ok: true, value: "YES" });
+		});
+
+		it("renders else-block when variable is 'false'", () => {
+			const result = renderTemplate(
+				"{{#if flag}}YES{{else}}NO{{/if}}",
+				{ flag: "false" },
+				RESERVED,
+			);
+			expect(result).toEqual({ ok: true, value: "NO" });
+		});
+
+		it("renders else-block when variable is empty string", () => {
+			const result = renderTemplate(
+				"{{#if name}}Hello {{name}}{{else}}No name{{/if}}",
+				{ name: "" },
+				RESERVED,
+			);
+			expect(result).toEqual({ ok: true, value: "No name" });
+		});
+
+		it("renders nothing when variable is falsy and no else-block", () => {
+			const result = renderTemplate(
+				"before{{#if flag}} included{{/if}} after",
+				{ flag: "false" },
+				RESERVED,
+			);
+			expect(result).toEqual({ ok: true, value: "before after" });
+		});
+
+		it("expands variables inside the selected branch", () => {
+			const result = renderTemplate(
+				"{{#if flag}}Deploy to {{env}}{{else}}Skipped{{/if}}",
+				{ flag: "true", env: "production" },
+				RESERVED,
+			);
+			expect(result).toEqual({ ok: true, value: "Deploy to production" });
+		});
+
+		it("ignores variables in the non-selected branch", () => {
+			const result = renderTemplate(
+				"{{#if flag}}{{used}}{{else}}{{unused_is_ok}}{{/if}}",
+				{ flag: "true", used: "value" },
+				RESERVED,
+			);
+			expect(result).toEqual({ ok: true, value: "value" });
+		});
+
+		it("handles multiple conditional blocks", () => {
+			const result = renderTemplate(
+				"{{#if a}}A{{/if}}-{{#if b}}B{{/if}}",
+				{ a: "true", b: "false" },
+				RESERVED,
+			);
+			expect(result).toEqual({ ok: true, value: "A-" });
+		});
+
+		it("returns error when condition variable is undefined", () => {
+			const result = renderTemplate("{{#if unknown}}X{{/if}}", {}, RESERVED);
+			expect(result).toEqual({
+				ok: false,
+				error: { type: "RENDER_ERROR", message: "Undefined variables: unknown" },
+			});
+		});
+
+		it("treats any non-empty non-false string as truthy", () => {
+			const result = renderTemplate(
+				"{{#if val}}YES{{else}}NO{{/if}}",
+				{ val: "anything" },
+				RESERVED,
+			);
+			expect(result).toEqual({ ok: true, value: "YES" });
+		});
+
+		it("works with multiline content in branches", () => {
+			const template = `{{#if verbose}}
+Line 1
+Line 2
+{{else}}
+Short
+{{/if}}`;
+			const result = renderTemplate(template, { verbose: "true" }, RESERVED);
+			expect(result).toEqual({
+				ok: true,
+				value: "\nLine 1\nLine 2\n",
+			});
+		});
+
+		it("returns error for nested {{#if}} blocks", () => {
+			const result = renderTemplate(
+				"{{#if a}}{{#if b}}nested{{/if}}{{/if}}",
+				{ a: "true", b: "true" },
+				RESERVED,
+			);
+			expect(result).toEqual({
+				ok: false,
+				error: { type: "RENDER_ERROR", message: "Nested {{#if}} blocks are not supported" },
+			});
+		});
+
+		it("allows condition variable to also appear in body", () => {
+			const result = renderTemplate("{{#if flag}}flag={{flag}}{{/if}}", { flag: "true" }, RESERVED);
+			expect(result).toEqual({ ok: true, value: "flag=true" });
+		});
+
+		it("allows reserved variable as condition", () => {
+			const result = renderTemplate("{{#if __cwd__}}cwd exists{{else}}no cwd{{/if}}", {}, RESERVED);
+			expect(result).toEqual({ ok: true, value: "cwd exists" });
+		});
+
+		it("returns error for unclosed {{#if}} block", () => {
+			const result = renderTemplate("{{#if flag}}no closing tag", { flag: "true" }, RESERVED);
+			expect(result).toEqual({
+				ok: false,
+				error: { type: "RENDER_ERROR", message: "Unclosed {{#if}} block: missing {{/if}}" },
+			});
+		});
+
+		it("returns error for {{/if}} without matching {{#if}}", () => {
+			const result = renderTemplate("some text{{/if}}", {}, RESERVED);
+			expect(result).toEqual({
+				ok: false,
+				error: { type: "RENDER_ERROR", message: "Unexpected {{/if}} without matching {{#if}}" },
+			});
+		});
+
+		it("returns error for {{else}} without matching {{#if}}", () => {
+			const result = renderTemplate("some text{{else}}other", {}, RESERVED);
+			expect(result).toEqual({
+				ok: false,
+				error: { type: "RENDER_ERROR", message: "Unexpected {{else}} without matching {{#if}}" },
+			});
+		});
+	});
 });
