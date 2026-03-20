@@ -77,7 +77,7 @@ describe("read tool", () => {
 	});
 
 	it("存在しないファイルでエラーを投げる", async () => {
-		const tools = buildTools(["read"]);
+		const tools = unwrapTools(["read"]);
 		await expect(
 			tools.read.execute?.(
 				{ path: "/nonexistent/path/file.txt" },
@@ -106,7 +106,7 @@ describe("write tool", () => {
 	});
 
 	it("存在しないディレクトリへの書き込みでエラーを投げる", async () => {
-		const tools = buildTools(["write"]);
+		const tools = unwrapTools(["write"]);
 		const invalidPath = "/nonexistent/dir/file.txt";
 		await expect(
 			tools.write.execute?.(
