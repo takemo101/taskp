@@ -1,4 +1,6 @@
-import { Box, createCliRenderer, Text } from "@opentui/core";
+import { createCliRenderer } from "@opentui/core";
+import { createDefaultSkillLoader } from "../adapter/skill-loader";
+import { showSkillSelector } from "./screens/skill-selector";
 
 export async function startTui(): Promise<void> {
 	const renderer = await createCliRenderer({
@@ -6,23 +8,21 @@ export async function startTui(): Promise<void> {
 		targetFps: 30,
 	});
 
-	renderer.root.add(
-		Box(
-			{
-				width: "100%",
-				height: "100%",
-				borderStyle: "rounded",
-				title: "taskp",
-				padding: 1,
-				flexDirection: "column",
-				justifyContent: "center",
-				alignItems: "center",
-			},
-			Text({ content: "taskp TUI - Press Ctrl+C to exit", fg: "#888888" }),
-		),
-	);
+	const skillRepository = createDefaultSkillLoader(process.cwd());
+	const skills = await skillRepository.listAll();
 
-	// renderer は exitOnCtrlC: true で Ctrl+C 時に自動 destroy するため、
-	// プロセス終了まで待機する
-	await new Promise(() => {});
+	if (skills.length === 0) {
+		renderer.destroy();
+		console.log("No skills found.");
+		return;
+	}
+
+	while (true) {
+		const skill = await showSkillSelector(renderer, skills);
+		if (!skill) break;
+
+		// TODO: 入力フォーム → 実行（後続 Issue で実装）
+	}
+
+	renderer.destroy();
 }
