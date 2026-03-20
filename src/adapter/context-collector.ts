@@ -92,14 +92,17 @@ async function collectGlob(
 		return scanResult;
 	}
 	const matches: CollectedContext[] = [];
+	const paths = scanResult.value;
+	const total = paths.length;
 
-	for (const path of scanResult.value) {
+	for (let i = 0; i < total; i++) {
+		const path = paths[i];
 		const fullPath = join(cwd, path);
 		try {
 			const content = await readFile(fullPath, "utf-8");
 			matches.push({ source: { type: "glob", pattern }, content });
 		} catch {
-			return err(executionError(`Failed to read file: ${fullPath}`));
+			return err(executionError(`Failed to read glob match (${i + 1}/${total}): ${fullPath}`));
 		}
 	}
 
