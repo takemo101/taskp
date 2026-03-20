@@ -10,19 +10,21 @@ import {
 	TextRenderable,
 } from "@opentui/core";
 import type { Skill } from "../../core/skill/skill";
-import type { SkillInput } from "../../core/skill/skill-metadata";
+import type { SkillInput } from "../../core/skill/skill-input";
 import { KeyHelp } from "../components/key-help";
 
 const CONTAINER_ID = "form-container";
 
-type InputElement = InputRenderable | SelectRenderable;
+type FormElement = {
+	readonly input: SkillInput;
+	readonly element: InputRenderable | SelectRenderable;
+};
 
 export async function showInputForm(
 	renderer: CliRenderer,
 	skill: Skill,
 ): Promise<Readonly<Record<string, string>> | null> {
 	const inputs = skill.metadata.inputs;
-
 	if (inputs.length === 0) {
 		return {};
 	}
@@ -48,8 +50,8 @@ export async function showInputForm(
 			}),
 		);
 
-		const elements: { input: SkillInput; element: InputElement }[] = [];
 		const values: Record<string, string> = {};
+		const elements: FormElement[] = [];
 
 		for (const input of inputs) {
 			container.add(
@@ -60,7 +62,11 @@ export async function showInputForm(
 				}),
 			);
 
-			const element = createInputElement(renderer, input, values, focusNext);
+			const element = createInputElement(renderer, input, (value) => {
+				values[input.name] = value;
+				advanceFocus();
+			});
+
 			container.add(element);
 			elements.push({ input, element });
 		}
@@ -78,18 +84,31 @@ export async function showInputForm(
 		let focusIndex = 0;
 
 		function focusCurrent(): void {
-			elements[focusIndex]?.element.focus();
+			elements[focusIndex].element.focus();
 		}
 
-		function focusNext(): void {
+		function advanceFocus(): void {
 			if (focusIndex < elements.length - 1) {
 				focusIndex++;
 				focusCurrent();
 			} else {
-				fillDefaults(elements, values);
-				cleanup();
-				resolve(values);
+				completeForm();
 			}
+		}
+
+		function completeForm(): void {
+			const result: Record<string, string> = {};
+			for (const { input } of elements) {
+				if (input.name in values) {
+					result[input.name] = values[input.name];
+				} else if (input.default !== undefined) {
+					result[input.name] = String(input.default);
+				} else {
+					result[input.name] = "";
+				}
+			}
+			cleanup();
+			resolve(result);
 		}
 
 		const keyHandler = (key: KeyEvent) => {
@@ -98,7 +117,6 @@ export async function showInputForm(
 				resolve(null);
 				return;
 			}
-
 			if (key.name === "tab") {
 				if (key.shift) {
 					focusIndex = Math.max(0, focusIndex - 1);
@@ -123,36 +141,36 @@ export async function showInputForm(
 function createInputElement(
 	renderer: CliRenderer,
 	input: SkillInput,
-	values: Record<string, string>,
-	focusNext: () => void,
-): InputElement {
-	if (input.type === "select" && input.choices) {
-		return createSelectElement(renderer, input, values, focusNext);
+	onConfirm: (value: string) => void,
+): InputRenderable | SelectRenderable {
+	switch (input.type) {
+		case "select":
+			return createSelectElement(renderer, input, onConfirm);
+		case "confirm":
+			return createConfirmElement(renderer, input, onConfirm);
+		case "text":
+		case "number":
+		case "password":
+			return createTextInputElement(renderer, input, onConfirm);
 	}
-
-	if (input.type === "confirm") {
-		return createConfirmElement(renderer, input, values, focusNext);
-	}
-
-	return createTextElement(renderer, input, values, focusNext);
 }
 
 function createSelectElement(
 	renderer: CliRenderer,
 	input: SkillInput,
-	values: Record<string, string>,
-	focusNext: () => void,
+	onConfirm: (value: string) => void,
 ): SelectRenderable {
-	const options: SelectOption[] = (input.choices ?? []).map((c) => ({
+	const choices = input.choices as string[];
+	const options: SelectOption[] = choices.map((c) => ({
 		name: c,
 		description: "",
 		value: c,
 	}));
 
-	const sel = new SelectRenderable(renderer, {
+	const select = new SelectRenderable(renderer, {
 		id: `input-${input.name}`,
 		width: "100%",
-		height: Math.min((input.choices ?? []).length + 1, 8),
+		height: Math.min(choices.length + 1, 8),
 		options,
 		backgroundColor: "#1a1a2e",
 		focusedBackgroundColor: "#16213e",
@@ -161,28 +179,28 @@ function createSelectElement(
 		selectedTextColor: "#ffffff",
 	});
 
-	sel.on(SelectRenderableEvents.ITEM_SELECTED, (_i: number, opt: SelectOption) => {
-		values[input.name] = opt.value;
-		focusNext();
+	select.on(SelectRenderableEvents.ITEM_SELECTED, (_index: number, option: SelectOption) => {
+		onConfirm(option.value);
 	});
 
-	return sel;
+	return select;
 }
 
 function createConfirmElement(
 	renderer: CliRenderer,
 	input: SkillInput,
-	values: Record<string, string>,
-	focusNext: () => void,
+	onConfirm: (value: string) => void,
 ): SelectRenderable {
-	const sel = new SelectRenderable(renderer, {
+	const options: SelectOption[] = [
+		{ name: "Yes", description: "", value: "true" },
+		{ name: "No", description: "", value: "false" },
+	];
+
+	const select = new SelectRenderable(renderer, {
 		id: `input-${input.name}`,
 		width: "100%",
 		height: 3,
-		options: [
-			{ name: "Yes", description: "", value: "true" },
-			{ name: "No", description: "", value: "false" },
-		],
+		options,
 		backgroundColor: "#1a1a2e",
 		focusedBackgroundColor: "#16213e",
 		textColor: "#e2e8f0",
@@ -190,21 +208,19 @@ function createConfirmElement(
 		selectedTextColor: "#ffffff",
 	});
 
-	sel.on(SelectRenderableEvents.ITEM_SELECTED, (_i: number, opt: SelectOption) => {
-		values[input.name] = opt.value;
-		focusNext();
+	select.on(SelectRenderableEvents.ITEM_SELECTED, (_index: number, option: SelectOption) => {
+		onConfirm(option.value);
 	});
 
-	return sel;
+	return select;
 }
 
-function createTextElement(
+function createTextInputElement(
 	renderer: CliRenderer,
 	input: SkillInput,
-	values: Record<string, string>,
-	focusNext: () => void,
+	onConfirm: (value: string) => void,
 ): InputRenderable {
-	const inp = new InputRenderable(renderer, {
+	const inputElement = new InputRenderable(renderer, {
 		id: `input-${input.name}`,
 		width: "100%",
 		placeholder: input.default !== undefined ? String(input.default) : "",
@@ -214,23 +230,12 @@ function createTextElement(
 		cursorColor: "#00FF00",
 	});
 
-	inp.on(InputRenderableEvents.ENTER, (val: string) => {
-		values[input.name] = val !== "" ? val : String(input.default ?? "");
-		focusNext();
+	inputElement.on(InputRenderableEvents.ENTER, (val: string) => {
+		const value = val !== "" ? val : input.default !== undefined ? String(input.default) : "";
+		onConfirm(value);
 	});
 
-	return inp;
-}
-
-function fillDefaults(
-	elements: readonly { input: SkillInput; element: InputElement }[],
-	values: Record<string, string>,
-): void {
-	for (const { input } of elements) {
-		if (!(input.name in values)) {
-			values[input.name] = input.default !== undefined ? String(input.default) : "";
-		}
-	}
+	return inputElement;
 }
 
 function clearScreen(renderer: CliRenderer): void {

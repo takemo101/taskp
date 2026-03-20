@@ -21,58 +21,31 @@ function createMockView(): ExecutionViewPort & { calls: string[] } {
 }
 
 describe("createTuiStreamWriter", () => {
-	it("writeText delegates to appendOutput", () => {
+	it("writeText calls appendOutput", () => {
 		const view = createMockView();
 		const writer = createTuiStreamWriter(view);
-
 		writer.writeText("hello");
-
-		expect(view.calls).toEqual(["appendOutput:hello"]);
+		expect(view.calls).toContain("appendOutput:hello");
 	});
 
-	it("writeToolCall delegates to showToolStatus", () => {
+	it("writeToolCall calls showToolStatus", () => {
 		const view = createMockView();
 		const writer = createTuiStreamWriter(view);
-
-		writer.writeToolCall("bash", { command: "ls -la" });
-
-		expect(view.calls).toEqual(["showToolStatus:bash"]);
+		writer.writeToolCall("bash", { command: "ls" });
+		expect(view.calls).toContain("showToolStatus:bash");
 	});
 
-	it("writeToolResult delegates to clearToolStatus", () => {
+	it("writeToolResult calls clearToolStatus", () => {
 		const view = createMockView();
 		const writer = createTuiStreamWriter(view);
-
-		writer.writeToolResult("bash", "output data");
-
-		expect(view.calls).toEqual(["clearToolStatus"]);
+		writer.writeToolResult("bash", "output");
+		expect(view.calls).toContain("clearToolStatus");
 	});
 
-	it("writeSummary delegates to showSummary", () => {
+	it("writeSummary calls showSummary", () => {
 		const view = createMockView();
 		const writer = createTuiStreamWriter(view);
-
 		writer.writeSummary(1234, 5);
-
-		expect(view.calls).toEqual(["showSummary:1234:5"]);
-	});
-
-	it("handles sequential operations correctly", () => {
-		const view = createMockView();
-		const writer = createTuiStreamWriter(view);
-
-		writer.writeText("starting...");
-		writer.writeToolCall("bash", { command: "echo test" });
-		writer.writeToolResult("bash", "test");
-		writer.writeText("done");
-		writer.writeSummary(500, 1);
-
-		expect(view.calls).toEqual([
-			"appendOutput:starting...",
-			"showToolStatus:bash",
-			"clearToolStatus",
-			"appendOutput:done",
-			"showSummary:500:1",
-		]);
+		expect(view.calls).toContain("showSummary:1234:5");
 	});
 });

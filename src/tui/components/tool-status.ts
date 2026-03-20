@@ -1,14 +1,19 @@
 import { type CliRenderer, TextRenderable } from "@opentui/core";
+import { formatToolArgs } from "./tool-args-formatter";
 
-const SPINNER_FRAMES = ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"];
+const SPINNER_FRAMES = ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"] as const;
 const SPINNER_INTERVAL_MS = 80;
+
+type ToolState = {
+	readonly tool: string;
+	readonly summary: string;
+};
 
 export class ToolStatusDisplay {
 	private readonly text: TextRenderable;
 	private spinnerIndex = 0;
 	private spinnerInterval: ReturnType<typeof setInterval> | null = null;
-	private currentTool = "";
-	private currentSummary = "";
+	private current: ToolState | null = null;
 
 	constructor(renderer: CliRenderer, id: string) {
 		this.text = new TextRenderable(renderer, {
@@ -23,15 +28,14 @@ export class ToolStatusDisplay {
 	}
 
 	show(toolName: string, args: Record<string, unknown>): void {
-		this.currentTool = toolName;
-		this.currentSummary = formatToolArgs(toolName, args);
+		this.current = {
+			tool: toolName,
+			summary: formatToolArgs(toolName, args),
+		};
 		this.spinnerIndex = 0;
 		this.updateContent();
 
-		if (this.spinnerInterval !== null) {
-			clearInterval(this.spinnerInterval);
-		}
-
+		if (this.spinnerInterval) clearInterval(this.spinnerInterval);
 		this.spinnerInterval = setInterval(() => {
 			this.spinnerIndex = (this.spinnerIndex + 1) % SPINNER_FRAMES.length;
 			this.updateContent();
@@ -39,10 +43,11 @@ export class ToolStatusDisplay {
 	}
 
 	clear(): void {
-		if (this.spinnerInterval !== null) {
+		if (this.spinnerInterval) {
 			clearInterval(this.spinnerInterval);
 			this.spinnerInterval = null;
 		}
+		this.current = null;
 		this.text.content = "";
 	}
 
@@ -51,33 +56,9 @@ export class ToolStatusDisplay {
 	}
 
 	private updateContent(): void {
-		const frame = SPINNER_FRAMES[this.spinnerIndex];
-		this.text.content = `${frame} [${this.currentTool}] ${this.currentSummary}`;
+		if (!this.current) return;
+		const frame = SPINNER_FRAMES[this.spinnerIndex % SPINNER_FRAMES.length];
+		if (frame === undefined) return;
+		this.text.content = `${frame} [${this.current.tool}] ${this.current.summary}`;
 	}
-}
-
-const MAX_ARGS_LENGTH = 60;
-
-function formatToolArgs(toolName: string, args: Record<string, unknown>): string {
-	switch (toolName) {
-		case "bash":
-			return truncate(String(args.command), MAX_ARGS_LENGTH);
-		case "read":
-			return String(args.path);
-		case "write":
-			return String(args.path);
-		case "glob":
-			return String(args.pattern);
-		case "ask_user":
-			return truncate(String(args.question), MAX_ARGS_LENGTH);
-		default:
-			return truncate(JSON.stringify(args), MAX_ARGS_LENGTH);
-	}
-}
-
-function truncate(text: string, maxLength: number): string {
-	if (text.length <= maxLength) {
-		return text;
-	}
-	return `${text.slice(0, maxLength)}...`;
 }
