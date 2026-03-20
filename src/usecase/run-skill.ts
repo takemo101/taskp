@@ -1,6 +1,6 @@
 import { dirname } from "node:path";
 import type { CodeBlock } from "../core/skill/skill-body";
-import type { DomainError } from "../core/types/errors";
+import { type DomainError, domainErrorMessage } from "../core/types/errors";
 import type { Result } from "../core/types/result";
 import { ok } from "../core/types/result";
 import type { ReservedVars } from "../core/variable/template-renderer";
@@ -114,7 +114,7 @@ async function executeCommands(
 			}
 			results.push({
 				command: renderResult.value,
-				result: { stdout: "", stderr: execResult.error.message, exitCode: 1 },
+				result: { stdout: "", stderr: domainErrorMessage(execResult.error), exitCode: 1 },
 			});
 			continue;
 		}

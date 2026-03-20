@@ -71,3 +71,15 @@ export function executionError(message: string): ExecutionError {
 export function configError(message: string): ConfigError {
 	return { type: ErrorType.Config, message };
 }
+
+export function domainErrorMessage(error: DomainError): string {
+	switch (error.type) {
+		case ErrorType.SkillNotFound:
+			return `Skill not found: ${error.name}`;
+		case ErrorType.Parse:
+		case ErrorType.Render:
+		case ErrorType.Execution:
+		case ErrorType.Config:
+			return error.message;
+	}
+}
