@@ -201,12 +201,20 @@ async function executeAgentMode(
 			}
 		},
 		scanGlob: async (pattern, cwd) => {
-			const { glob } = await import("node:fs/promises");
-			const matches: string[] = [];
-			for await (const entry of glob(pattern, { cwd })) {
-				matches.push(entry);
+			try {
+				const { glob } = await import("node:fs/promises");
+				const matches: string[] = [];
+				for await (const entry of glob(pattern, { cwd })) {
+					matches.push(entry);
+				}
+				return ok(matches);
+			} catch (e) {
+				return err(
+					executionError(
+						`Failed to scan glob: ${pattern} (${e instanceof Error ? e.message : String(e)})`,
+					),
+				);
 			}
-			return matches;
 		},
 	});
 

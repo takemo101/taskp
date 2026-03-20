@@ -12,12 +12,12 @@ import { err, ok } from "../../src/core/types/result";
 function stubDeps(overrides?: {
 	executeCommand?: (command: string, cwd: string) => Promise<Result<string, ExecutionError>>;
 	fetchUrl?: (url: string) => Promise<Result<string, ExecutionError>>;
-	scanGlob?: (pattern: string, cwd: string) => Promise<readonly string[]>;
+	scanGlob?: (pattern: string, cwd: string) => Promise<Result<readonly string[], ExecutionError>>;
 }) {
 	return {
 		executeCommand: overrides?.executeCommand ?? (async () => ok("")),
 		fetchUrl: overrides?.fetchUrl ?? (async () => ok("")),
-		scanGlob: overrides?.scanGlob ?? (async () => []),
+		scanGlob: overrides?.scanGlob ?? (async () => ok([] as readonly string[])),
 	};
 }
 
@@ -64,7 +64,7 @@ describe("ContextCollector", () => {
 			await writeFile(join(tempDir, "b.md"), "bbb");
 			const collector = createContextCollector(
 				stubDeps({
-					scanGlob: async () => ["a.md", "b.md"],
+					scanGlob: async () => ok(["a.md", "b.md"]),
 				}),
 			);
 			const sources: ContextSource[] = [{ type: "glob", pattern: "*.md" }];
@@ -82,7 +82,7 @@ describe("ContextCollector", () => {
 			await writeFile(join(tempDir, "sub", "deep.md"), "deep content");
 			const collector = createContextCollector(
 				stubDeps({
-					scanGlob: async () => ["sub/deep.md"],
+					scanGlob: async () => ok(["sub/deep.md"]),
 				}),
 			);
 			const sources: ContextSource[] = [{ type: "glob", pattern: "**/*.md" }];
@@ -105,11 +105,27 @@ describe("ContextCollector", () => {
 			expect(result.value).toBe("");
 		});
 
+		it("returns error when scanGlob fails", async () => {
+			const collector = createContextCollector(
+				stubDeps({
+					scanGlob: async () => err(executionError("glob scan failed")),
+				}),
+			);
+			const sources: ContextSource[] = [{ type: "glob", pattern: "*.md" }];
+
+			const result = await collector.collect(sources, tempDir);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("EXECUTION_ERROR");
+			expect(result.error.message).toBe("glob scan failed");
+		});
+
 		it("includes progress counter in error for unreadable file", async () => {
 			await writeFile(join(tempDir, "a.md"), "aaa");
 			const collector = createContextCollector(
 				stubDeps({
-					scanGlob: async () => ["a.md", "missing.md", "c.md"],
+					scanGlob: async () => ok(["a.md", "missing.md", "c.md"]),
 				}),
 			);
 			const sources: ContextSource[] = [{ type: "glob", pattern: "*.md" }];
@@ -170,6 +186,39 @@ describe("ContextCollector", () => {
 			expect(result.ok).toBe(false);
 			if (result.ok) return;
 			expect(result.error.message).toBe("command failed");
+		});
+	});
+
+	describe("url type", () => {
+		it("returns fetched content", async () => {
+			const collector = createContextCollector(
+				stubDeps({
+					fetchUrl: async () => ok("fetched content"),
+				}),
+			);
+			const sources: ContextSource[] = [{ type: "url", url: "https://example.com" }];
+
+			const result = await collector.collect(sources, tempDir);
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value).toBe("fetched content");
+		});
+
+		it("returns error on fetch failure", async () => {
+			const collector = createContextCollector(
+				stubDeps({
+					fetchUrl: async () => err(executionError("network error")),
+				}),
+			);
+			const sources: ContextSource[] = [{ type: "url", url: "https://example.com" }];
+
+			const result = await collector.collect(sources, tempDir);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("EXECUTION_ERROR");
+			expect(result.error.message).toBe("network error");
 		});
 	});
 
