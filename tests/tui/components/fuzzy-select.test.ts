@@ -52,4 +52,22 @@ describe("filterSkills", () => {
 		filterSkills("code", skills);
 		expect(skills).toEqual(original);
 	});
+
+	it("excludes low-relevance fuzzy matches", () => {
+		const manySkills: SkillOption[] = [
+			{ name: "github", description: "Interact with GitHub using the gh CLI" },
+			{ name: "commit", description: "Read this skill before making git commits" },
+			{ name: "brainstorming", description: "You MUST use this before any creative work" },
+			{
+				name: "frontend-design",
+				description: "Design and implement distinctive frontend interfaces",
+			},
+		];
+		const result = filterSkills("git", manySkills);
+		const names = result.map((s) => s.name);
+		expect(names).toContain("github");
+		expect(names).toContain("commit");
+		expect(names).not.toContain("brainstorming");
+		expect(names).not.toContain("frontend-design");
+	});
 });
