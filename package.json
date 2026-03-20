@@ -22,6 +22,7 @@
 	],
 	"scripts": {
 		"prepare": "lefthook install",
+    "postinstall": "bun build src/cli.ts --outdir dist --target bun",
 		"dev": "bun run src/cli.ts",
 		"build": "bun build src/cli.ts --outdir dist --target bun",
 		"check": "biome check .",
