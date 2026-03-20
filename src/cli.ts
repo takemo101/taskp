@@ -220,6 +220,13 @@ const cli = Cli.create("taskp", {
 			console.log(formatShowOutput(result.value));
 		},
 	})
+	.command("tui", {
+		description: "Launch interactive TUI",
+		async run() {
+			const { startTui } = await import("./tui/app");
+			await startTui();
+		},
+	})
 	.command("serve", {
 		description: "Start as MCP stdio server",
 		async run() {
