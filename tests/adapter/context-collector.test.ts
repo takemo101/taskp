@@ -104,6 +104,24 @@ describe("ContextCollector", () => {
 			if (!result.ok) return;
 			expect(result.value).toBe("");
 		});
+
+		it("includes progress counter in error for unreadable file", async () => {
+			await writeFile(join(tempDir, "a.md"), "aaa");
+			const collector = createContextCollector(
+				stubDeps({
+					scanGlob: async () => ["a.md", "missing.md", "c.md"],
+				}),
+			);
+			const sources: ContextSource[] = [{ type: "glob", pattern: "*.md" }];
+
+			const result = await collector.collect(sources, tempDir);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("EXECUTION_ERROR");
+			expect(result.error.message).toContain("Failed to read glob match (2/3):");
+			expect(result.error.message).toContain("missing.md");
+		});
 	});
 
 	describe("command type", () => {
