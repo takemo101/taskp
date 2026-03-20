@@ -8,6 +8,7 @@ import {
 	type SelectOption,
 	SelectRenderable,
 	SelectRenderableEvents,
+	TextareaRenderable,
 	TextRenderable,
 	t,
 } from "@opentui/core";
@@ -17,10 +18,11 @@ import { KeyHelp } from "../components/key-help";
 import { flatSelectStyle } from "../components/styles";
 
 const CONTAINER_ID = "form-container";
+const TEXTAREA_DEFAULT_HEIGHT = 5;
 
 type FormElement = {
 	readonly input: SkillInput;
-	readonly element: InputRenderable | SelectRenderable;
+	readonly element: InputRenderable | SelectRenderable | TextareaRenderable;
 };
 
 export async function showInputForm(
@@ -153,12 +155,14 @@ function createInputElement(
 	renderer: CliRenderer,
 	input: SkillInput,
 	onConfirm: (value: string) => void,
-): InputRenderable | SelectRenderable {
+): InputRenderable | SelectRenderable | TextareaRenderable {
 	switch (input.type) {
 		case "select":
 			return createSelectElement(renderer, input, onConfirm);
 		case "confirm":
 			return createConfirmElement(renderer, input, onConfirm);
+		case "textarea":
+			return createTextareaElement(renderer, input, onConfirm);
 		case "text":
 		case "number":
 		case "password":
@@ -220,6 +224,33 @@ function createConfirmElement(
 	});
 
 	return select;
+}
+
+function createTextareaElement(
+	renderer: CliRenderer,
+	input: SkillInput,
+	onConfirm: (value: string) => void,
+): TextareaRenderable {
+	const textarea = new TextareaRenderable(renderer, {
+		id: `input-${input.name}`,
+		width: "100%",
+		height: TEXTAREA_DEFAULT_HEIGHT,
+		marginLeft: 2,
+		wrapMode: "word",
+	});
+
+	if (input.default !== undefined) {
+		textarea.initialValue = String(input.default);
+	}
+
+	// Meta+Enter（macOS: Cmd+Enter, Linux/Windows: Alt+Enter）で確定
+	textarea.onSubmit = () => {
+		// getTextRange で全テキストを取得（endOffset に十分大きい値を渡す）
+		const text = textarea.getTextRange(0, Number.MAX_SAFE_INTEGER);
+		onConfirm(text);
+	};
+
+	return textarea;
 }
 
 function createTextInputElement(

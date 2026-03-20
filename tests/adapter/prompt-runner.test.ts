@@ -3,16 +3,18 @@ import type { SkillInput } from "../../src/core/skill/skill-input";
 
 vi.mock("@inquirer/prompts", () => ({
 	input: vi.fn(),
+	editor: vi.fn(),
 	select: vi.fn(),
 	confirm: vi.fn(),
 	number: vi.fn(),
 	password: vi.fn(),
 }));
 
-import { confirm, input, number, password, select } from "@inquirer/prompts";
+import { confirm, editor, input, number, password, select } from "@inquirer/prompts";
 import { createPromptRunner } from "../../src/adapter/prompt-runner";
 
 const mockedInput = input as ReturnType<typeof vi.fn>;
+const mockedEditor = editor as ReturnType<typeof vi.fn>;
 const mockedSelect = select as ReturnType<typeof vi.fn>;
 const mockedConfirm = confirm as ReturnType<typeof vi.fn>;
 const mockedNumber = number as ReturnType<typeof vi.fn>;
@@ -78,6 +80,16 @@ describe("PromptRunner", () => {
 
 		const result = await runner.collect(inputs, {});
 		expect(result).toEqual({ count: "42" });
+	});
+
+	it("collects textarea input", async () => {
+		mockedEditor.mockResolvedValueOnce("line1\nline2\nline3");
+
+		const inputs: SkillInput[] = [{ name: "body", type: "textarea", message: "Enter body" }];
+
+		const result = await runner.collect(inputs, {});
+		expect(result).toEqual({ body: "line1\nline2\nline3" });
+		expect(mockedEditor).toHaveBeenCalledWith(expect.objectContaining({ message: "Enter body" }));
 	});
 
 	it("collects password input", async () => {

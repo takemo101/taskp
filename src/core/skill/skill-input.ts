@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const inputTypeSchema = z.enum(["text", "select", "confirm", "number", "password"]);
+const inputTypeSchema = z.enum(["text", "textarea", "select", "confirm", "number", "password"]);
 
 const skillInputSchema = z
 	.object({

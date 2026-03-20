@@ -1,4 +1,4 @@
-import { confirm, input, number, password, select } from "@inquirer/prompts";
+import { confirm, editor, input, number, password, select } from "@inquirer/prompts";
 import type { SkillInput } from "../core/skill/skill-input";
 import type { PromptCollector } from "../usecase/port/prompt-collector";
 
@@ -6,6 +6,7 @@ type PromptFn = (skillInput: SkillInput) => Promise<string>;
 
 const promptByType: Record<string, PromptFn> = {
 	text: askText,
+	textarea: askTextarea,
 	select: askSelect,
 	confirm: askConfirm,
 	number: askNumber,
@@ -42,6 +43,14 @@ async function askText(skillInput: SkillInput): Promise<string> {
 		message: skillInput.message,
 		default: skillInput.default as string | undefined,
 		required: skillInput.required ?? false,
+		validate: buildValidator(skillInput),
+	});
+}
+
+async function askTextarea(skillInput: SkillInput): Promise<string> {
+	return editor({
+		message: skillInput.message,
+		default: skillInput.default as string | undefined,
 		validate: buildValidator(skillInput),
 	});
 }
