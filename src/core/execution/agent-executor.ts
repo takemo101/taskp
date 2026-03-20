@@ -30,7 +30,11 @@ export function createAgentExecutor() {
 async function executeAgentLoop(
 	input: AgentExecutorInput,
 ): Promise<Result<AgentResult, ExecutionError>> {
-	const tools = buildTools(input.toolNames);
+	const toolsResult = buildTools(input.toolNames);
+	if (!toolsResult.ok) {
+		return toolsResult;
+	}
+	const tools = toolsResult.value;
 
 	try {
 		const result = streamText({
