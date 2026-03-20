@@ -1,5 +1,9 @@
 import { confirm, editor, input, number, password, select } from "@inquirer/prompts";
 import type { SkillInput } from "../core/skill/skill-input";
+import type { ExecutionError } from "../core/types/errors";
+import { executionError } from "../core/types/errors";
+import type { Result } from "../core/types/result";
+import { err, ok } from "../core/types/result";
 import type { PromptCollector } from "../usecase/port/prompt-collector";
 
 type PromptFn = (skillInput: SkillInput) => Promise<string>;
@@ -18,7 +22,7 @@ export function createPromptRunner(): PromptCollector {
 		collect: async (
 			inputs: readonly SkillInput[],
 			presets: Readonly<Record<string, string>>,
-		): Promise<Readonly<Record<string, string>>> => {
+		): Promise<Result<Readonly<Record<string, string>>, ExecutionError>> => {
 			const results: Record<string, string> = {};
 
 			for (const skillInput of inputs) {
@@ -30,10 +34,14 @@ export function createPromptRunner(): PromptCollector {
 				}
 
 				const promptFn = promptByType[skillInput.type];
-				results[skillInput.name] = await promptFn(skillInput);
+				try {
+					results[skillInput.name] = await promptFn(skillInput);
+				} catch (error: unknown) {
+					return err(executionError(toErrorMessage(error)));
+				}
 			}
 
-			return results;
+			return ok(results);
 		},
 	};
 }
@@ -56,7 +64,11 @@ async function askTextarea(skillInput: SkillInput): Promise<string> {
 }
 
 async function askSelect(skillInput: SkillInput): Promise<string> {
-	const choices = skillInput.choices!.map((choice) => ({
+	if (!skillInput.choices) {
+		throw new Error(`choices is required for select input: ${skillInput.name}`);
+	}
+
+	const choices = skillInput.choices.map((choice) => ({
 		name: choice,
 		value: choice,
 	}));
@@ -120,4 +132,9 @@ function buildNumberValidator(
 		}
 		return true;
 	};
+}
+
+function toErrorMessage(error: unknown): string {
+	if (error instanceof Error) return error.message;
+	return String(error);
 }

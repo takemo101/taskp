@@ -64,7 +64,7 @@ function stubRepository(skill?: Skill): SkillRepository {
 
 function stubCollector(values: Record<string, string>): PromptCollector {
 	return {
-		collect: async () => values,
+		collect: async () => ok(values),
 	};
 }
 
@@ -209,7 +209,7 @@ echo "step 2 {{env}}"
 				collect: async (_inputs, presets) => {
 					const merged = { env: "production", ...presets };
 					collectedValues.push(merged);
-					return merged;
+					return ok(merged);
 				},
 			},
 		});
