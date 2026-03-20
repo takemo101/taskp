@@ -169,7 +169,7 @@ function buildSkillRepository(skill: Skill): SkillRepository {
 
 function buildPromptCollector(variables: Readonly<Record<string, string>>): PromptCollector {
 	return {
-		collect: async () => variables as Record<string, string>,
+		collect: async () => ok(variables as Record<string, string>),
 	};
 }
 

@@ -45,7 +45,11 @@ export async function runSkill(
 
 	const skill = findResult.value;
 
-	const variables = await deps.promptCollector.collect(skill.metadata.inputs, input.presets);
+	const collectResult = await deps.promptCollector.collect(skill.metadata.inputs, input.presets);
+	if (!collectResult.ok) {
+		return collectResult;
+	}
+	const variables = collectResult.value;
 
 	const reserved: ReservedVars = {
 		cwd: process.cwd(),
