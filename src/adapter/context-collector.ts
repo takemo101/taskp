@@ -17,7 +17,10 @@ type ContextCollectorDeps = {
 		cwd: string,
 	) => Promise<Result<string, ExecutionError>>;
 	readonly fetchUrl: (url: string) => Promise<Result<string, ExecutionError>>;
-	readonly scanGlob: (pattern: string, cwd: string) => Promise<readonly string[]>;
+	readonly scanGlob: (
+		pattern: string,
+		cwd: string,
+	) => Promise<Result<readonly string[], ExecutionError>>;
 };
 
 export function createContextCollector(deps: ContextCollectorDeps) {
@@ -84,16 +87,22 @@ async function collectGlob(
 	cwd: string,
 	deps: ContextCollectorDeps,
 ): Promise<Result<readonly CollectedContext[], ExecutionError>> {
-	const paths = await deps.scanGlob(pattern, cwd);
+	const scanResult = await deps.scanGlob(pattern, cwd);
+	if (!scanResult.ok) {
+		return scanResult;
+	}
 	const matches: CollectedContext[] = [];
+	const paths = scanResult.value;
+	const total = paths.length;
 
-	for (const path of paths) {
+	for (let i = 0; i < total; i++) {
+		const path = paths[i];
 		const fullPath = join(cwd, path);
 		try {
 			const content = await readFile(fullPath, "utf-8");
 			matches.push({ source: { type: "glob", pattern }, content });
 		} catch {
-			return err(executionError(`Failed to read file: ${fullPath}`));
+			return err(executionError(`Failed to read glob match (${i + 1}/${total}): ${fullPath}`));
 		}
 	}
 

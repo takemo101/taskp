@@ -1,4 +1,8 @@
 import { z } from "zod";
+import type { ParseError } from "../types/errors";
+import { parseError } from "../types/errors";
+import type { Result } from "../types/result";
+import { err, ok } from "../types/result";
 import type { ContextSource } from "./context-source";
 import { contextSourceSchema } from "./context-source";
 import type { SkillInput } from "./skill-input";
@@ -23,8 +27,13 @@ const skillMetadataSchema = z.object({
 type SkillMode = z.infer<typeof skillModeSchema>;
 type SkillMetadata = z.infer<typeof skillMetadataSchema>;
 
-function parseSkillMetadata(data: unknown): SkillMetadata {
-	return skillMetadataSchema.parse(data);
+function parseSkillMetadata(data: unknown): Result<SkillMetadata, ParseError> {
+	try {
+		return ok(skillMetadataSchema.parse(data));
+	} catch (e) {
+		const message = e instanceof Error ? e.message : String(e);
+		return err(parseError(`Invalid skill metadata: ${message}`));
+	}
 }
 
 export type { ContextSource, SkillInput, SkillMetadata, SkillMode };

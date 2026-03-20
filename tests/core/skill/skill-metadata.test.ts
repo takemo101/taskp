@@ -8,7 +8,9 @@ describe("parseSkillMetadata", () => {
 			description: "アプリケーションをデプロイする",
 		});
 
-		expect(result).toStrictEqual({
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toStrictEqual({
 			name: "deploy",
 			description: "アプリケーションをデプロイする",
 			mode: "template",
@@ -47,56 +49,66 @@ describe("parseSkillMetadata", () => {
 			],
 		});
 
-		expect(result.name).toBe("code-review");
-		expect(result.mode).toBe("agent");
-		expect(result.model).toBe("claude-sonnet-4-20250514");
-		expect(result.inputs).toHaveLength(2);
-		expect(result.tools).toStrictEqual(["bash", "read"]);
-		expect(result.context).toHaveLength(4);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.name).toBe("code-review");
+		expect(result.value.mode).toBe("agent");
+		expect(result.value.model).toBe("claude-sonnet-4-20250514");
+		expect(result.value.inputs).toHaveLength(2);
+		expect(result.value.tools).toStrictEqual(["bash", "read"]);
+		expect(result.value.context).toHaveLength(4);
 	});
 
 	it("無効な mode でエラーになる", () => {
-		expect(() =>
-			parseSkillMetadata({
-				name: "test",
-				description: "test",
-				mode: "invalid",
-			}),
-		).toThrow();
+		const result = parseSkillMetadata({
+			name: "test",
+			description: "test",
+			mode: "invalid",
+		});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("PARSE_ERROR");
 	});
 
 	it("name が空文字でエラーになる", () => {
-		expect(() =>
-			parseSkillMetadata({
-				name: "",
-				description: "test",
-			}),
-		).toThrow();
+		const result = parseSkillMetadata({
+			name: "",
+			description: "test",
+		});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("PARSE_ERROR");
 	});
 
 	it("description が空文字でエラーになる", () => {
-		expect(() =>
-			parseSkillMetadata({
-				name: "test",
-				description: "",
-			}),
-		).toThrow();
+		const result = parseSkillMetadata({
+			name: "test",
+			description: "",
+		});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("PARSE_ERROR");
 	});
 
 	it("inputs の select タイプに choices がない場合エラーになる", () => {
-		expect(() =>
-			parseSkillMetadata({
-				name: "test",
-				description: "test",
-				inputs: [
-					{
-						name: "env",
-						type: "select",
-						message: "環境を選んでください",
-					},
-				],
-			}),
-		).toThrow();
+		const result = parseSkillMetadata({
+			name: "test",
+			description: "test",
+			inputs: [
+				{
+					name: "env",
+					type: "select",
+					message: "環境を選んでください",
+				},
+			],
+		});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("PARSE_ERROR");
 	});
 
 	it("inputs の各フィールドが正しくパースされる", () => {
@@ -121,18 +133,22 @@ describe("parseSkillMetadata", () => {
 			],
 		});
 
-		expect(result.inputs[0].name).toBe("confirm");
-		expect(result.inputs[0].type).toBe("confirm");
-		expect(result.inputs[0].default).toBe(true);
-		expect(result.inputs[0].required).toBe(false);
-		expect(result.inputs[1].validate).toBe("^[1-9][0-9]*$");
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.inputs[0].name).toBe("confirm");
+		expect(result.value.inputs[0].type).toBe("confirm");
+		expect(result.value.inputs[0].default).toBe(true);
+		expect(result.value.inputs[0].required).toBe(false);
+		expect(result.value.inputs[1].validate).toBe("^[1-9][0-9]*$");
 	});
 
 	it("name が未指定でエラーになる", () => {
-		expect(() =>
-			parseSkillMetadata({
-				description: "test",
-			}),
-		).toThrow();
+		const result = parseSkillMetadata({
+			description: "test",
+		});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("PARSE_ERROR");
 	});
 });

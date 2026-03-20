@@ -33,7 +33,9 @@ describe("PromptRunner", () => {
 		const inputs: SkillInput[] = [{ name: "greeting", type: "text", message: "Enter greeting" }];
 
 		const result = await runner.collect(inputs, {});
-		expect(result).toEqual({ ok: true, value: { greeting: "hello" } });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toEqual({ greeting: "hello" });
 		expect(mockedInput).toHaveBeenCalledWith(
 			expect.objectContaining({ message: "Enter greeting" }),
 		);
@@ -52,7 +54,9 @@ describe("PromptRunner", () => {
 		];
 
 		const result = await runner.collect(inputs, {});
-		expect(result).toEqual({ ok: true, value: { lang: "opt-b" } });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toEqual({ lang: "opt-b" });
 		expect(mockedSelect).toHaveBeenCalledWith(
 			expect.objectContaining({
 				message: "Pick language",
@@ -70,7 +74,9 @@ describe("PromptRunner", () => {
 		const inputs: SkillInput[] = [{ name: "proceed", type: "confirm", message: "Continue?" }];
 
 		const result = await runner.collect(inputs, {});
-		expect(result).toEqual({ ok: true, value: { proceed: "true" } });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toEqual({ proceed: "true" });
 	});
 
 	it("collects number input", async () => {
@@ -79,7 +85,9 @@ describe("PromptRunner", () => {
 		const inputs: SkillInput[] = [{ name: "count", type: "number", message: "How many?" }];
 
 		const result = await runner.collect(inputs, {});
-		expect(result).toEqual({ ok: true, value: { count: "42" } });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toEqual({ count: "42" });
 	});
 
 	it("collects textarea input", async () => {
@@ -88,7 +96,9 @@ describe("PromptRunner", () => {
 		const inputs: SkillInput[] = [{ name: "body", type: "textarea", message: "Enter body" }];
 
 		const result = await runner.collect(inputs, {});
-		expect(result).toEqual({ ok: true, value: { body: "line1\nline2\nline3" } });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toEqual({ body: "line1\nline2\nline3" });
 		expect(mockedEditor).toHaveBeenCalledWith(expect.objectContaining({ message: "Enter body" }));
 	});
 
@@ -98,7 +108,9 @@ describe("PromptRunner", () => {
 		const inputs: SkillInput[] = [{ name: "token", type: "password", message: "Enter token" }];
 
 		const result = await runner.collect(inputs, {});
-		expect(result).toEqual({ ok: true, value: { token: "secret123" } });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toEqual({ token: "secret123" });
 	});
 
 	it("skips questions for preset values", async () => {
@@ -110,7 +122,9 @@ describe("PromptRunner", () => {
 		mockedNumber.mockResolvedValueOnce(25);
 
 		const result = await runner.collect(inputs, { name: "Alice" });
-		expect(result).toEqual({ ok: true, value: { name: "Alice", age: "25" } });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toEqual({ name: "Alice", age: "25" });
 		expect(mockedInput).not.toHaveBeenCalled();
 	});
 
@@ -145,6 +159,23 @@ describe("PromptRunner", () => {
 		expect(callArgs.validate!("INVALID")).toEqual(expect.stringContaining("must match"));
 	});
 
+	it("returns error on invalid validate regex pattern", async () => {
+		const inputs: SkillInput[] = [
+			{
+				name: "code",
+				type: "text",
+				message: "Code?",
+				validate: "[invalid(",
+			},
+		];
+
+		const result = await runner.collect(inputs, {});
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("EXECUTION_ERROR");
+		expect(result.error.message).toContain("Invalid regex pattern: [invalid(");
+	});
+
 	it("collects multiple inputs in order", async () => {
 		mockedInput.mockResolvedValueOnce("Alice");
 		mockedNumber.mockResolvedValueOnce(30);
@@ -157,7 +188,9 @@ describe("PromptRunner", () => {
 		];
 
 		const result = await runner.collect(inputs, {});
-		expect(result).toEqual({ ok: true, value: { name: "Alice", age: "30", ok: "false" } });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toEqual({ name: "Alice", age: "30", ok: "false" });
 	});
 
 	it("returns error when user cancels prompt", async () => {
@@ -166,13 +199,10 @@ describe("PromptRunner", () => {
 		const inputs: SkillInput[] = [{ name: "name", type: "text", message: "Name?" }];
 
 		const result = await runner.collect(inputs, {});
-		expect(result).toEqual({
-			ok: false,
-			error: {
-				type: "EXECUTION_ERROR",
-				message: "User force closed the prompt",
-			},
-		});
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("EXECUTION_ERROR");
+		expect(result.error.message).toContain("User force closed the prompt");
 	});
 
 	it("returns error on TTY failure", async () => {
@@ -183,12 +213,9 @@ describe("PromptRunner", () => {
 		];
 
 		const result = await runner.collect(inputs, {});
-		expect(result).toEqual({
-			ok: false,
-			error: {
-				type: "EXECUTION_ERROR",
-				message: "Input stream is not a TTY",
-			},
-		});
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("EXECUTION_ERROR");
+		expect(result.error.message).toContain("Input stream is not a TTY");
 	});
 });

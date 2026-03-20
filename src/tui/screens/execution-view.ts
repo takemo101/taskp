@@ -12,8 +12,8 @@ import { createAgentExecutor } from "../../adapter/agent-executor";
 import { createCommandRunner } from "../../adapter/command-runner";
 import { createContextCollector } from "../../adapter/context-collector";
 import type { Skill } from "../../core/skill/skill";
-import type { DomainError } from "../../core/types/errors";
-import { ok } from "../../core/types/result";
+import { type DomainError, executionError } from "../../core/types/errors";
+import { err, ok } from "../../core/types/result";
 import type { PromptCollector } from "../../usecase/port/prompt-collector";
 import type { SkillRepository } from "../../usecase/port/skill-repository";
 import { runAgentSkill } from "../../usecase/run-agent-skill";
@@ -189,16 +189,32 @@ async function executeAgentMode(
 			return ok(result.stdout);
 		},
 		fetchUrl: async (url) => {
-			const response = await fetch(url);
-			return ok(await response.text());
+			try {
+				const response = await fetch(url);
+				if (!response.ok) {
+					return err(executionError(`Failed to fetch URL (HTTP ${response.status}): ${url}`));
+				}
+				return ok(await response.text());
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				return err(executionError(`Network error fetching ${url}: ${message}`));
+			}
 		},
 		scanGlob: async (pattern, cwd) => {
-			const { glob } = await import("node:fs/promises");
-			const matches: string[] = [];
-			for await (const entry of glob(pattern, { cwd })) {
-				matches.push(entry);
+			try {
+				const { glob } = await import("node:fs/promises");
+				const matches: string[] = [];
+				for await (const entry of glob(pattern, { cwd })) {
+					matches.push(entry);
+				}
+				return ok(matches);
+			} catch (e) {
+				return err(
+					executionError(
+						`Failed to scan glob: ${pattern} (${e instanceof Error ? e.message : String(e)})`,
+					),
+				);
 			}
-			return matches;
 		},
 	});
 

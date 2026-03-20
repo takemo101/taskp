@@ -46,6 +46,13 @@ export function createPromptRunner(): PromptCollector {
 	};
 }
 
+function toErrorMessage(error: unknown): string {
+	if (error instanceof Error) {
+		return error.message;
+	}
+	return String(error);
+}
+
 async function askText(skillInput: SkillInput): Promise<string> {
 	return input({
 		message: skillInput.message,
@@ -110,7 +117,7 @@ async function askPassword(skillInput: SkillInput): Promise<string> {
 function buildValidator(skillInput: SkillInput): ((value: string) => string | true) | undefined {
 	if (!skillInput.validate) return undefined;
 
-	const regex = new RegExp(skillInput.validate);
+	const regex = compileRegex(skillInput.validate);
 	return (value: string) => {
 		if (!regex.test(value)) {
 			return `Input must match pattern: ${skillInput.validate}`;
@@ -124,7 +131,7 @@ function buildNumberValidator(
 ): ((value: number | undefined) => string | true) | undefined {
 	if (!skillInput.validate) return undefined;
 
-	const regex = new RegExp(skillInput.validate);
+	const regex = compileRegex(skillInput.validate);
 	return (value: number | undefined) => {
 		if (value === undefined) return true;
 		if (!regex.test(String(value))) {
@@ -134,7 +141,10 @@ function buildNumberValidator(
 	};
 }
 
-function toErrorMessage(error: unknown): string {
-	if (error instanceof Error) return error.message;
-	return String(error);
+function compileRegex(pattern: string): RegExp {
+	try {
+		return new RegExp(pattern);
+	} catch (cause) {
+		throw new Error(`Invalid regex pattern: ${pattern}`, { cause });
+	}
 }

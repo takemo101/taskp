@@ -32,16 +32,13 @@ export function parseSkill(
 		return err(parseError(`Failed to parse frontmatter: ${message}`));
 	}
 
-	let metadata: SkillMetadata;
-	try {
-		metadata = parseSkillMetadata(parsed.data);
-	} catch (e) {
-		const message = e instanceof Error ? e.message : String(e);
-		return err(parseError(`Invalid skill metadata: ${message}`));
+	const metadataResult = parseSkillMetadata(parsed.data);
+	if (!metadataResult.ok) {
+		return metadataResult;
 	}
 
 	return ok({
-		metadata,
+		metadata: metadataResult.value,
 		body: createSkillBody(raw),
 		location,
 		scope: scope ?? inferScope(location),
