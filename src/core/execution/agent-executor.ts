@@ -32,29 +32,37 @@ async function executeAgentLoop(
 ): Promise<Result<AgentResult, ExecutionError>> {
 	const tools = buildTools(input.toolNames);
 
-	const result = streamText({
-		model: input.model,
-		system: input.systemPrompt,
-		prompt: input.context,
-		tools,
-		stopWhen: stepCountIs(MAX_STEPS),
-	});
+	try {
+		const result = streamText({
+			model: input.model,
+			system: input.systemPrompt,
+			prompt: input.context,
+			tools,
+			stopWhen: stepCountIs(MAX_STEPS),
+		});
 
-	const chunks: string[] = [];
-	for await (const chunk of result.textStream) {
-		chunks.push(chunk);
-		process.stdout.write(chunk);
+		const chunks: string[] = [];
+		for await (const chunk of result.textStream) {
+			chunks.push(chunk);
+			process.stdout.write(chunk);
+		}
+
+		const finalResult = await result;
+		const steps = await finalResult.steps;
+		const stepCount = steps.length;
+
+		if (isMaxStepsExceeded(steps)) {
+			return err(executionError(`Agent loop exceeded maximum steps (${MAX_STEPS}). Aborting.`));
+		}
+
+		return ok({ output: chunks.join(""), steps: stepCount });
+	} catch (error) {
+		return err(
+			executionError(
+				`Agent execution failed: ${error instanceof Error ? error.message : String(error)}`,
+			),
+		);
 	}
-
-	const finalResult = await result;
-	const steps = await finalResult.steps;
-	const stepCount = steps.length;
-
-	if (isMaxStepsExceeded(steps)) {
-		return err(executionError(`Agent loop exceeded maximum steps (${MAX_STEPS}). Aborting.`));
-	}
-
-	return ok({ output: chunks.join(""), steps: stepCount });
 }
 
 function isMaxStepsExceeded(steps: readonly { readonly finishReason: string }[]): boolean {
