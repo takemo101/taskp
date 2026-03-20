@@ -5,14 +5,14 @@ import { createLanguageModel, resolveModelSpec } from "./adapter/ai-provider";
 import { createCommandRunner } from "./adapter/command-runner";
 import { createDefaultConfigLoader } from "./adapter/config-loader";
 import { createContextCollector } from "./adapter/context-collector";
+import { createDefaultContextCollectorDeps } from "./adapter/context-collector-deps";
 import { createPromptRunner } from "./adapter/prompt-runner";
 import { createSkillInitializer } from "./adapter/skill-initializer";
 import { createDefaultSkillLoader } from "./adapter/skill-loader";
 import { createStreamWriter } from "./adapter/stream-writer";
 import type { ContextSource } from "./core/skill/context-source";
 import type { SkillScope } from "./core/skill/skill";
-import { type DomainError, EXIT_CODE, executionError } from "./core/types/errors";
-import { err, ok } from "./core/types/result";
+import { type DomainError, EXIT_CODE } from "./core/types/errors";
 import { type InitOutput, initSkill } from "./usecase/init-skill";
 import { createListSkillsUseCase } from "./usecase/list-skills";
 import { runAgentSkill } from "./usecase/run-agent-skill";
@@ -276,41 +276,8 @@ async function runAgentMode(
 		output: process.stdout,
 	});
 
-	const contextCollector = createContextCollector({
-		executeCommand: async (command, cwd) => {
-			const { execa } = await import("execa");
-			const result = await execa(command, { shell: true, cwd, reject: false });
-			return ok(result.stdout);
-		},
-		fetchUrl: async (url) => {
-			try {
-				const response = await fetch(url);
-				if (!response.ok) {
-					return err(executionError(`Failed to fetch URL (HTTP ${response.status}): ${url}`));
-				}
-				return ok(await response.text());
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				return err(executionError(`Network error fetching ${url}: ${message}`));
-			}
-		},
-		scanGlob: async (pattern, cwd) => {
-			try {
-				const { glob } = await import("node:fs/promises");
-				const matches: string[] = [];
-				for await (const entry of glob(pattern, { cwd })) {
-					matches.push(entry);
-				}
-				return ok(matches);
-			} catch (e) {
-				return err(
-					executionError(
-						`Failed to scan glob: ${pattern} (${e instanceof Error ? e.message : String(e)})`,
-					),
-				);
-			}
-		},
-	});
+	const contextCollectorDeps = await createDefaultContextCollectorDeps();
+	const contextCollector = createContextCollector(contextCollectorDeps);
 
 	const agentExecutor = createAgentExecutor(writer);
 
