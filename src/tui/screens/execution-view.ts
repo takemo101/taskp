@@ -169,7 +169,7 @@ function buildSkillRepository(skill: Skill): SkillRepository {
 
 function buildPromptCollector(variables: Readonly<Record<string, string>>): PromptCollector {
 	return {
-		collect: async () => variables as Record<string, string>,
+		collect: async () => ok(variables as Record<string, string>),
 	};
 }
 
@@ -192,15 +192,12 @@ async function executeAgentMode(
 			try {
 				const response = await fetch(url);
 				if (!response.ok) {
-					return err(executionError(`Failed to fetch URL: ${url} (${response.status})`));
+					return err(executionError(`Failed to fetch URL (HTTP ${response.status}): ${url}`));
 				}
 				return ok(await response.text());
-			} catch (e) {
-				return err(
-					executionError(
-						`Failed to fetch URL: ${url} (${e instanceof Error ? e.message : String(e)})`,
-					),
-				);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				return err(executionError(`Network error fetching ${url}: ${message}`));
 			}
 		},
 		scanGlob: async (pattern, cwd) => {

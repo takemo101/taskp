@@ -1,6 +1,6 @@
 import { dirname } from "node:path";
 import type { CodeBlock } from "../core/skill/skill-body";
-import type { DomainError } from "../core/types/errors";
+import { type DomainError, domainErrorMessage } from "../core/types/errors";
 import type { Result } from "../core/types/result";
 import { ok } from "../core/types/result";
 import type { ReservedVars } from "../core/variable/template-renderer";
@@ -45,7 +45,11 @@ export async function runSkill(
 
 	const skill = findResult.value;
 
-	const variables = await deps.promptCollector.collect(skill.metadata.inputs, input.presets);
+	const collectResult = await deps.promptCollector.collect(skill.metadata.inputs, input.presets);
+	if (!collectResult.ok) {
+		return collectResult;
+	}
+	const variables = collectResult.value;
 
 	const reserved: ReservedVars = {
 		cwd: process.cwd(),
@@ -114,7 +118,7 @@ async function executeCommands(
 			}
 			results.push({
 				command: renderResult.value,
-				result: { stdout: "", stderr: execResult.error.message, exitCode: 1 },
+				result: { stdout: "", stderr: domainErrorMessage(execResult.error), exitCode: 1 },
 			});
 			continue;
 		}

@@ -286,15 +286,12 @@ async function runAgentMode(
 			try {
 				const response = await fetch(url);
 				if (!response.ok) {
-					return err(executionError(`Failed to fetch URL: ${url} (${response.status})`));
+					return err(executionError(`Failed to fetch URL (HTTP ${response.status}): ${url}`));
 				}
 				return ok(await response.text());
-			} catch (e) {
-				return err(
-					executionError(
-						`Failed to fetch URL: ${url} (${e instanceof Error ? e.message : String(e)})`,
-					),
-				);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				return err(executionError(`Network error fetching ${url}: ${message}`));
 			}
 		},
 		scanGlob: async (pattern, cwd) => {

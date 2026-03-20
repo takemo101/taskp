@@ -99,17 +99,27 @@ function isNetworkError(error: unknown): boolean {
 		"ENOTFOUND",
 		"UND_ERR_CONNECT_TIMEOUT",
 	];
-	const cause = (error as { cause?: { code?: string } }).cause;
-	if (cause?.code !== undefined && networkCodes.includes(cause.code)) {
+	if (hasCauseWithCode(error, networkCodes)) {
 		return true;
 	}
 
-	const code = (error as { code?: string }).code;
-	if (code !== undefined && networkCodes.includes(code)) {
+	if (hasCode(error, networkCodes)) {
 		return true;
 	}
 
 	return false;
+}
+
+function hasCauseWithCode(error: Error, codes: readonly string[]): boolean {
+	const { cause } = error;
+	if (typeof cause !== "object" || cause === null) return false;
+	if (!("code" in cause) || typeof cause.code !== "string") return false;
+	return codes.includes(cause.code);
+}
+
+function hasCode(error: Error, codes: readonly string[]): boolean {
+	if (!("code" in error) || typeof error.code !== "string") return false;
+	return codes.includes(error.code);
 }
 
 const API_KEY_ENV_VARS: Record<string, string> = {

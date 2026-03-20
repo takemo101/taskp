@@ -4,6 +4,8 @@ import type { JSONSchema7, Tool } from "ai";
 import { jsonSchema } from "ai";
 import { execa } from "execa";
 import { toJSONSchema, z } from "zod";
+import { type ExecutionError, executionError } from "../types/errors";
+import { err, ok, type Result } from "../types/result";
 
 // Vercel AI SDK は JSONSchema7 形式のツール定義を要求するが、
 // zod スキーマから直接変換する公式 API がないため、
@@ -62,7 +64,11 @@ const readTool: Tool<ReadInput, string> = {
 	description: "Read the contents of a file",
 	inputSchema: zodToJsonSchema(readParams),
 	execute: async ({ path }) => {
-		return await readFile(path, "utf-8");
+		try {
+			return await readFile(path, "utf-8");
+		} catch (error) {
+			throw new Error(`Failed to read file: ${path}`, { cause: error });
+		}
 	},
 };
 
@@ -72,8 +78,12 @@ const writeTool: Tool<WriteInput, string> = {
 	description: "Write content to a file",
 	inputSchema: zodToJsonSchema(writeParams),
 	execute: async ({ path, content }) => {
-		await writeFile(path, content, "utf-8");
-		return `Written to ${path}`;
+		try {
+			await writeFile(path, content, "utf-8");
+			return `Written to ${path}`;
+		} catch (error) {
+			throw new Error(`Failed to write file: ${path}`, { cause: error });
+		}
 	},
 };
 
@@ -83,11 +93,15 @@ const globTool: Tool<GlobInput, readonly string[]> = {
 	description: "Search for files matching a glob pattern",
 	inputSchema: zodToJsonSchema(globParams),
 	execute: async ({ pattern }) => {
-		const matches: string[] = [];
-		for await (const entry of fsGlob(pattern)) {
-			matches.push(entry);
+		try {
+			const matches: string[] = [];
+			for await (const entry of fsGlob(pattern)) {
+				matches.push(entry);
+			}
+			return matches;
+		} catch (error) {
+			throw new Error(`Failed to glob pattern: ${pattern}`, { cause: error });
 		}
-		return matches;
 	},
 };
 
@@ -115,17 +129,17 @@ const allTools: Record<ToolName, Tool<any, any>> = {
 export function buildTools(
 	toolNames: readonly string[],
 	// biome-ignore lint/suspicious/noExplicitAny: Tool generic variance prevents strict typing
-): Record<string, Tool<any, any>> {
+): Result<Record<string, Tool<any, any>>, ExecutionError> {
 	// biome-ignore lint/suspicious/noExplicitAny: Tool generic variance prevents strict typing
 	const tools: Record<string, Tool<any, any>> = {};
 	for (const name of toolNames) {
 		const t = allTools[name as ToolName];
 		if (t === undefined) {
-			throw new Error(`Unknown tool: ${name}`);
+			return err(executionError(`Unknown tool: ${name}`));
 		}
 		tools[name] = t;
 	}
-	return tools;
+	return ok(tools);
 }
 
 export type { ToolName };

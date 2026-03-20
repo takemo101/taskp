@@ -40,7 +40,7 @@ function createMockDeps(skill: Skill) {
 	};
 
 	const promptCollector: PromptCollector = {
-		collect: vi.fn().mockResolvedValue({}),
+		collect: vi.fn().mockResolvedValue(ok({})),
 	};
 
 	const contextCollector: ContextCollectorPort = {
