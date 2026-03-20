@@ -84,7 +84,13 @@ async function collectGlob(
 	cwd: string,
 	deps: ContextCollectorDeps,
 ): Promise<Result<readonly CollectedContext[], ExecutionError>> {
-	const paths = await deps.scanGlob(pattern, cwd);
+	let paths: readonly string[];
+	try {
+		paths = await deps.scanGlob(pattern, cwd);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		return err(executionError(`Failed to scan glob pattern "${pattern}": ${message}`));
+	}
 	const matches: CollectedContext[] = [];
 
 	for (const path of paths) {
