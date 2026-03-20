@@ -9,9 +9,9 @@ import { err, ok, type Result } from "../core/types/result";
 const CONFIG_PATH = ".taskp/config.toml";
 
 export const providerConfigSchema = z.object({
-	api_key_env: z.string().min(1).optional().describe("APIキーの環境変数名"),
-	base_url: z.string().min(1).optional().describe("カスタムエンドポイントURL"),
-	default_model: z.string().min(1).optional().describe("プロバイダ別デフォルトモデル"),
+	api_key_env: z.string().min(1).optional().describe("Environment variable name for API key"),
+	base_url: z.string().min(1).optional().describe("Custom endpoint URL"),
+	default_model: z.string().min(1).optional().describe("Default model for this provider"),
 });
 
 export const aiConfigSchema = z.object({
@@ -19,13 +19,16 @@ export const aiConfigSchema = z.object({
 		.string()
 		.min(1)
 		.optional()
-		.describe("デフォルトプロバイダ (anthropic | openai | google | ollama | omlx | lmstudio)"),
-	default_model: z.string().min(1).optional().describe("デフォルトモデル名"),
-	providers: z.record(z.string(), providerConfigSchema).optional().describe("プロバイダ別設定"),
+		.describe("Default provider (anthropic | openai | google | ollama | omlx | lmstudio)"),
+	default_model: z.string().min(1).optional().describe("Default model name"),
+	providers: z
+		.record(z.string(), providerConfigSchema)
+		.optional()
+		.describe("Per-provider settings"),
 });
 
 export const configSchema = z.object({
-	ai: aiConfigSchema.optional().describe("AI/LLM 設定"),
+	ai: aiConfigSchema.optional().describe("AI/LLM settings"),
 });
 
 export type ProviderConfig = z.infer<typeof providerConfigSchema>;

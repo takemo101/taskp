@@ -86,9 +86,9 @@ export async function showInputForm(
 
 		container.add(
 			KeyHelp([
-				{ key: "Tab", description: "次へ" },
-				{ key: "Shift+Tab", description: "前へ" },
-				{ key: "Esc", description: "戻る" },
+				{ key: "Tab", description: "Next" },
+				{ key: "Shift+Tab", description: "Prev" },
+				{ key: "Esc", description: "Back" },
 			]),
 		);
 

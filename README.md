@@ -1,55 +1,57 @@
 # taskp
 
-マークダウンで定義されたスキル（タスク手順）を、インタラクティブな質問で引数を収集し、LLM またはテンプレートエンジンで実行する CLI ツール。
+A CLI tool that runs skills (task procedures) defined in Markdown — collecting arguments via interactive prompts, then executing them with an LLM or template engine.
 
-## 特徴
+[日本語版 README はこちら](README.ja.md)
 
-- **マークダウンでスキル定義** — 人間が読み書きしやすく、Git 管理も容易
-- **2つの実行モード** — テンプレート展開（LLM 不要）と AI エージェント実行
-- **マルチプロバイダ対応** — Anthropic / OpenAI / Google / Ollama をサポート
-- **MCP サーバー** — Claude Code や pi などの AI ツールからも利用可能
+## Features
 
-## インストール
+- **Skills defined in Markdown** — Human-readable, easy to write, and Git-friendly
+- **Two execution modes** — Template rendering (no LLM required) and AI agent execution
+- **Multi-provider support** — Anthropic / OpenAI / Google / Ollama
+- **MCP server** — Usable from AI tools like Claude Code and pi
+
+## Installation
 
 ```bash
 bun install -g taskp
 ```
 
-> **必要環境:** Bun >= 1.2.0
+> **Requirements:** Bun >= 1.2.0
 
-## クイックスタート
+## Quick Start
 
-### 1. スキルを作成する
+### 1. Create a skill
 
 ```bash
 taskp init deploy
 ```
 
-`.taskp/skills/deploy/SKILL.md` が生成されます。
+This generates `.taskp/skills/deploy/SKILL.md`.
 
-### 2. スキルを編集する
+### 2. Edit the skill
 
 ```markdown
 ---
 name: deploy
-description: アプリケーションをデプロイする
+description: Deploy the application
 mode: template
 inputs:
   - name: environment
     type: select
-    message: "デプロイ先を選んでください"
+    message: "Select deployment target"
     choices: [staging, production]
   - name: branch
     type: text
-    message: "ブランチ名は？"
+    message: "Branch name?"
     default: main
 ---
 
 # Deploy
 
-{{environment}} 環境に {{branch}} ブランチをデプロイします。
+Deploying branch {{branch}} to the {{environment}} environment.
 
-## 手順
+## Steps
 
 \`\`\`bash
 git checkout {{branch}}
@@ -59,28 +61,28 @@ npm run deploy:{{environment}}
 \`\`\`
 ```
 
-### 3. スキルを実行する
+### 3. Run the skill
 
 ```bash
 taskp run deploy
-# → "デプロイ先を選んでください" [staging / production]
-# → "ブランチ名は？" [main]
-# → コマンドが順番に実行される
+# → "Select deployment target" [staging / production]
+# → "Branch name?" [main]
+# → Commands are executed in order
 ```
 
-### 4. AI エージェントモードで実行する
+### 4. Run in AI agent mode
 
-`mode: agent` に変更すれば、LLM がスキルの内容を解釈して実行します。
+Change to `mode: agent` and the LLM will interpret and execute the skill's content.
 
 ```bash
 taskp run code-review --model anthropic/claude-sonnet-4-20250514
 ```
 
-## コマンド一覧
+## Commands
 
 ### `taskp run <skill>`
 
-スキルを実行します。
+Run a skill.
 
 ```bash
 taskp run deploy
@@ -90,19 +92,19 @@ taskp run deploy --set environment=production --set branch=main
 taskp run deploy --no-input
 ```
 
-| オプション | 短縮 | 説明 |
-|-----------|------|------|
-| `--model` | `-m` | 使用する LLM モデル |
-| `--provider` | `-p` | LLM プロバイダ |
-| `--dry-run` | | 実行計画を表示するが実行しない |
-| `--force` | `-f` | エラー時も続行する（template モード） |
-| `--verbose` | `-v` | 詳細ログを表示 |
-| `--no-input` | | 対話的質問を無効化（デフォルト値を使用） |
-| `--set` | `-s` | 変数を直接指定（`--set key=value`） |
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--model` | `-m` | LLM model to use |
+| `--provider` | `-p` | LLM provider |
+| `--dry-run` | | Show execution plan without running |
+| `--force` | `-f` | Continue on error (template mode) |
+| `--verbose` | `-v` | Show detailed logs |
+| `--no-input` | | Disable interactive prompts (use defaults) |
+| `--set` | `-s` | Set variables directly (`--set key=value`) |
 
 ### `taskp list`
 
-利用可能なスキルを一覧表示します。
+List available skills.
 
 ```bash
 taskp list
@@ -112,7 +114,7 @@ taskp list --local
 
 ### `taskp init <name>`
 
-スキルの雛形を生成します。
+Generate a skill scaffold.
 
 ```bash
 taskp init my-task
@@ -122,7 +124,7 @@ taskp init my-task --mode agent
 
 ### `taskp show <skill>`
 
-スキルの詳細を表示します。
+Show skill details.
 
 ```bash
 taskp show deploy
@@ -130,71 +132,71 @@ taskp show deploy
 
 ### `taskp tui`
 
-インタラクティブ TUI を起動します。
+Launch the interactive TUI.
 
 ```bash
 taskp tui
 ```
 
-fzf 風のファジー検索でスキルを選択し、パラメータを入力して実行できます。
-agent モードの実行結果はマークダウンでストリーミング表示されます。
+Select skills with fzf-style fuzzy search, fill in parameters, and execute.
+Agent mode results are streamed as rendered Markdown.
 
-#### キーバインド
+#### Key Bindings
 
-| 画面 | キー | 動作 |
-|------|------|------|
-| スキル選択 | ↑↓ | 移動 |
-| スキル選択 | Enter | 選択 |
-| スキル選択 | Esc | 終了 |
-| 入力フォーム | Tab / Shift+Tab | 次/前の入力へ |
-| 入力フォーム | Enter | 値確定 |
-| 入力フォーム | Esc | 戻る |
-| 実行完了 | Enter | スキル選択に戻る |
-| 実行完了 | Esc | 終了 |
+| Screen | Key | Action |
+|--------|-----|--------|
+| Skill selector | ↑↓ | Navigate |
+| Skill selector | Enter | Select |
+| Skill selector | Esc | Quit |
+| Input form | Tab / Shift+Tab | Next / previous input |
+| Input form | Enter | Confirm value |
+| Input form | Esc | Back |
+| Execution done | Enter | Return to skill selector |
+| Execution done | Esc | Quit |
 
-<!-- TODO: スクリーンショットを追加 -->
+<!-- TODO: Add screenshots -->
 
 ### `taskp serve`
 
-MCP サーバーとして起動します（詳細は [MCP サーバーとしての使い方](#mcp-サーバーとしての使い方) を参照）。
+Start as an MCP server (see [Using as an MCP Server](#using-as-an-mcp-server) for details).
 
-## スキルの作成方法
+## Creating Skills
 
-スキルは `SKILL.md` というマークダウンファイルで定義します。
+Skills are defined as Markdown files named `SKILL.md`.
 
-### ファイル構造
+### File Structure
 
 ```
 <skill-name>/
 └── SKILL.md
 ```
 
-### 配置場所
+### Locations
 
-| 場所 | スコープ | 用途 |
-|------|---------|------|
-| `.taskp/skills/<name>/SKILL.md` | プロジェクトローカル | プロジェクト固有のタスク |
-| `~/.taskp/skills/<name>/SKILL.md` | グローバル | 個人で共通利用するタスク |
+| Location | Scope | Use Case |
+|----------|-------|----------|
+| `.taskp/skills/<name>/SKILL.md` | Project-local | Project-specific tasks |
+| `~/.taskp/skills/<name>/SKILL.md` | Global | Personal tasks shared across projects |
 
-プロジェクトローカルが優先されます。
+Project-local skills take priority.
 
-### フロントマター
+### Frontmatter
 
 ```yaml
 ---
-name: my-skill          # スキル名
-description: 説明文      # list コマンドで表示
+name: my-skill          # Skill name
+description: About this  # Shown in list command
 mode: template          # template | agent
-inputs:                 # 入力定義
+inputs:                 # Input definitions
   - name: target
     type: text
-    message: "対象は？"
-model: anthropic/claude-sonnet-4-20250514  # agent モード用（省略可）
-tools:                  # agent モードで使用するツール（省略可）
+    message: "Target?"
+model: anthropic/claude-sonnet-4-20250514  # For agent mode (optional)
+tools:                  # Tools for agent mode (optional)
   - bash
   - read
   - write
-context:                # 自動的にコンテキストに含めるソース（省略可）
+context:                # Sources auto-included in context (optional)
   - type: file
     path: "src/{{target}}"
   - type: command
@@ -202,25 +204,26 @@ context:                # 自動的にコンテキストに含めるソース（
 ---
 ```
 
-### 入力タイプ
+### Input Types
 
-| type | UI | 戻り値型 |
-|------|-----|---------|
-| `text` | 自由入力 | `string` |
-| `select` | 選択肢から選ぶ | `string` |
+| Type | UI | Return Type |
+|------|-----|------------|
+| `text` | Free text input | `string` |
+| `textarea` | Multi-line input (confirm with Meta+Enter) | `string` |
+| `select` | Choose from options | `string` |
 | `confirm` | Yes/No | `boolean` |
-| `number` | 数値入力 | `number` |
-| `password` | マスク入力 | `string` |
+| `number` | Numeric input | `number` |
+| `password` | Masked input | `string` |
 
-### 変数展開
+### Variable Expansion
 
-本文中で `{{変数名}}` を使って入力値を展開できます。
+Use `{{variable_name}}` in the body to expand input values.
 
-## 設定ファイル
+## Configuration
 
-設定は TOML 形式で記述します。プロジェクト設定がグローバル設定より優先されます。
+Configuration is written in TOML format. Project settings take priority over global settings.
 
-### グローバル設定 `~/.taskp/config.toml`
+### Global config `~/.taskp/config.toml`
 
 ```toml
 [ai]
@@ -238,7 +241,7 @@ base_url = "http://localhost:11434/v1"
 default_model = "qwen2.5-coder:32b"
 ```
 
-### プロジェクト設定 `.taskp/config.toml`
+### Project config `.taskp/config.toml`
 
 ```toml
 [ai]
@@ -246,31 +249,31 @@ default_provider = "ollama"
 default_model = "qwen2.5-coder:14b"
 ```
 
-## MCP サーバーとしての使い方
+## Using as an MCP Server
 
-taskp は MCP（Model Context Protocol）サーバーとして動作し、Claude Code や pi などの AI ツールから利用できます。
+taskp can run as an MCP (Model Context Protocol) server, making it accessible from AI tools like Claude Code and pi.
 
 ```bash
 taskp serve
 ```
 
-公開されるツール:
+Exposed tools:
 
-- `taskp_run` — スキルを実行
-- `taskp_list` — スキル一覧を取得
-- `taskp_init` — スキルの雛形を生成
-- `taskp_show` — スキルの詳細を表示
+- `taskp_run` — Run a skill
+- `taskp_list` — List available skills
+- `taskp_init` — Generate a skill scaffold
+- `taskp_show` — Show skill details
 
-## ドキュメント
+## Documentation
 
-詳細な仕様は `docs/` ディレクトリを参照してください。
+See the `docs/` directory for detailed specifications.
 
-- [コンセプト](docs/CONCEPT.md)
-- [アーキテクチャ](docs/ARCHITECTURE.md)
-- [スキル仕様](docs/SKILL-SPEC.md)
-- [CLI 仕様](docs/CLI-SPEC.md)
-- [AI 連携仕様](docs/AI-SPEC.md)
+- [Concept](docs/CONCEPT.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Skill Spec](docs/SKILL-SPEC.md)
+- [CLI Spec](docs/CLI-SPEC.md)
+- [AI Integration Spec](docs/AI-SPEC.md)
 
-## ライセンス
+## License
 
 MIT
