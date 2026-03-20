@@ -50,6 +50,29 @@ describe("parseSkillInput", () => {
 		expect(result.default).toBe(5);
 	});
 
+	it("textarea タイプが正しくパースされる", () => {
+		const result = parseSkillInput({
+			name: "body",
+			type: "textarea",
+			message: "本文を入力してください",
+		});
+
+		expect(result.type).toBe("textarea");
+		expect(result.message).toBe("本文を入力してください");
+	});
+
+	it("textarea タイプがデフォルト値付きでパースされる", () => {
+		const result = parseSkillInput({
+			name: "body",
+			type: "textarea",
+			message: "本文を入力",
+			default: "デフォルトテキスト",
+		});
+
+		expect(result.type).toBe("textarea");
+		expect(result.default).toBe("デフォルトテキスト");
+	});
+
 	it("password タイプが正しくパースされる", () => {
 		const result = parseSkillInput({
 			name: "secret",

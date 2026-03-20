@@ -66,7 +66,7 @@ npm run deploy:{{environment}}
 ### Input 型
 
 ```typescript
-type InputType = "text" | "select" | "confirm" | "number" | "password";
+type InputType = "text" | "textarea" | "select" | "confirm" | "number" | "password";
 
 interface Input {
   name: string;                     // 変数名（{{name}} で参照）
@@ -83,7 +83,8 @@ interface Input {
 
 | type | UI | 戻り値型 |
 |------|-----|---------|
-| `text` | 自由入力 | `string` |
+| `text` | 自由入力（1行） | `string` |
+| `textarea` | 複数行入力（Meta+Enter で確定） | `string` |
 | `select` | 選択肢から選ぶ | `string` |
 | `confirm` | Yes/No | `boolean` |
 | `number` | 数値入力 | `number` |
