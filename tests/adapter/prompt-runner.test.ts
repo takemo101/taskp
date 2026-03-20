@@ -10,6 +10,7 @@ vi.mock("@inquirer/prompts", () => ({
 	password: vi.fn(),
 }));
 
+import { ExitPromptError } from "@inquirer/core";
 import { confirm, editor, input, number, password, select } from "@inquirer/prompts";
 import { createPromptRunner } from "../../src/adapter/prompt-runner";
 
@@ -203,6 +204,18 @@ describe("PromptRunner", () => {
 		if (result.ok) return;
 		expect(result.error.type).toBe("EXECUTION_ERROR");
 		expect(result.error.message).toContain("User force closed the prompt");
+	});
+
+	it("returns cancellation error when user presses Ctrl+C", async () => {
+		mockedInput.mockRejectedValueOnce(new ExitPromptError());
+
+		const inputs: SkillInput[] = [{ name: "name", type: "text", message: "Name?" }];
+
+		const result = await runner.collect(inputs, {});
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("EXECUTION_ERROR");
+		expect(result.error.message).toBe("User cancelled the prompt");
 	});
 
 	it("returns error on TTY failure", async () => {

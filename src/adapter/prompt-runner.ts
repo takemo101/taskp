@@ -1,3 +1,4 @@
+import { ExitPromptError } from "@inquirer/core";
 import { confirm, editor, input, number, password, select } from "@inquirer/prompts";
 import type { SkillInput } from "../core/skill/skill-input";
 import type { ExecutionError } from "../core/types/errors";
@@ -37,6 +38,9 @@ export function createPromptRunner(): PromptCollector {
 				try {
 					results[skillInput.name] = await promptFn(skillInput);
 				} catch (error: unknown) {
+					if (error instanceof ExitPromptError) {
+						return err(executionError("User cancelled the prompt"));
+					}
 					return err(executionError(toErrorMessage(error)));
 				}
 			}
