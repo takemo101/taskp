@@ -62,9 +62,9 @@ export async function showSkillSelector(
 		});
 
 		const help = KeyHelp([
-			{ key: "↑↓", description: "移動" },
-			{ key: "Enter", description: "選択" },
-			{ key: "Esc", description: "終了" },
+			{ key: "↑↓", description: "Navigate" },
+			{ key: "Enter", description: "Select" },
+			{ key: "Esc", description: "Quit" },
 		]);
 
 		container.add(searchInput);

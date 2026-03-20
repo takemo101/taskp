@@ -39,7 +39,7 @@ export async function showExecution(
 			width: "100%",
 			height: "100%",
 			borderStyle: "rounded",
-			title: `${skill.metadata.name} [実行中]`,
+			title: `${skill.metadata.name} [Running]`,
 			padding: 1,
 			flexDirection: "column",
 			justifyContent: "flex-start",
@@ -81,8 +81,8 @@ export async function showExecution(
 		});
 		helpBox.add(
 			KeyHelp([
-				{ key: "Enter", description: "戻る" },
-				{ key: "Esc", description: "終了" },
+				{ key: "Enter", description: "Back" },
+				{ key: "Esc", description: "Quit" },
 			]),
 		);
 		container.add(helpBox);
@@ -104,7 +104,7 @@ export async function showExecution(
 				stopSpinner();
 				const seconds = (elapsedMs / 1000).toFixed(1);
 				summaryText.content = `Done in ${seconds}s (${steps} steps)`;
-				container.title = `${skill.metadata.name} [完了]`;
+				container.title = `${skill.metadata.name} [Done]`;
 				helpBox.visible = true;
 			},
 		};
