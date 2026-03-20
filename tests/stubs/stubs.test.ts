@@ -80,7 +80,7 @@ describe("StubPromptCollector", () => {
 		const collector = createStubPromptCollector({ name: "Alice" });
 
 		const result = await collector.collect([], { existing: "value" });
-		expect(result).toEqual({ existing: "value", name: "Alice" });
+		expect(result).toEqual(ok({ existing: "value", name: "Alice" }));
 	});
 
 	it("records collected inputs", async () => {

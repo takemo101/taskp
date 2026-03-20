@@ -1,5 +1,9 @@
 import { confirm, editor, input, number, password, select } from "@inquirer/prompts";
 import type { SkillInput } from "../core/skill/skill-input";
+import type { ExecutionError } from "../core/types/errors";
+import { executionError } from "../core/types/errors";
+import type { Result } from "../core/types/result";
+import { err, ok } from "../core/types/result";
 import type { PromptCollector } from "../usecase/port/prompt-collector";
 
 type PromptFn = (skillInput: SkillInput) => Promise<string>;
@@ -18,24 +22,35 @@ export function createPromptRunner(): PromptCollector {
 		collect: async (
 			inputs: readonly SkillInput[],
 			presets: Readonly<Record<string, string>>,
-		): Promise<Readonly<Record<string, string>>> => {
-			const results: Record<string, string> = {};
+		): Promise<Result<Readonly<Record<string, string>>, ExecutionError>> => {
+			try {
+				const results: Record<string, string> = {};
 
-			for (const skillInput of inputs) {
-				// --set key=value で事前指定された値はプロンプトをスキップする
-				// （CI/スクリプトからの非対話実行を可能にするため）
-				if (skillInput.name in presets) {
-					results[skillInput.name] = presets[skillInput.name];
-					continue;
+				for (const skillInput of inputs) {
+					// --set key=value で事前指定された値はプロンプトをスキップする
+					// （CI/スクリプトからの非対話実行を可能にするため）
+					if (skillInput.name in presets) {
+						results[skillInput.name] = presets[skillInput.name];
+						continue;
+					}
+
+					const promptFn = promptByType[skillInput.type];
+					results[skillInput.name] = await promptFn(skillInput);
 				}
 
-				const promptFn = promptByType[skillInput.type];
-				results[skillInput.name] = await promptFn(skillInput);
+				return ok(results);
+			} catch (error: unknown) {
+				return err(executionError(toErrorMessage(error)));
 			}
-
-			return results;
 		},
 	};
+}
+
+function toErrorMessage(error: unknown): string {
+	if (error instanceof Error) {
+		return error.message;
+	}
+	return String(error);
 }
 
 async function askText(skillInput: SkillInput): Promise<string> {
