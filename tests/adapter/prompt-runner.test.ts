@@ -159,7 +159,7 @@ describe("PromptRunner", () => {
 		expect(callArgs.validate!("INVALID")).toEqual(expect.stringContaining("must match"));
 	});
 
-	it("throws on invalid validate regex pattern", async () => {
+	it("returns error on invalid validate regex pattern", async () => {
 		const inputs: SkillInput[] = [
 			{
 				name: "code",
@@ -169,7 +169,11 @@ describe("PromptRunner", () => {
 			},
 		];
 
-		await expect(runner.collect(inputs, {})).rejects.toThrow("Invalid regex pattern: [invalid(");
+		const result = await runner.collect(inputs, {});
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("EXECUTION_ERROR");
+		expect(result.error.message).toContain("Invalid regex pattern: [invalid(");
 	});
 
 	it("collects multiple inputs in order", async () => {
@@ -189,7 +193,7 @@ describe("PromptRunner", () => {
 		expect(result.value).toEqual({ name: "Alice", age: "30", ok: "false" });
 	});
 
-	it("returns error when prompt throws", async () => {
+	it("returns error when user cancels prompt", async () => {
 		mockedInput.mockRejectedValueOnce(new Error("User force closed the prompt"));
 
 		const inputs: SkillInput[] = [{ name: "name", type: "text", message: "Name?" }];
@@ -199,5 +203,19 @@ describe("PromptRunner", () => {
 		if (result.ok) return;
 		expect(result.error.type).toBe("EXECUTION_ERROR");
 		expect(result.error.message).toContain("User force closed the prompt");
+	});
+
+	it("returns error on TTY failure", async () => {
+		mockedSelect.mockRejectedValueOnce(new Error("Input stream is not a TTY"));
+
+		const inputs: SkillInput[] = [
+			{ name: "lang", type: "select", message: "Pick", choices: ["a", "b"] },
+		];
+
+		const result = await runner.collect(inputs, {});
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("EXECUTION_ERROR");
+		expect(result.error.message).toContain("Input stream is not a TTY");
 	});
 });

@@ -23,25 +23,25 @@ export function createPromptRunner(): PromptCollector {
 			inputs: readonly SkillInput[],
 			presets: Readonly<Record<string, string>>,
 		): Promise<Result<Readonly<Record<string, string>>, ExecutionError>> => {
-			try {
-				const results: Record<string, string> = {};
+			const results: Record<string, string> = {};
 
-				for (const skillInput of inputs) {
-					// --set key=value で事前指定された値はプロンプトをスキップする
-					// （CI/スクリプトからの非対話実行を可能にするため）
-					if (skillInput.name in presets) {
-						results[skillInput.name] = presets[skillInput.name];
-						continue;
-					}
-
-					const promptFn = promptByType[skillInput.type];
-					results[skillInput.name] = await promptFn(skillInput);
+			for (const skillInput of inputs) {
+				// --set key=value で事前指定された値はプロンプトをスキップする
+				// （CI/スクリプトからの非対話実行を可能にするため）
+				if (skillInput.name in presets) {
+					results[skillInput.name] = presets[skillInput.name];
+					continue;
 				}
 
-				return ok(results);
-			} catch (error: unknown) {
-				return err(executionError(toErrorMessage(error)));
+				const promptFn = promptByType[skillInput.type];
+				try {
+					results[skillInput.name] = await promptFn(skillInput);
+				} catch (error: unknown) {
+					return err(executionError(toErrorMessage(error)));
+				}
 			}
+
+			return ok(results);
 		},
 	};
 }
@@ -71,7 +71,11 @@ async function askTextarea(skillInput: SkillInput): Promise<string> {
 }
 
 async function askSelect(skillInput: SkillInput): Promise<string> {
-	const choices = skillInput.choices!.map((choice) => ({
+	if (!skillInput.choices) {
+		throw new Error(`choices is required for select input: ${skillInput.name}`);
+	}
+
+	const choices = skillInput.choices.map((choice) => ({
 		name: choice,
 		value: choice,
 	}));
