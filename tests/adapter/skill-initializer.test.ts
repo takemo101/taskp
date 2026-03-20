@@ -47,6 +47,20 @@ describe("createSkillInitializer", () => {
 		expect(content).toContain("```bash");
 	});
 
+	it("returns error when directory creation fails", async () => {
+		const initializer = createSkillInitializer({ baseDir: "/nonexistent/readonly/path" });
+
+		const result = await initializer.create("my-task", {
+			mode: "template",
+			description: "my-task skill",
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.message).toContain('Failed to create skill "my-task"');
+		}
+	});
+
 	it("generates agent mode content", async () => {
 		const initializer = createSkillInitializer({ baseDir });
 
