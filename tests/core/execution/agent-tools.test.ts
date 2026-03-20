@@ -57,6 +57,16 @@ describe("read tool", () => {
 		);
 		expect(result).toContain("describe");
 	});
+
+	it("存在しないファイルでエラーを投げる", async () => {
+		const tools = buildTools(["read"]);
+		await expect(
+			tools.read.execute?.(
+				{ path: "/nonexistent/path/file.txt" },
+				{ toolCallId: "3", messages: [], abortSignal: AbortSignal.timeout(5000) },
+			),
+		).rejects.toThrow("Failed to read file: /nonexistent/path/file.txt");
+	});
 });
 
 describe("write tool", () => {
@@ -75,6 +85,17 @@ describe("write tool", () => {
 		} finally {
 			await rm(dir, { recursive: true });
 		}
+	});
+
+	it("存在しないディレクトリへの書き込みでエラーを投げる", async () => {
+		const tools = buildTools(["write"]);
+		const invalidPath = "/nonexistent/dir/file.txt";
+		await expect(
+			tools.write.execute?.(
+				{ path: invalidPath, content: "test" },
+				{ toolCallId: "4", messages: [], abortSignal: AbortSignal.timeout(5000) },
+			),
+		).rejects.toThrow(`Failed to write file: ${invalidPath}`);
 	});
 });
 
