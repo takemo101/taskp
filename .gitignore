@@ -45,3 +45,4 @@ opnecode.json
 # Isuner specific
 .isuner/
 .isuner-prompt.md
+.isuner-prompt-*.md
