@@ -26,8 +26,6 @@ describe("domainErrorMessage", () => {
 	});
 
 	it("returns formatted message for SkillNotFoundError", () => {
-		expect(domainErrorMessage(skillNotFoundError("my-skill"))).toBe(
-			"Skill not found: my-skill",
-		);
+		expect(domainErrorMessage(skillNotFoundError("my-skill"))).toBe("Skill not found: my-skill");
 	});
 });
