@@ -3,6 +3,7 @@ import { createCliRenderer } from "@opentui/core";
 import { createLanguageModel, resolveModelSpec } from "../adapter/ai-provider";
 import { createDefaultConfigLoader } from "../adapter/config-loader";
 import { createDefaultSkillLoader } from "../adapter/skill-loader";
+import { copyToClipboard } from "./clipboard";
 import { showExecution } from "./screens/execution-view";
 import { showInputForm } from "./screens/input-form";
 import { showSkillSelector } from "./screens/skill-selector";
@@ -11,6 +12,13 @@ export async function startTui(): Promise<void> {
 	const renderer = await createCliRenderer({
 		exitOnCtrlC: true,
 		targetFps: 30,
+	});
+
+	renderer.on("selection", (selection) => {
+		const text = selection.getSelectedText();
+		if (text) {
+			copyToClipboard(text);
+		}
 	});
 
 	const skillRepository = createDefaultSkillLoader(process.cwd());
