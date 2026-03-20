@@ -4,7 +4,6 @@ import {
 	type CliRenderer,
 	type KeyEvent,
 	MarkdownRenderable,
-	RGBA,
 	ScrollBoxRenderable,
 	SyntaxStyle,
 	TextRenderable,
@@ -20,20 +19,11 @@ import type { SkillRepository } from "../../usecase/port/skill-repository";
 import { runAgentSkill } from "../../usecase/run-agent-skill";
 import { runSkill } from "../../usecase/run-skill";
 import { KeyHelp } from "../components/key-help";
+import { createLoadingSpinner } from "../components/loading-spinner";
 import { ToolStatusDisplay } from "../components/tool-status";
 import { createTuiStreamWriter, type ExecutionViewPort } from "../tui-stream-writer";
 
 const CONTAINER_ID = "exec-container";
-
-const markdownSyntaxStyle = SyntaxStyle.fromStyles({
-	"markup.heading": { fg: RGBA.fromHex("#58A6FF"), bold: true },
-	"markup.bold": { fg: RGBA.fromHex("#F0F6FC"), bold: true },
-	"markup.italic": { fg: RGBA.fromHex("#F0F6FC"), italic: true },
-	"markup.list": { fg: RGBA.fromHex("#FF7B72") },
-	"markup.raw": { fg: RGBA.fromHex("#A5D6FF") },
-	"markup.link": { fg: RGBA.fromHex("#58A6FF"), underline: true },
-	default: { fg: RGBA.fromHex("#E6EDF3") },
-});
 
 export async function showExecution(
 	renderer: CliRenderer,
@@ -52,7 +42,11 @@ export async function showExecution(
 			title: `${skill.metadata.name} [実行中]`,
 			padding: 1,
 			flexDirection: "column",
+			justifyContent: "flex-start",
 		});
+
+		const loadingSpinner = createLoadingSpinner(renderer);
+		container.add(loadingSpinner.renderable);
 
 		const toolStatus = new ToolStatusDisplay(renderer, "tool-status");
 		container.add(toolStatus.renderable);
@@ -69,7 +63,7 @@ export async function showExecution(
 			id: "output-markdown",
 			width: "100%",
 			content: "",
-			syntaxStyle: markdownSyntaxStyle,
+			syntaxStyle: SyntaxStyle.create(),
 			streaming: true,
 		});
 
@@ -79,7 +73,6 @@ export async function showExecution(
 		const summaryText = new TextRenderable(renderer, {
 			id: "summary",
 			content: "",
-			fg: "#00FF00",
 		});
 		container.add(summaryText);
 
@@ -96,12 +89,15 @@ export async function showExecution(
 		container.add(helpBox);
 
 		renderer.root.add(container);
+		container.focus();
 
 		const viewPort: ExecutionViewPort = {
 			appendOutput(text: string) {
+				loadingSpinner.stop();
 				markdown.content += text;
 			},
 			showToolStatus(toolName: string, args: Record<string, unknown>) {
+				loadingSpinner.stop();
 				toolStatus.show(toolName, args);
 			},
 			clearToolStatus() {
@@ -131,6 +127,7 @@ export async function showExecution(
 
 		function cleanup(handler: (key: KeyEvent) => void): void {
 			renderer.keyInput.off("keypress", handler);
+			loadingSpinner.stop();
 			toolStatus.destroy();
 			renderer.root.remove(CONTAINER_ID);
 		}

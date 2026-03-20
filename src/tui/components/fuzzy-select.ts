@@ -12,6 +12,7 @@ export function filterSkills(query: string, skills: readonly SkillOption[]): Ski
 
 	const results = fuzzysort.go(query, skills as SkillOption[], {
 		keys: ["name", "description"],
+		threshold: 0.3,
 	});
 
 	return results.map((r) => r.obj);

@@ -1,6 +1,6 @@
 [ai]
 default_provider = "omlx"
-default_model = "Qwen3.5-9B-MLX-4bit"
+default_model = "Qwen3.5-4B-MLX-4bit"
 
 [ai.providers.omlx]
 base_url = "http://127.0.0.1:8124/v1"

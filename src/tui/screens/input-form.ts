@@ -1,6 +1,7 @@
 import {
 	BoxRenderable,
 	type CliRenderer,
+	green,
 	InputRenderable,
 	InputRenderableEvents,
 	type KeyEvent,
@@ -8,10 +9,12 @@ import {
 	SelectRenderable,
 	SelectRenderableEvents,
 	TextRenderable,
+	t,
 } from "@opentui/core";
 import type { Skill } from "../../core/skill/skill";
 import type { SkillInput } from "../../core/skill/skill-input";
 import { KeyHelp } from "../components/key-help";
+import { flatSelectStyle } from "../components/styles";
 
 const CONTAINER_ID = "form-container";
 
@@ -40,6 +43,7 @@ export async function showInputForm(
 			title: skill.metadata.name,
 			padding: 1,
 			flexDirection: "column",
+			justifyContent: "flex-start",
 		});
 
 		container.add(
@@ -54,11 +58,17 @@ export async function showInputForm(
 		const elements: FormElement[] = [];
 
 		for (const input of inputs) {
-			container.add(
+			const group = new BoxRenderable(renderer, {
+				id: `group-${input.name}`,
+				width: "100%",
+				flexDirection: "column",
+				marginBottom: 1,
+			});
+
+			group.add(
 				new TextRenderable(renderer, {
 					id: `label-${input.name}`,
-					content: input.message,
-					fg: "#e2e8f0",
+					content: t`${green("❯")} ${input.message}`,
 				}),
 			);
 
@@ -67,7 +77,8 @@ export async function showInputForm(
 				advanceFocus();
 			});
 
-			container.add(element);
+			group.add(element);
+			container.add(group);
 			elements.push({ input, element });
 		}
 
@@ -170,13 +181,11 @@ function createSelectElement(
 	const select = new SelectRenderable(renderer, {
 		id: `input-${input.name}`,
 		width: "100%",
-		height: Math.min(choices.length + 1, 8),
+		height: choices.length,
+		marginLeft: 2,
 		options,
-		backgroundColor: "#1a1a2e",
-		focusedBackgroundColor: "#16213e",
-		textColor: "#e2e8f0",
-		selectedBackgroundColor: "#3b82f6",
-		selectedTextColor: "#ffffff",
+		showDescription: false,
+		...flatSelectStyle,
 	});
 
 	select.on(SelectRenderableEvents.ITEM_SELECTED, (_index: number, option: SelectOption) => {
@@ -199,13 +208,11 @@ function createConfirmElement(
 	const select = new SelectRenderable(renderer, {
 		id: `input-${input.name}`,
 		width: "100%",
-		height: 3,
+		height: 2,
+		marginLeft: 2,
 		options,
-		backgroundColor: "#1a1a2e",
-		focusedBackgroundColor: "#16213e",
-		textColor: "#e2e8f0",
-		selectedBackgroundColor: "#3b82f6",
-		selectedTextColor: "#ffffff",
+		showDescription: false,
+		...flatSelectStyle,
 	});
 
 	select.on(SelectRenderableEvents.ITEM_SELECTED, (_index: number, option: SelectOption) => {
@@ -223,11 +230,8 @@ function createTextInputElement(
 	const inputElement = new InputRenderable(renderer, {
 		id: `input-${input.name}`,
 		width: "100%",
+		marginLeft: 2,
 		placeholder: input.default !== undefined ? String(input.default) : "",
-		backgroundColor: "#1a1a2e",
-		focusedBackgroundColor: "#16213e",
-		textColor: "#e2e8f0",
-		cursorColor: "#00FF00",
 	});
 
 	inputElement.on(InputRenderableEvents.ENTER, (val: string) => {

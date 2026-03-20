@@ -11,6 +11,7 @@ import {
 import type { Skill } from "../../core/skill/skill";
 import { filterSkills, type SkillOption } from "../components/fuzzy-select";
 import { KeyHelp } from "../components/key-help";
+import { flatSelectStyle } from "../components/styles";
 
 const CONTAINER_ID = "selector-container";
 
@@ -41,32 +42,23 @@ export async function showSkillSelector(
 			title: "taskp",
 			padding: 1,
 			flexDirection: "column",
+			justifyContent: "flex-start",
 		});
 
 		const searchInput = new InputRenderable(renderer, {
 			id: "search-input",
 			width: "100%",
 			placeholder: "Search skills...",
-			backgroundColor: "#1a1a2e",
-			focusedBackgroundColor: "#16213e",
-			textColor: "#e2e8f0",
-			cursorColor: "#00FF00",
 		});
 
 		const selectList = new SelectRenderable(renderer, {
 			id: "skill-list",
 			width: "100%",
-			height: 15,
+			flexGrow: 1,
 			options: toSelectOptions(skillOptions),
 			showDescription: true,
 			wrapSelection: true,
-			backgroundColor: "#0f0f1a",
-			focusedBackgroundColor: "#1a1a2e",
-			textColor: "#e2e8f0",
-			selectedBackgroundColor: "#3b82f6",
-			selectedTextColor: "#ffffff",
-			descriptionColor: "#6b7280",
-			selectedDescriptionColor: "#d1d5db",
+			...flatSelectStyle,
 		});
 
 		const help = KeyHelp([

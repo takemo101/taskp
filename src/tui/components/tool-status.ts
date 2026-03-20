@@ -1,8 +1,6 @@
 import { type CliRenderer, TextRenderable } from "@opentui/core";
+import { SPINNER_FRAMES, SPINNER_INTERVAL_MS } from "./spinner";
 import { formatToolArgs } from "./tool-args-formatter";
-
-const SPINNER_FRAMES = ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"] as const;
-const SPINNER_INTERVAL_MS = 80;
 
 type ToolState = {
 	readonly tool: string;
