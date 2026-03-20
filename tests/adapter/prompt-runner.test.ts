@@ -10,6 +10,7 @@ vi.mock("@inquirer/prompts", () => ({
 	password: vi.fn(),
 }));
 
+import { ExitPromptError } from "@inquirer/core";
 import { confirm, editor, input, number, password, select } from "@inquirer/prompts";
 import { createPromptRunner } from "../../src/adapter/prompt-runner";
 
@@ -159,7 +160,7 @@ describe("PromptRunner", () => {
 		expect(callArgs.validate!("INVALID")).toEqual(expect.stringContaining("must match"));
 	});
 
-	it("throws on invalid validate regex pattern", async () => {
+	it("returns error on invalid validate regex pattern", async () => {
 		const inputs: SkillInput[] = [
 			{
 				name: "code",
@@ -169,7 +170,11 @@ describe("PromptRunner", () => {
 			},
 		];
 
-		await expect(runner.collect(inputs, {})).rejects.toThrow("Invalid regex pattern: [invalid(");
+		const result = await runner.collect(inputs, {});
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("EXECUTION_ERROR");
+		expect(result.error.message).toContain("Invalid regex pattern: [invalid(");
 	});
 
 	it("collects multiple inputs in order", async () => {
@@ -199,5 +204,17 @@ describe("PromptRunner", () => {
 		if (result.ok) return;
 		expect(result.error.type).toBe("EXECUTION_ERROR");
 		expect(result.error.message).toContain("User force closed the prompt");
+	});
+
+	it("returns cancellation error when user presses Ctrl+C", async () => {
+		mockedInput.mockRejectedValueOnce(new ExitPromptError());
+
+		const inputs: SkillInput[] = [{ name: "name", type: "text", message: "Name?" }];
+
+		const result = await runner.collect(inputs, {});
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("EXECUTION_ERROR");
+		expect(result.error.message).toBe("User cancelled the prompt");
 	});
 });
