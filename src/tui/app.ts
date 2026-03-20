@@ -1,5 +1,6 @@
 import { createCliRenderer } from "@opentui/core";
 import { createDefaultSkillLoader } from "../adapter/skill-loader";
+import { showInputForm } from "./screens/input-form";
 import { showSkillSelector } from "./screens/skill-selector";
 
 export async function startTui(): Promise<void> {
@@ -21,7 +22,10 @@ export async function startTui(): Promise<void> {
 		const skill = await showSkillSelector(renderer, skills);
 		if (!skill) break;
 
-		// TODO: 入力フォーム → 実行（後続 Issue で実装）
+		const variables = await showInputForm(renderer, skill);
+		if (!variables) continue;
+
+		// TODO: 実行画面（後続 Issue で実装）
 	}
 
 	renderer.destroy();
