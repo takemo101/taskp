@@ -156,8 +156,8 @@ describe("PromptRunner", () => {
 
 		const callArgs = mockedInput.mock.calls[0][0] as { validate?: (v: string) => string | true };
 		expect(callArgs.validate).toBeDefined();
-		expect(callArgs.validate!("abc123")).toBe(true);
-		expect(callArgs.validate!("INVALID")).toEqual(expect.stringContaining("must match"));
+		expect(callArgs.validate?.("abc123")).toBe(true);
+		expect(callArgs.validate?.("INVALID")).toEqual(expect.stringContaining("must match"));
 	});
 
 	it("returns error on invalid validate regex pattern", async () => {
