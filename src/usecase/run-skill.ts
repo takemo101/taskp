@@ -1,3 +1,4 @@
+import { dirname } from "node:path";
 import type { CodeBlock } from "../core/skill/skill-body";
 import type { DomainError } from "../core/types/errors";
 import type { Result } from "../core/types/result";
@@ -48,7 +49,7 @@ export async function runSkill(
 
 	const reserved: ReservedVars = {
 		cwd: process.cwd(),
-		skillDir: skill.location,
+		skillDir: dirname(skill.location),
 		date: new Date().toISOString().split("T")[0],
 		timestamp: new Date().toISOString(),
 	};
