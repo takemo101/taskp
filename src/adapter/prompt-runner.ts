@@ -113,7 +113,7 @@ async function askPassword(skillInput: SkillInput): Promise<string> {
 function buildValidator(skillInput: SkillInput): ((value: string) => string | true) | undefined {
 	if (!skillInput.validate) return undefined;
 
-	const regex = new RegExp(skillInput.validate);
+	const regex = compileRegex(skillInput.validate);
 	return (value: string) => {
 		if (!regex.test(value)) {
 			return `Input must match pattern: ${skillInput.validate}`;
@@ -127,7 +127,7 @@ function buildNumberValidator(
 ): ((value: number | undefined) => string | true) | undefined {
 	if (!skillInput.validate) return undefined;
 
-	const regex = new RegExp(skillInput.validate);
+	const regex = compileRegex(skillInput.validate);
 	return (value: number | undefined) => {
 		if (value === undefined) return true;
 		if (!regex.test(String(value))) {
@@ -135,4 +135,12 @@ function buildNumberValidator(
 		}
 		return true;
 	};
+}
+
+function compileRegex(pattern: string): RegExp {
+	try {
+		return new RegExp(pattern);
+	} catch (cause) {
+		throw new Error(`Invalid regex pattern: ${pattern}`, { cause });
+	}
 }

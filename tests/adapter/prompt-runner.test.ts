@@ -159,6 +159,19 @@ describe("PromptRunner", () => {
 		expect(callArgs.validate!("INVALID")).toEqual(expect.stringContaining("must match"));
 	});
 
+	it("throws on invalid validate regex pattern", async () => {
+		const inputs: SkillInput[] = [
+			{
+				name: "code",
+				type: "text",
+				message: "Code?",
+				validate: "[invalid(",
+			},
+		];
+
+		await expect(runner.collect(inputs, {})).rejects.toThrow("Invalid regex pattern: [invalid(");
+	});
+
 	it("collects multiple inputs in order", async () => {
 		mockedInput.mockResolvedValueOnce("Alice");
 		mockedNumber.mockResolvedValueOnce(30);
