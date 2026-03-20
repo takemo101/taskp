@@ -67,11 +67,7 @@ describe("renderTemplate", () => {
 
 	describe("conditional blocks ({{#if}}/{{else}}/{{/if}})", () => {
 		it("renders if-block when variable is truthy", () => {
-			const result = renderTemplate(
-				"{{#if flag}}YES{{/if}}",
-				{ flag: "true" },
-				RESERVED,
-			);
+			const result = renderTemplate("{{#if flag}}YES{{/if}}", { flag: "true" }, RESERVED);
 			expect(result).toEqual({ ok: true, value: "YES" });
 		});
 
@@ -173,29 +169,17 @@ Short
 		});
 
 		it("allows condition variable to also appear in body", () => {
-			const result = renderTemplate(
-				"{{#if flag}}flag={{flag}}{{/if}}",
-				{ flag: "true" },
-				RESERVED,
-			);
+			const result = renderTemplate("{{#if flag}}flag={{flag}}{{/if}}", { flag: "true" }, RESERVED);
 			expect(result).toEqual({ ok: true, value: "flag=true" });
 		});
 
 		it("allows reserved variable as condition", () => {
-			const result = renderTemplate(
-				"{{#if __cwd__}}cwd exists{{else}}no cwd{{/if}}",
-				{},
-				RESERVED,
-			);
+			const result = renderTemplate("{{#if __cwd__}}cwd exists{{else}}no cwd{{/if}}", {}, RESERVED);
 			expect(result).toEqual({ ok: true, value: "cwd exists" });
 		});
 
 		it("returns error for unclosed {{#if}} block", () => {
-			const result = renderTemplate(
-				"{{#if flag}}no closing tag",
-				{ flag: "true" },
-				RESERVED,
-			);
+			const result = renderTemplate("{{#if flag}}no closing tag", { flag: "true" }, RESERVED);
 			expect(result).toEqual({
 				ok: false,
 				error: { type: "RENDER_ERROR", message: "Unclosed {{#if}} block: missing {{/if}}" },
@@ -203,11 +187,7 @@ Short
 		});
 
 		it("returns error for {{/if}} without matching {{#if}}", () => {
-			const result = renderTemplate(
-				"some text{{/if}}",
-				{},
-				RESERVED,
-			);
+			const result = renderTemplate("some text{{/if}}", {}, RESERVED);
 			expect(result).toEqual({
 				ok: false,
 				error: { type: "RENDER_ERROR", message: "Unexpected {{/if}} without matching {{#if}}" },
@@ -215,11 +195,7 @@ Short
 		});
 
 		it("returns error for {{else}} without matching {{#if}}", () => {
-			const result = renderTemplate(
-				"some text{{else}}other",
-				{},
-				RESERVED,
-			);
+			const result = renderTemplate("some text{{else}}other", {}, RESERVED);
 			expect(result).toEqual({
 				ok: false,
 				error: { type: "RENDER_ERROR", message: "Unexpected {{else}} without matching {{#if}}" },
