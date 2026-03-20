@@ -11,8 +11,8 @@ import { createDefaultSkillLoader } from "./adapter/skill-loader";
 import { createStreamWriter } from "./adapter/stream-writer";
 import type { ContextSource } from "./core/skill/context-source";
 import type { SkillScope } from "./core/skill/skill";
-import { type DomainError, EXIT_CODE } from "./core/types/errors";
-import { ok } from "./core/types/result";
+import { type DomainError, EXIT_CODE, executionError } from "./core/types/errors";
+import { err, ok } from "./core/types/result";
 import { type InitOutput, initSkill } from "./usecase/init-skill";
 import { createListSkillsUseCase } from "./usecase/list-skills";
 import { runAgentSkill } from "./usecase/run-agent-skill";
@@ -283,16 +283,35 @@ async function runAgentMode(
 			return ok(result.stdout);
 		},
 		fetchUrl: async (url) => {
-			const response = await fetch(url);
-			return ok(await response.text());
+			try {
+				const response = await fetch(url);
+				if (!response.ok) {
+					return err(executionError(`Failed to fetch URL: ${url} (${response.status})`));
+				}
+				return ok(await response.text());
+			} catch (e) {
+				return err(
+					executionError(
+						`Failed to fetch URL: ${url} (${e instanceof Error ? e.message : String(e)})`,
+					),
+				);
+			}
 		},
 		scanGlob: async (pattern, cwd) => {
-			const { glob } = await import("node:fs/promises");
-			const matches: string[] = [];
-			for await (const entry of glob(pattern, { cwd })) {
-				matches.push(entry);
+			try {
+				const { glob } = await import("node:fs/promises");
+				const matches: string[] = [];
+				for await (const entry of glob(pattern, { cwd })) {
+					matches.push(entry);
+				}
+				return ok(matches);
+			} catch (e) {
+				return err(
+					executionError(
+						`Failed to scan glob: ${pattern} (${e instanceof Error ? e.message : String(e)})`,
+					),
+				);
 			}
-			return matches;
 		},
 	});
 
