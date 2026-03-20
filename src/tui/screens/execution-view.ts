@@ -19,7 +19,7 @@ import type { SkillRepository } from "../../usecase/port/skill-repository";
 import { runAgentSkill } from "../../usecase/run-agent-skill";
 import { runSkill } from "../../usecase/run-skill";
 import { KeyHelp } from "../components/key-help";
-import { createLoadingSpinner } from "../components/loading-spinner";
+import { SPINNER_FRAMES, SPINNER_INTERVAL_MS } from "../components/spinner";
 import { ToolStatusDisplay } from "../components/tool-status";
 import { createTuiStreamWriter, type ExecutionViewPort } from "../tui-stream-writer";
 
@@ -44,9 +44,6 @@ export async function showExecution(
 			flexDirection: "column",
 			justifyContent: "flex-start",
 		});
-
-		const loadingSpinner = createLoadingSpinner(renderer);
-		container.add(loadingSpinner.renderable);
 
 		const toolStatus = new ToolStatusDisplay(renderer, "tool-status");
 		container.add(toolStatus.renderable);
@@ -76,6 +73,8 @@ export async function showExecution(
 		});
 		container.add(summaryText);
 
+		const stopSpinner = startSpinner(summaryText);
+
 		const helpBox = new BoxRenderable(renderer, {
 			id: "exec-help",
 			visible: false,
@@ -93,17 +92,16 @@ export async function showExecution(
 
 		const viewPort: ExecutionViewPort = {
 			appendOutput(text: string) {
-				loadingSpinner.stop();
 				markdown.content += text;
 			},
 			showToolStatus(toolName: string, args: Record<string, unknown>) {
-				loadingSpinner.stop();
 				toolStatus.show(toolName, args);
 			},
 			clearToolStatus() {
 				toolStatus.clear();
 			},
 			showSummary(elapsedMs: number, steps: number) {
+				stopSpinner();
 				const seconds = (elapsedMs / 1000).toFixed(1);
 				summaryText.content = `Done in ${seconds}s (${steps} steps)`;
 				container.title = `${skill.metadata.name} [完了]`;
@@ -127,7 +125,7 @@ export async function showExecution(
 
 		function cleanup(handler: (key: KeyEvent) => void): void {
 			renderer.keyInput.off("keypress", handler);
-			loadingSpinner.stop();
+			stopSpinner();
 			toolStatus.destroy();
 			renderer.root.remove(CONTAINER_ID);
 		}
@@ -258,6 +256,24 @@ function formatDomainError(error: DomainError): string {
 		return `Skill "${error.name}" not found`;
 	}
 	return error.message;
+}
+
+function startSpinner(text: TextRenderable): () => void {
+	text.fg = "#888888";
+	let index = 0;
+	let interval: ReturnType<typeof setInterval> | null = setInterval(() => {
+		const frame = SPINNER_FRAMES[index % SPINNER_FRAMES.length];
+		text.content = `${frame} Generating...`;
+		index++;
+	}, SPINNER_INTERVAL_MS);
+
+	return () => {
+		if (interval === null) return;
+		clearInterval(interval);
+		interval = null;
+		text.fg = "#FFFFFF";
+		text.content = "";
+	};
 }
 
 function clearScreen(renderer: CliRenderer): void {
