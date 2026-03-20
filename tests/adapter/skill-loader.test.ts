@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { createSkillLoader } from "../../src/adapter/skill-loader";
 
 function createSkillFile(baseDir: string, name: string, content: string): void {
@@ -143,6 +143,51 @@ describe("SkillLoader", () => {
 
 			expect(skills).toHaveLength(1);
 			expect(skills[0].metadata.name).toBe("lint");
+		});
+	});
+
+	describe("parse error warning", () => {
+		let warnSpy: MockInstance;
+
+		beforeEach(() => {
+			warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+		});
+
+		afterEach(() => {
+			warnSpy.mockRestore();
+		});
+
+		it("パースエラー時に警告を出力する", async () => {
+			createSkillFile(localRoot, "broken", "---\ninvalid: :\n  bad: [\n---\n# Broken");
+			const loader = createSkillLoader({ localRoot, globalRoot });
+
+			const skills = await loader.listAll();
+
+			expect(skills).toHaveLength(0);
+			expect(warnSpy).toHaveBeenCalledOnce();
+			expect(warnSpy.mock.calls[0][0]).toMatch(/Warning: Failed to parse skill at/);
+			expect(warnSpy.mock.calls[0][0]).toMatch(/broken/);
+		});
+
+		it("パースエラーがあっても他のスキルは読み込める", async () => {
+			createSkillFile(localRoot, "broken", "---\ninvalid: :\n  bad: [\n---\n# Broken");
+			createSkillFile(localRoot, "valid", makeSkillMd("valid", "正常なスキル"));
+			const loader = createSkillLoader({ localRoot, globalRoot });
+
+			const skills = await loader.listAll();
+
+			expect(skills).toHaveLength(1);
+			expect(skills[0].metadata.name).toBe("valid");
+			expect(warnSpy).toHaveBeenCalledOnce();
+		});
+
+		it("ファイル不在時は警告を出さない", async () => {
+			const loader = createSkillLoader({ localRoot, globalRoot });
+
+			const skills = await loader.listAll();
+
+			expect(skills).toHaveLength(0);
+			expect(warnSpy).not.toHaveBeenCalled();
 		});
 	});
 });

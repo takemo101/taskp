@@ -98,6 +98,7 @@ async function tryLoadSkill(
 
 	const result = parseSkill(raw, path, scope);
 	if (!result.ok) {
+		console.warn(`Warning: Failed to parse skill at ${path}: ${result.error.message}`);
 		return undefined;
 	}
 
