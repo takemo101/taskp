@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 import { homedir } from "node:os";
 import { Cli, z } from "incur";
 import { createAgentExecutor } from "./adapter/agent-executor";

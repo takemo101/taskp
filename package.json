@@ -8,7 +8,7 @@
 		"bun": ">=1.2.0"
 	},
 	"bin": {
-		"taskp": "./dist/cli.js"
+		"taskp": "./src/cli.ts"
 	},
 	"exports": {
 		".": {
@@ -22,7 +22,7 @@
 	],
 	"scripts": {
 		"prepare": "lefthook install || true",
-    "postinstall": "bun build src/cli.ts --outdir dist --target bun --banner '#!/usr/bin/env bun'",
+
 		"dev": "bun run src/cli.ts",
 		"build": "bun build src/cli.ts --outdir dist --target bun --banner '#!/usr/bin/env bun'",
 		"check": "biome check .",
