@@ -7,5 +7,7 @@ pre-push:
       run: bun run typecheck
     test:
       run: bun run test
+    verify-config-schema:
+      run: bun run verify-config-schema
     build:
       run: bun run build
