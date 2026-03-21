@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, type MockInstance, vi } from "vitest";
 import { repairToolCall } from "../../src/adapter/agent-executor";
 
 // repairToolCall は AI SDK の ToolCallRepairFunction 型だが、
@@ -30,10 +30,17 @@ describe("repairToolCall", () => {
 		expect(result).toBeNull();
 	});
 
-	it("returns null when escaped JSON is still invalid", async () => {
-		// 制御文字はあるが JSON 構造自体が壊れている
-		const broken = '{"command": \x01';
-		const result = await repairToolCall(makeOptions(broken));
-		expect(result).toBeNull();
+	it("returns null and logs debug info when escaped JSON is still invalid", async () => {
+		const debugSpy: MockInstance = vi.spyOn(console, "debug").mockImplementation(() => {});
+		try {
+			// 制御文字はあるが JSON 構造自体が壊れている
+			const broken = '{"command": \x01';
+			const result = await repairToolCall(makeOptions(broken));
+			expect(result).toBeNull();
+			expect(debugSpy).toHaveBeenCalledOnce();
+			expect(debugSpy.mock.calls[0]?.[0]).toMatch(/Tool call repair failed/);
+		} finally {
+			debugSpy.mockRestore();
+		}
 	});
 });
