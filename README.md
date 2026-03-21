@@ -19,6 +19,18 @@ bun add -g github:takemo101/taskp
 
 > **Requirements:** Bun >= 1.2.0
 
+### Update
+
+```bash
+bun add -g github:takemo101/taskp
+```
+
+### Uninstall
+
+```bash
+bun remove -g taskp
+```
+
 ## Quick Start
 
 ### 1. Create a skill

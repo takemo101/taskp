@@ -19,6 +19,18 @@ bun add -g github:takemo101/taskp
 
 > **必要環境:** Bun >= 1.2.0
 
+### アップデート
+
+```bash
+bun add -g github:takemo101/taskp
+```
+
+### アンインストール
+
+```bash
+bun remove -g taskp
+```
+
 ## クイックスタート
 
 ### 1. スキルを作成する
