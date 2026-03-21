@@ -7,7 +7,13 @@ import type { CommandExecutor, ExecOptions, ExecResult } from "../usecase/port/c
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
-export function createCommandRunner(): CommandExecutor {
+export type CommandRunnerDeps = {
+	readonly defaultTimeoutMs?: number;
+};
+
+export function createCommandRunner(deps?: CommandRunnerDeps): CommandExecutor {
+	const timeoutMs = deps?.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS;
+
 	return {
 		execute: async (
 			command: string,
@@ -18,7 +24,7 @@ export function createCommandRunner(): CommandExecutor {
 					shell: true,
 					cwd: options?.cwd,
 					env: options?.env as Record<string, string> | undefined,
-					timeout: options?.timeout ?? DEFAULT_TIMEOUT_MS,
+					timeout: options?.timeout ?? timeoutMs,
 				});
 
 				return ok({

@@ -133,12 +133,16 @@ const cli = Cli.create("taskp", {
 				return;
 			}
 
-			const commandExecutor = createCommandRunner();
-			const progressWriter = createCliProgressWriter(process.stdout);
-
 			const configLoader = createDefaultConfigLoader(process.cwd());
 			const configResult = await configLoader.load();
-			const hooksConfig = configResult.ok ? configResult.value.hooks : undefined;
+			const config = configResult.ok ? configResult.value : undefined;
+
+			const commandExecutor = createCommandRunner({
+				defaultTimeoutMs: config?.cli?.command_timeout_ms,
+			});
+			const progressWriter = createCliProgressWriter(process.stdout);
+
+			const hooksConfig = config?.hooks;
 			const hookExecutor = createHookExecutor(commandExecutor);
 
 			const result = await runSkill(
@@ -310,7 +314,9 @@ async function runAgentMode(
 
 	const agentExecutor = createAgentExecutor(writer);
 
-	const commandExecutor = createCommandRunner();
+	const commandExecutor = createCommandRunner({
+		defaultTimeoutMs: configResult.value.cli?.command_timeout_ms,
+	});
 	const hookExecutor = createHookExecutor(commandExecutor);
 	const hooksConfig = configResult.value.hooks;
 
