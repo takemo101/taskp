@@ -7,8 +7,13 @@ export {
 	toExecutionError,
 } from "./agent-error-handler";
 export { createAgentExecutor } from "./agent-executor";
-export type { ModelSource, ModelSpec } from "./ai-provider";
-export { createLanguageModel, parseModelSpec, resolveModelSpec } from "./ai-provider";
+export type { ModelSource, ModelSpec, ProviderFactory, ProviderRegistry } from "./ai-provider";
+export {
+	createDefaultProviderRegistry,
+	createLanguageModel,
+	parseModelSpec,
+	resolveModelSpec,
+} from "./ai-provider";
 export { createCommandRunner } from "./command-runner";
 
 export type { AiConfig, CliConfig, Config, ProviderConfig } from "./config-loader";
