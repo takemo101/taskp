@@ -9,7 +9,7 @@ import { renderTemplate } from "../core/variable/template-renderer";
 import { type HooksConfig, runHooks } from "./hook-runner";
 import type { AgentExecutorPort, AgentExecutorResult } from "./port/agent-executor";
 import type { ContextCollectorPort } from "./port/context-collector";
-import type { HookContext, HookExecutorPort } from "./port/hook-executor";
+import type { HookExecutorPort } from "./port/hook-executor";
 import { createNoopProgressWriter, type ProgressWriter } from "./port/progress-writer";
 import type { PromptCollector } from "./port/prompt-collector";
 import type { SkillRepository } from "./port/skill-repository";
@@ -108,40 +108,34 @@ export async function runAgentSkill(
 	const durationMs = Date.now() - startTime;
 
 	if (!executeResult.ok) {
-		await invokeHooks(deps, {
-			skillName: skill.metadata.name,
-			mode: "agent",
-			status: "failed",
-			durationMs,
-			error: domainErrorMessage(executeResult.error),
+		await runHooks({
+			hookExecutor: deps.hookExecutor,
+			hooksConfig: deps.hooksConfig,
+			context: {
+				skillName: skill.metadata.name,
+				mode: "agent",
+				status: "failed",
+				durationMs,
+				error: domainErrorMessage(executeResult.error),
+			},
 		});
 		return executeResult;
 	}
 
-	await invokeHooks(deps, {
-		skillName: skill.metadata.name,
-		mode: "agent",
-		status: "success",
-		durationMs,
+	await runHooks({
+		hookExecutor: deps.hookExecutor,
+		hooksConfig: deps.hooksConfig,
+		context: {
+			skillName: skill.metadata.name,
+			mode: "agent",
+			status: "success",
+			durationMs,
+		},
 	});
 
 	return ok({
 		skillName: skill.metadata.name,
 		result: executeResult.value,
-	});
-}
-
-async function invokeHooks(
-	deps: Pick<RunAgentSkillDeps, "hookExecutor" | "hooksConfig">,
-	hookContext: HookContext,
-): Promise<void> {
-	if (deps.hookExecutor === undefined || deps.hooksConfig === undefined) {
-		return;
-	}
-	await runHooks({
-		hookExecutor: deps.hookExecutor,
-		hooksConfig: deps.hooksConfig,
-		context: hookContext,
 	});
 }
 

@@ -16,7 +16,6 @@ import { createStreamWriter } from "./adapter/stream-writer";
 import type { ContextSource } from "./core/skill/context-source";
 import type { SkillScope } from "./core/skill/skill";
 import { type DomainError, EXIT_CODE } from "./core/types/errors";
-import type { HooksConfig } from "./usecase/hook-runner";
 import { type InitOutput, initSkill } from "./usecase/init-skill";
 import { createListSkillsUseCase } from "./usecase/list-skills";
 import { runAgentSkill } from "./usecase/run-agent-skill";
@@ -137,7 +136,9 @@ const cli = Cli.create("taskp", {
 			const commandExecutor = createCommandRunner();
 			const progressWriter = createCliProgressWriter(process.stdout);
 
-			const hooksConfig = await loadHooksConfig();
+			const configLoader = createDefaultConfigLoader(process.cwd());
+			const configResult = await configLoader.load();
+			const hooksConfig = configResult.ok ? configResult.value.hooks : undefined;
 			const hookExecutor = createHookExecutor(commandExecutor);
 
 			const result = await runSkill(
@@ -324,13 +325,6 @@ async function runAgentMode(
 		console.error(formatError(result.error));
 		process.exit(EXIT_CODE[result.error.type]);
 	}
-}
-
-async function loadHooksConfig(): Promise<HooksConfig | undefined> {
-	const configLoader = createDefaultConfigLoader(process.cwd());
-	const configResult = await configLoader.load();
-	if (!configResult.ok) return undefined;
-	return configResult.value.hooks;
 }
 
 function resolveScope(

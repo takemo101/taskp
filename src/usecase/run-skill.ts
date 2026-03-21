@@ -7,7 +7,7 @@ import type { ReservedVars } from "../core/variable/template-renderer";
 import { renderTemplate } from "../core/variable/template-renderer";
 import { type HooksConfig, runHooks } from "./hook-runner";
 import type { CommandExecutor, ExecResult } from "./port/command-executor";
-import type { HookContext, HookExecutorPort } from "./port/hook-executor";
+import type { HookExecutorPort } from "./port/hook-executor";
 import { createNoopProgressWriter, type ProgressWriter } from "./port/progress-writer";
 import type { PromptCollector } from "./port/prompt-collector";
 import type { SkillRepository } from "./port/skill-repository";
@@ -102,21 +102,29 @@ export async function runSkill(
 	const durationMs = Date.now() - startTime;
 
 	if (!commandResults.ok) {
-		await invokeHooks(deps, {
-			skillName: skill.metadata.name,
-			mode: "template",
-			status: "failed",
-			durationMs,
-			error: domainErrorMessage(commandResults.error),
+		await runHooks({
+			hookExecutor: deps.hookExecutor,
+			hooksConfig: deps.hooksConfig,
+			context: {
+				skillName: skill.metadata.name,
+				mode: "template",
+				status: "failed",
+				durationMs,
+				error: domainErrorMessage(commandResults.error),
+			},
 		});
 		return commandResults;
 	}
 
-	await invokeHooks(deps, {
-		skillName: skill.metadata.name,
-		mode: "template",
-		status: "success",
-		durationMs,
+	await runHooks({
+		hookExecutor: deps.hookExecutor,
+		hooksConfig: deps.hooksConfig,
+		context: {
+			skillName: skill.metadata.name,
+			mode: "template",
+			status: "success",
+			durationMs,
+		},
 	});
 
 	return ok({
@@ -124,20 +132,6 @@ export async function runSkill(
 		rendered,
 		commands: commandResults.value,
 		dryRun: false,
-	});
-}
-
-async function invokeHooks(
-	deps: Pick<RunSkillDeps, "hookExecutor" | "hooksConfig">,
-	context: HookContext,
-): Promise<void> {
-	if (deps.hookExecutor === undefined || deps.hooksConfig === undefined) {
-		return;
-	}
-	await runHooks({
-		hookExecutor: deps.hookExecutor,
-		hooksConfig: deps.hooksConfig,
-		context,
 	});
 }
 
