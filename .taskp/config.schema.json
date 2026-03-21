@@ -3,21 +3,21 @@
   "type": "object",
   "properties": {
     "ai": {
-      "description": "AI/LLM 設定",
+      "description": "AI/LLM settings",
       "type": "object",
       "properties": {
         "default_provider": {
-          "description": "デフォルトプロバイダ (anthropic | openai | google | ollama | omlx | lmstudio)",
+          "description": "Default provider (anthropic | openai | google | ollama | omlx | lmstudio)",
           "type": "string",
           "minLength": 1
         },
         "default_model": {
-          "description": "デフォルトモデル名",
+          "description": "Default model name",
           "type": "string",
           "minLength": 1
         },
         "providers": {
-          "description": "プロバイダ別設定",
+          "description": "Per-provider settings",
           "type": "object",
           "propertyNames": {
             "type": "string"
@@ -26,22 +26,45 @@
             "type": "object",
             "properties": {
               "api_key_env": {
-                "description": "APIキーの環境変数名",
+                "description": "Environment variable name for API key",
                 "type": "string",
                 "minLength": 1
               },
               "base_url": {
-                "description": "カスタムエンドポイントURL",
+                "description": "Custom endpoint URL",
                 "type": "string",
                 "minLength": 1
               },
               "default_model": {
-                "description": "プロバイダ別デフォルトモデル",
+                "description": "Default model for this provider",
                 "type": "string",
                 "minLength": 1
               }
             },
             "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "hooks": {
+      "description": "Lifecycle hooks",
+      "type": "object",
+      "properties": {
+        "on_success": {
+          "description": "Commands to run on skill success",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "on_failure": {
+          "description": "Commands to run on skill failure",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
           }
         }
       },

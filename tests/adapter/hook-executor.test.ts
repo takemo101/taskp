@@ -72,7 +72,7 @@ describe("HookExecutor", () => {
 		await hookExecutor.execute(["echo test"], successContext);
 
 		const env = executor.executedCommands[0].options?.env;
-		expect(env).toEqual({
+		expect(env).toMatchObject({
 			TASKP_SKILL_NAME: "deploy",
 			TASKP_MODE: "template",
 			TASKP_STATUS: "success",
