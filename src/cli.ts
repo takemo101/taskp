@@ -86,7 +86,7 @@ function formatError(error: DomainError): string {
 }
 
 const cli = Cli.create("taskp", {
-	version: "0.1.0",
+	version: "0.1.1",
 	description:
 		"Markdown-defined skill runner with interactive argument collection and LLM execution",
 })
