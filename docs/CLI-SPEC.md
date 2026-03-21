@@ -34,7 +34,7 @@ taskp run deploy --env production --branch main   # 質問をスキップ
 | `--dry-run` | | `boolean` | `false` | 実行計画を表示するが実行しない |
 | `--force` | `-f` | `boolean` | `false` | エラー時も続行する（template モード） |
 | `--verbose` | `-v` | `boolean` | `false` | 詳細ログを表示 |
-| `--no-input` | | `boolean` | `false` | 対話的質問を無効化（デフォルト値を使用） |
+| `--skip-prompt` | | `boolean` | `false` | 対話的質問を無効化（デフォルト値を使用） |
 | `--set` | `-s` | `string[]` | `[]` | 変数を直接指定（`--set key=value`） |
 
 #### 変数の直接指定
@@ -45,8 +45,8 @@ taskp run deploy --env production --branch main   # 質問をスキップ
 # --set で個別指定
 taskp run deploy --set environment=production --set branch=main
 
-# --no-input でデフォルト値を使用
-taskp run deploy --no-input
+# --skip-prompt でデフォルト値を使用
+taskp run deploy --skip-prompt
 ```
 
 #### 出力

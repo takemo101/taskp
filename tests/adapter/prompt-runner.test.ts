@@ -264,7 +264,7 @@ describe("PromptRunner", () => {
 			if (result.ok) return;
 			expect(result.error.type).toBe("EXECUTION_ERROR");
 			expect(result.error.message).toBe(
-				'Input "branch" is required but has no default value (--no-input mode)',
+				'Input "branch" is required but has no default value (--skip-prompt mode)',
 			);
 		});
 

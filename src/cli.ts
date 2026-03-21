@@ -101,7 +101,7 @@ const cli = Cli.create("taskp", {
 			dryRun: z.boolean().optional().describe("Show execution plan without running"),
 			force: z.boolean().optional().describe("Continue on error (template mode)"),
 			verbose: z.boolean().optional().describe("Show detailed logs"),
-			noInput: z.boolean().optional().describe("Disable interactive prompts (use defaults)"),
+			skipPrompt: z.boolean().optional().describe("Disable interactive prompts (use defaults)"),
 			set: z.array(z.string()).optional().describe("Set variables directly (key=value)"),
 		}),
 		alias: {
@@ -138,7 +138,7 @@ const cli = Cli.create("taskp", {
 					presets,
 					dryRun: c.options.dryRun ?? false,
 					force: c.options.force ?? false,
-					noInput: c.options.noInput,
+					noInput: c.options.skipPrompt,
 				},
 				{ skillRepository, promptCollector, commandExecutor },
 			);
@@ -241,7 +241,7 @@ type RunCommandContext = {
 	readonly options: {
 		readonly model?: string;
 		readonly verbose?: boolean;
-		readonly noInput?: boolean;
+		readonly skipPrompt?: boolean;
 	};
 };
 
@@ -289,7 +289,7 @@ async function runAgentMode(
 			name: c.args.skill,
 			presets,
 			model: languageModelResult.value,
-			noInput: c.options.noInput,
+			noInput: c.options.skipPrompt,
 		},
 		{
 			skillRepository,
@@ -314,11 +314,13 @@ function resolveScope(
 	return undefined;
 }
 
-// ANSI カラーコード
+// ANSI カラーコード（NO_COLOR / 非 TTY 環境ではエスケープを無効化）
+// 注意: bold と dim は同じリセットコード（\x1b[22m）のため、ネスト不可
+const useColor = process.stdout.isTTY === true && !process.env.NO_COLOR;
 const ansi = {
-	bold: (s: string) => `\x1b[1m${s}\x1b[22m`,
-	cyan: (s: string) => `\x1b[36m${s}\x1b[39m`,
-	dim: (s: string) => `\x1b[2m${s}\x1b[22m`,
+	bold: (s: string) => (useColor ? `\x1b[1m${s}\x1b[22m` : s),
+	cyan: (s: string) => (useColor ? `\x1b[36m${s}\x1b[39m` : s),
+	dim: (s: string) => (useColor ? `\x1b[2m${s}\x1b[22m` : s),
 } as const;
 
 function printSkillTable(
