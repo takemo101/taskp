@@ -57,7 +57,6 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 	} finally {
 		renderer.destroy();
 	}
-
 }
 
 type ModelAndConfig = {

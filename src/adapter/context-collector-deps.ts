@@ -1,6 +1,7 @@
 import { executionError } from "../core/types/errors";
 import { err, ok } from "../core/types/result";
 import type { ContextCollectorDeps } from "./context-collector";
+import { toErrorMessage, tryCatch } from "./error-handler-utils";
 
 export async function createDefaultContextCollectorDeps(): Promise<ContextCollectorDeps> {
 	const { execa } = await import("execa");
@@ -23,8 +24,9 @@ export async function createDefaultContextCollectorDeps(): Promise<ContextCollec
 				}
 				return ok(result.stdout);
 			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				return err(executionError(`Failed to execute command: ${command} (${message})`));
+				return err(
+					executionError(`Failed to execute command: ${command} (${toErrorMessage(error)})`),
+				);
 			}
 		},
 		fetchUrl: async (url) => {
@@ -35,24 +37,20 @@ export async function createDefaultContextCollectorDeps(): Promise<ContextCollec
 				}
 				return ok(await response.text());
 			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				return err(executionError(`Network error fetching ${url}: ${message}`));
+				return err(executionError(`Network error fetching ${url}: ${toErrorMessage(error)}`));
 			}
 		},
 		scanGlob: async (pattern, cwd) => {
-			try {
-				const matches: string[] = [];
-				for await (const entry of glob(pattern, { cwd })) {
-					matches.push(entry);
-				}
-				return ok(matches);
-			} catch (e) {
-				return err(
-					executionError(
-						`Failed to scan glob: ${pattern} (${e instanceof Error ? e.message : String(e)})`,
-					),
-				);
-			}
+			return tryCatch(
+				async () => {
+					const matches: string[] = [];
+					for await (const entry of glob(pattern, { cwd })) {
+						matches.push(entry);
+					}
+					return matches;
+				},
+				(e) => executionError(`Failed to scan glob: ${pattern} (${e.message})`),
+			);
 		},
 	};
 }
