@@ -100,6 +100,187 @@ default_model = "qwen2.5-coder:14b"
 		expect(result.error.message).toContain("Failed to parse TOML");
 	});
 
+	describe("hooks", () => {
+		it("parses config without hooks section", async () => {
+			writeConfig(
+				globalRoot,
+				`
+[ai]
+default_provider = "anthropic"
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.hooks).toBeUndefined();
+		});
+
+		it("parses on_success only", async () => {
+			writeConfig(
+				globalRoot,
+				`
+[hooks]
+on_success = ["echo done"]
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.hooks?.on_success).toEqual(["echo done"]);
+			expect(result.value.hooks?.on_failure).toBeUndefined();
+		});
+
+		it("parses on_failure only", async () => {
+			writeConfig(
+				globalRoot,
+				`
+[hooks]
+on_failure = ["notify-failure"]
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.hooks?.on_success).toBeUndefined();
+			expect(result.value.hooks?.on_failure).toEqual(["notify-failure"]);
+		});
+
+		it("parses both on_success and on_failure", async () => {
+			writeConfig(
+				globalRoot,
+				`
+[hooks]
+on_success = ["echo ok", "notify-success"]
+on_failure = ["echo fail"]
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.hooks?.on_success).toEqual(["echo ok", "notify-success"]);
+			expect(result.value.hooks?.on_failure).toEqual(["echo fail"]);
+		});
+
+		it("returns error for empty string in on_success", async () => {
+			writeConfig(
+				globalRoot,
+				`
+[hooks]
+on_success = [""]
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("CONFIG_ERROR");
+		});
+
+		it("returns error for non-array on_success", async () => {
+			writeConfig(
+				globalRoot,
+				`
+[hooks]
+on_success = "not-an-array"
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("CONFIG_ERROR");
+		});
+
+		it("merges hooks: project on_success overrides global, global on_failure preserved", async () => {
+			writeConfig(
+				globalRoot,
+				`
+[hooks]
+on_success = ["global-success"]
+on_failure = ["global-failure"]
+`,
+			);
+
+			writeConfig(
+				projectRoot,
+				`
+[hooks]
+on_success = ["project-success"]
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.hooks?.on_success).toEqual(["project-success"]);
+			expect(result.value.hooks?.on_failure).toEqual(["global-failure"]);
+		});
+
+		it("merges hooks: project overrides both", async () => {
+			writeConfig(
+				globalRoot,
+				`
+[hooks]
+on_success = ["global-success"]
+on_failure = ["global-failure"]
+`,
+			);
+
+			writeConfig(
+				projectRoot,
+				`
+[hooks]
+on_success = ["project-success"]
+on_failure = ["project-failure"]
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.hooks?.on_success).toEqual(["project-success"]);
+			expect(result.value.hooks?.on_failure).toEqual(["project-failure"]);
+		});
+
+		it("merges hooks: global only when project has no hooks", async () => {
+			writeConfig(
+				globalRoot,
+				`
+[hooks]
+on_success = ["global-success"]
+on_failure = ["global-failure"]
+`,
+			);
+
+			writeConfig(
+				projectRoot,
+				`
+[ai]
+default_provider = "ollama"
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.hooks?.on_success).toEqual(["global-success"]);
+			expect(result.value.hooks?.on_failure).toEqual(["global-failure"]);
+		});
+	});
+
 	it("merges providers from both configs", async () => {
 		writeConfig(
 			globalRoot,
