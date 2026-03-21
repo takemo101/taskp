@@ -18,8 +18,8 @@ vi.mock("../../../src/adapter/context-collector-deps", () => ({
 }));
 
 import {
-	buildPromptCollector,
-	buildSkillRepository,
+	createPresetPromptCollector,
+	createSingleSkillRepository,
 	type ExecutionDeps,
 	formatDomainError,
 	runExecution,
@@ -72,6 +72,8 @@ function createMockDeps(): ExecutionDeps {
 	return {
 		commandExecutor: { execute: vi.fn() },
 		hookExecutor: { execute: vi.fn() },
+		skillRepositoryFactory: createSingleSkillRepository,
+		promptCollectorFactory: createPresetPromptCollector,
 	};
 }
 
@@ -92,27 +94,27 @@ describe("formatDomainError", () => {
 	});
 });
 
-describe("buildSkillRepository", () => {
+describe("createSingleSkillRepository", () => {
 	it("returns the skill from findByName", async () => {
 		const skill = createSkill("test", "template");
-		const repo = buildSkillRepository(skill);
+		const repo = createSingleSkillRepository(skill);
 		const result = await repo.findByName("anything");
 		expect(result).toEqual(ok(skill));
 	});
 
 	it("returns empty arrays for list methods", async () => {
 		const skill = createSkill("test", "template");
-		const repo = buildSkillRepository(skill);
+		const repo = createSingleSkillRepository(skill);
 		expect(await repo.listAll()).toEqual({ skills: [], failures: [] });
 		expect(await repo.listLocal()).toEqual({ skills: [], failures: [] });
 		expect(await repo.listGlobal()).toEqual({ skills: [], failures: [] });
 	});
 });
 
-describe("buildPromptCollector", () => {
+describe("createPresetPromptCollector", () => {
 	it("returns the provided variables", async () => {
 		const vars = { key: "value" };
-		const collector = buildPromptCollector(vars);
+		const collector = createPresetPromptCollector(vars);
 		const result = await collector.collect([], {});
 		expect(result).toEqual(ok({ key: "value" }));
 	});
