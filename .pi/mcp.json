@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "isuner": {
+      "command": "isuner",
+      "args": [
+        "mcp",
+        "serve",
+        "--context",
+        "{\"sessionId\":97,\"issueNumber\":185,\"sessionName\":\"taskp-185-default\",\"workflow\":{\"name\":\"default\",\"steps\":[{\"name\":\"plan\",\"status\":\"pending\"},{\"name\":\"implement\",\"status\":\"pending\"},{\"name\":\"review\",\"status\":\"pending\"},{\"name\":\"merge\",\"status\":\"pending\"}]},\"dbPath\":\"/Users/kawasakiisao/Desktop/ai/task-preset/.isuner/isuner.db\",\"worktreePath\":\"/Users/kawasakiisao/Desktop/ai/task-preset/.worktrees/issue-185\",\"agentType\":\"pi\"}"
+      ],
+      "lifecycle": "keep-alive",
+      "directTools": true
+    }
+  }
+}

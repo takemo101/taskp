@@ -7,6 +7,7 @@ import { createCommandRunner } from "./adapter/command-runner";
 import { createDefaultConfigLoader } from "./adapter/config-loader";
 import { createContextCollector } from "./adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "./adapter/context-collector-deps";
+import { createHookExecutor } from "./adapter/hook-executor";
 import { createCliProgressWriter } from "./adapter/progress-formatter";
 import { createPromptRunner } from "./adapter/prompt-runner";
 import { createSkillInitializer } from "./adapter/skill-initializer";
@@ -15,6 +16,7 @@ import { createStreamWriter } from "./adapter/stream-writer";
 import type { ContextSource } from "./core/skill/context-source";
 import type { SkillScope } from "./core/skill/skill";
 import { type DomainError, EXIT_CODE } from "./core/types/errors";
+import type { HooksConfig } from "./usecase/hook-runner";
 import { type InitOutput, initSkill } from "./usecase/init-skill";
 import { createListSkillsUseCase } from "./usecase/list-skills";
 import { runAgentSkill } from "./usecase/run-agent-skill";
@@ -134,6 +136,10 @@ const cli = Cli.create("taskp", {
 
 			const commandExecutor = createCommandRunner();
 			const progressWriter = createCliProgressWriter(process.stdout);
+
+			const hooksConfig = await loadHooksConfig();
+			const hookExecutor = createHookExecutor(commandExecutor);
+
 			const result = await runSkill(
 				{
 					name: c.args.skill,
@@ -142,7 +148,14 @@ const cli = Cli.create("taskp", {
 					force: c.options.force ?? false,
 					noInput: c.options.skipPrompt,
 				},
-				{ skillRepository, promptCollector, commandExecutor, progressWriter },
+				{
+					skillRepository,
+					promptCollector,
+					commandExecutor,
+					progressWriter,
+					hookExecutor,
+					hooksConfig,
+				},
 			);
 
 			if (!result.ok) {
@@ -286,6 +299,10 @@ async function runAgentMode(
 
 	const agentExecutor = createAgentExecutor(writer);
 
+	const commandExecutor = createCommandRunner();
+	const hookExecutor = createHookExecutor(commandExecutor);
+	const hooksConfig = configResult.value.hooks;
+
 	const result = await runAgentSkill(
 		{
 			name: c.args.skill,
@@ -299,12 +316,21 @@ async function runAgentMode(
 			contextCollector,
 			agentExecutor,
 			progressWriter: createCliProgressWriter(process.stdout),
+			hookExecutor,
+			hooksConfig,
 		},
 	);
 	if (!result.ok) {
 		console.error(formatError(result.error));
 		process.exit(EXIT_CODE[result.error.type]);
 	}
+}
+
+async function loadHooksConfig(): Promise<HooksConfig | undefined> {
+	const configLoader = createDefaultConfigLoader(process.cwd());
+	const configResult = await configLoader.load();
+	if (!configResult.ok) return undefined;
+	return configResult.value.hooks;
 }
 
 function resolveScope(

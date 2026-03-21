@@ -12,9 +12,11 @@ import { createAgentExecutor } from "../../adapter/agent-executor";
 import { createCommandRunner } from "../../adapter/command-runner";
 import { createContextCollector } from "../../adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "../../adapter/context-collector-deps";
+import { createHookExecutor } from "../../adapter/hook-executor";
 import type { Skill } from "../../core/skill/skill";
 import type { DomainError } from "../../core/types/errors";
 import { ok } from "../../core/types/result";
+import type { HooksConfig } from "../../usecase/hook-runner";
 import type { PromptCollector } from "../../usecase/port/prompt-collector";
 import type { SkillRepository } from "../../usecase/port/skill-repository";
 import { runAgentSkill } from "../../usecase/run-agent-skill";
@@ -35,6 +37,7 @@ export async function showExecution(
 	skill: Skill,
 	variables: Readonly<Record<string, string>>,
 	model: LanguageModelV3 | null,
+	hooksConfig?: HooksConfig,
 ): Promise<"back" | "exit"> {
 	return new Promise((resolve) => {
 		clearScreen(renderer);
@@ -139,7 +142,7 @@ export async function showExecution(
 			},
 		};
 
-		runExecution(skill, variables, model, viewPort).then(() => {
+		runExecution(skill, variables, model, viewPort, hooksConfig).then(() => {
 			const doneHandler = (key: KeyEvent) => {
 				if (key.name === "return") {
 					cleanup(doneHandler);
@@ -167,6 +170,7 @@ async function runExecution(
 	variables: Readonly<Record<string, string>>,
 	model: LanguageModelV3 | null,
 	viewPort: ExecutionViewPort,
+	hooksConfig?: HooksConfig,
 ): Promise<void> {
 	if (skill.metadata.mode === "agent" && model === null) {
 		viewPort.appendOutput("Error: LLM model not configured.\n");
@@ -177,9 +181,9 @@ async function runExecution(
 
 	try {
 		if (skill.metadata.mode === "agent" && model !== null) {
-			await executeAgentMode(skill, variables, model, viewPort);
+			await executeAgentMode(skill, variables, model, viewPort, hooksConfig);
 		} else {
-			await executeTemplateMode(skill, variables, viewPort);
+			await executeTemplateMode(skill, variables, viewPort, hooksConfig);
 		}
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -208,10 +212,13 @@ async function executeAgentMode(
 	variables: Readonly<Record<string, string>>,
 	model: LanguageModelV3,
 	viewPort: ExecutionViewPort,
+	hooksConfig?: HooksConfig,
 ): Promise<void> {
 	const writer = createTuiStreamWriter(viewPort);
 	const progressWriter = createTuiProgressWriter(viewPort);
 	const agentExecutor = createAgentExecutor(writer);
+	const commandExecutor = createCommandRunner();
+	const hookExecutor = createHookExecutor(commandExecutor);
 
 	const contextCollectorDeps = await createDefaultContextCollectorDeps();
 	const contextCollector = createContextCollector(contextCollectorDeps);
@@ -224,6 +231,8 @@ async function executeAgentMode(
 			contextCollector,
 			agentExecutor,
 			progressWriter,
+			hookExecutor,
+			hooksConfig,
 		},
 	);
 
@@ -237,9 +246,11 @@ async function executeTemplateMode(
 	skill: Skill,
 	variables: Readonly<Record<string, string>>,
 	viewPort: ExecutionViewPort,
+	hooksConfig?: HooksConfig,
 ): Promise<void> {
 	const commandExecutor = createCommandRunner();
 	const progressWriter = createTuiProgressWriter(viewPort);
+	const hookExecutor = createHookExecutor(commandExecutor);
 
 	const result = await runSkill(
 		{ name: skill.metadata.name, presets: variables, dryRun: false, force: false },
@@ -248,6 +259,8 @@ async function executeTemplateMode(
 			promptCollector: buildPromptCollector(variables),
 			commandExecutor,
 			progressWriter,
+			hookExecutor,
+			hooksConfig,
 		},
 	);
 
