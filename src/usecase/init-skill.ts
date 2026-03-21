@@ -52,7 +52,7 @@ async function checkNameConflict(
 	repository: SkillRepository,
 	name: string,
 ): Promise<Result<void, DomainError>> {
-	const skills = await repository.listAll();
+	const { skills } = await repository.listAll();
 	const exists = skills.some((s) => s.metadata.name === name);
 	if (exists) {
 		return err(configError(`Skill "${name}" already exists`));

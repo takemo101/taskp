@@ -66,9 +66,9 @@ function createTestSkill(
 function stubRepository(skill?: Skill): SkillRepository {
 	return {
 		findByName: async (name: string) => (skill ? ok(skill) : err(skillNotFoundError(name))),
-		listAll: async () => (skill ? [skill] : []),
-		listLocal: async () => [],
-		listGlobal: async () => (skill ? [skill] : []),
+		listAll: async () => ({ skills: skill ? [skill] : [], failures: [] }),
+		listLocal: async () => ({ skills: [], failures: [] }),
+		listGlobal: async () => ({ skills: skill ? [skill] : [], failures: [] }),
 	};
 }
 

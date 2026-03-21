@@ -35,9 +35,9 @@ function createAgentSkill(overrides?: Partial<Skill["metadata"]>): Skill {
 function createMockDeps(skill: Skill) {
 	const skillRepository: SkillRepository = {
 		findByName: vi.fn().mockResolvedValue(ok(skill)),
-		listAll: vi.fn(),
-		listLocal: vi.fn(),
-		listGlobal: vi.fn(),
+		listAll: vi.fn().mockResolvedValue({ skills: [], failures: [] }),
+		listLocal: vi.fn().mockResolvedValue({ skills: [], failures: [] }),
+		listGlobal: vi.fn().mockResolvedValue({ skills: [], failures: [] }),
 	};
 
 	const promptCollector: PromptCollector = {
@@ -126,9 +126,9 @@ describe("runAgentSkill", () => {
 						ok: false,
 						error: { type: "SKILL_NOT_FOUND", name: "missing" },
 					}),
-					listAll: vi.fn(),
-					listLocal: vi.fn(),
-					listGlobal: vi.fn(),
+					listAll: vi.fn().mockResolvedValue({ skills: [], failures: [] }),
+					listLocal: vi.fn().mockResolvedValue({ skills: [], failures: [] }),
+					listGlobal: vi.fn().mockResolvedValue({ skills: [], failures: [] }),
 				},
 			},
 		);
