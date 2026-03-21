@@ -15,12 +15,8 @@ build: deps
     bun run build
 
 # ローカルにインストール (bun link)
-install: build
-    @# bun build --target bun は shebang を付与しないため、手動で追加する
-    @if ! head -1 dist/cli.js | grep -q '^#!/'; then \
-        sed -i '' '1s|^|#!/usr/bin/env bun\n|' dist/cli.js; \
-    fi
-    @chmod +x dist/cli.js
+# postinstall スクリプトがビルド + shebang 付与を行う
+install: deps
     bun link
     @echo ""
     @echo "✅ taskp installed"
