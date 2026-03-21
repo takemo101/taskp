@@ -231,4 +231,87 @@ describe("PromptRunner", () => {
 		expect(result.error.type).toBe("EXECUTION_ERROR");
 		expect(result.error.message).toContain("Input stream is not a TTY");
 	});
+
+	describe("noInput mode", () => {
+		it("uses default value when available", async () => {
+			const inputs: SkillInput[] = [
+				{ name: "env", type: "text", message: "Environment?", default: "staging" },
+			];
+
+			const result = await runner.collect(inputs, {}, { noInput: true });
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value).toEqual({ env: "staging" });
+			expect(mockedInput).not.toHaveBeenCalled();
+		});
+
+		it("uses preset value over default", async () => {
+			const inputs: SkillInput[] = [
+				{ name: "env", type: "text", message: "Environment?", default: "staging" },
+			];
+
+			const result = await runner.collect(inputs, { env: "production" }, { noInput: true });
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value).toEqual({ env: "production" });
+		});
+
+		it("returns error for required input without default", async () => {
+			const inputs: SkillInput[] = [{ name: "branch", type: "text", message: "Branch?" }];
+
+			const result = await runner.collect(inputs, {}, { noInput: true });
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("EXECUTION_ERROR");
+			expect(result.error.message).toBe(
+				'Input "branch" is required but has no default value (--no-input mode)',
+			);
+		});
+
+		it("uses empty string for optional input without default", async () => {
+			const inputs: SkillInput[] = [
+				{ name: "note", type: "text", message: "Note?", required: false },
+			];
+
+			const result = await runner.collect(inputs, {}, { noInput: true });
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value).toEqual({ note: "" });
+		});
+
+		it("stringifies non-string default values", async () => {
+			const inputs: SkillInput[] = [
+				{ name: "count", type: "number", message: "Count?", default: 42 },
+				{ name: "proceed", type: "confirm", message: "Proceed?", default: true },
+			];
+
+			const result = await runner.collect(inputs, {}, { noInput: true });
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value).toEqual({ count: "42", proceed: "true" });
+		});
+
+		it("handles mix of preset, default, and optional inputs", async () => {
+			const inputs: SkillInput[] = [
+				{ name: "env", type: "text", message: "Environment?", default: "staging" },
+				{ name: "tag", type: "text", message: "Tag?" },
+				{ name: "note", type: "text", message: "Note?", required: false },
+			];
+
+			const result = await runner.collect(inputs, { tag: "v1.0" }, { noInput: true });
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value).toEqual({ env: "staging", tag: "v1.0", note: "" });
+		});
+
+		it("noInput: false falls through to interactive prompts", async () => {
+			mockedInput.mockResolvedValueOnce("answer");
+
+			const inputs: SkillInput[] = [{ name: "x", type: "text", message: "?" }];
+
+			const result = await runner.collect(inputs, {}, { noInput: false });
+			expect(result.ok).toBe(true);
+			expect(mockedInput).toHaveBeenCalled();
+		});
+	});
 });

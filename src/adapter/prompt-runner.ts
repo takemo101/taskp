@@ -5,7 +5,7 @@ import type { ExecutionError } from "../core/types/errors";
 import { executionError } from "../core/types/errors";
 import type { Result } from "../core/types/result";
 import { err, ok } from "../core/types/result";
-import type { PromptCollector } from "../usecase/port/prompt-collector";
+import type { PromptCollectOptions, PromptCollector } from "../usecase/port/prompt-collector";
 
 type PromptFn = (skillInput: SkillInput) => Promise<Result<string, ExecutionError>>;
 
@@ -23,14 +23,22 @@ export function createPromptRunner(): PromptCollector {
 		collect: async (
 			inputs: readonly SkillInput[],
 			presets: Readonly<Record<string, string>>,
+			options?: PromptCollectOptions,
 		): Promise<Result<Readonly<Record<string, string>>, ExecutionError>> => {
 			const results: Record<string, string> = {};
 
 			for (const skillInput of inputs) {
 				// --set key=value で事前指定された値はプロンプトをスキップする
-				// （CI/スクリプトからの非対話実行を可能にするため）
 				if (skillInput.name in presets) {
 					results[skillInput.name] = presets[skillInput.name];
+					continue;
+				}
+
+				// --no-input: 対話プロンプトをスキップし、デフォルト値を自動適用する
+				if (options?.noInput) {
+					const resolveResult = resolveNonInteractive(skillInput);
+					if (!resolveResult.ok) return resolveResult;
+					results[skillInput.name] = resolveResult.value;
 					continue;
 				}
 
@@ -43,6 +51,22 @@ export function createPromptRunner(): PromptCollector {
 			return ok(results);
 		},
 	};
+}
+
+function resolveNonInteractive(skillInput: SkillInput): Result<string, ExecutionError> {
+	if (skillInput.default !== undefined) {
+		return ok(String(skillInput.default));
+	}
+	// required は optional (boolean | undefined)。undefined は「required」として扱う
+	// （SkillInput の Zod スキーマでデフォルト値が設定されていないため）
+	if (skillInput.required !== false) {
+		return err(
+			executionError(
+				`Input "${skillInput.name}" is required but has no default value (--no-input mode)`,
+			),
+		);
+	}
+	return ok("");
 }
 
 function toErrorMessage(error: unknown): string {
