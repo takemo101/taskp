@@ -223,5 +223,16 @@ describe("parseSkillMetadata", () => {
 		expect(result.ok).toBe(false);
 		if (result.ok) return;
 		expect(result.error.type).toBe("PARSE_ERROR");
+		expect(result.error.message).toContain("name:");
+	});
+
+	it("エラーメッセージに不足フィールドのパス情報が含まれる", () => {
+		const result = parseSkillMetadata({});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.message).toContain("Invalid skill metadata:");
+		expect(result.error.message).toContain("name:");
+		expect(result.error.message).toContain("description:");
 	});
 });
