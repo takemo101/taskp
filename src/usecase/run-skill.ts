@@ -6,6 +6,7 @@ import { ok } from "../core/types/result";
 import type { ReservedVars } from "../core/variable/template-renderer";
 import { renderTemplate } from "../core/variable/template-renderer";
 import type { CommandExecutor, ExecResult } from "./port/command-executor";
+import { createNoopProgressWriter, type ProgressWriter } from "./port/progress-writer";
 import type { PromptCollector } from "./port/prompt-collector";
 import type { SkillRepository } from "./port/skill-repository";
 
@@ -33,6 +34,7 @@ export type RunSkillDeps = {
 	readonly skillRepository: SkillRepository;
 	readonly promptCollector: PromptCollector;
 	readonly commandExecutor: CommandExecutor;
+	readonly progressWriter?: ProgressWriter;
 };
 
 export async function runSkill(
@@ -53,6 +55,9 @@ export async function runSkill(
 		return collectResult;
 	}
 	const variables = collectResult.value;
+
+	const progress = deps.progressWriter ?? createNoopProgressWriter();
+	progress.writeInputs(skill.metadata.inputs, variables);
 
 	const reserved: ReservedVars = {
 		cwd: process.cwd(),

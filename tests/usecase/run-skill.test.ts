@@ -4,6 +4,7 @@ import { createSkillBody } from "../../src/core/skill/skill-body";
 import { executionError, skillNotFoundError } from "../../src/core/types/errors";
 import { err, ok } from "../../src/core/types/result";
 import type { CommandExecutor } from "../../src/usecase/port/command-executor";
+import { createNoopProgressWriter } from "../../src/usecase/port/progress-writer";
 import type { PromptCollector } from "../../src/usecase/port/prompt-collector";
 import type { SkillRepository } from "../../src/usecase/port/skill-repository";
 import type { RunSkillDeps, RunSkillInput } from "../../src/usecase/run-skill";
@@ -92,6 +93,7 @@ function createDeps(overrides?: Partial<RunSkillDeps>): RunSkillDeps {
 		skillRepository: stubRepository(createTestSkill()),
 		promptCollector: stubCollector({ env: "staging" }),
 		commandExecutor: stubExecutor("success"),
+		progressWriter: createNoopProgressWriter(),
 		...overrides,
 	};
 }
@@ -281,5 +283,35 @@ echo "step 2 {{env}}"
 		await runSkill(createInput({ noInput: true }), deps);
 
 		expect(receivedOptions).toEqual({ noInput: true });
+	});
+
+	it("calls progressWriter.writeInputs with skill inputs and collected variables", async () => {
+		let capturedInputs: unknown;
+		let capturedVariables: unknown;
+		const deps = createDeps({
+			progressWriter: {
+				writeInputs(inputs, variables) {
+					capturedInputs = inputs;
+					capturedVariables = variables;
+				},
+				writeContextSources() {},
+			},
+		});
+
+		await runSkill(createInput(), deps);
+
+		expect(capturedInputs).toEqual([
+			{ name: "env", type: "select", message: "Environment?", choices: ["staging", "production"] },
+		]);
+		expect(capturedVariables).toEqual({ env: "staging" });
+	});
+
+	it("uses noop progressWriter when not provided", async () => {
+		const deps = createDeps();
+		delete (deps as Record<string, unknown>).progressWriter;
+
+		const result = await runSkill(createInput(), deps);
+
+		expect(result.ok).toBe(true);
 	});
 });

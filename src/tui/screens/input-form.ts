@@ -6,6 +6,7 @@ import {
 	InputRenderable,
 	InputRenderableEvents,
 	type KeyEvent,
+	ScrollBoxRenderable,
 	type SelectOption,
 	SelectRenderable,
 	SelectRenderableEvents,
@@ -58,6 +59,16 @@ export async function showInputForm(
 			}),
 		);
 
+		// 入力項目が多い場合にターミナル高さを超えても操作できるよう、
+		// スクロール可能なコンテナに入力グループを配置する
+		const scrollbox = new ScrollBoxRenderable(renderer, {
+			id: "form-scrollbox",
+			width: "100%",
+			flexGrow: 1,
+			stickyScroll: true,
+			stickyStart: "top",
+		});
+
 		const values: Record<string, string> = {};
 		const elements: FormElement[] = [];
 
@@ -82,9 +93,11 @@ export async function showInputForm(
 			});
 
 			group.add(element);
-			container.add(group);
+			scrollbox.add(group);
 			elements.push({ input, label, element });
 		}
+
+		container.add(scrollbox);
 
 		container.add(
 			KeyHelp([

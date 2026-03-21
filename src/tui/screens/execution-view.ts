@@ -239,6 +239,7 @@ async function executeTemplateMode(
 	viewPort: ExecutionViewPort,
 ): Promise<void> {
 	const commandExecutor = createCommandRunner();
+	const progressWriter = createTuiProgressWriter(viewPort);
 
 	const result = await runSkill(
 		{ name: skill.metadata.name, presets: variables, dryRun: false, force: false },
@@ -246,6 +247,7 @@ async function executeTemplateMode(
 			skillRepository: buildSkillRepository(skill),
 			promptCollector: buildPromptCollector(variables),
 			commandExecutor,
+			progressWriter,
 		},
 	);
 
