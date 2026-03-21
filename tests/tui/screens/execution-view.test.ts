@@ -17,11 +17,11 @@ vi.mock("../../../src/adapter/context-collector-deps", () => ({
 	createDefaultContextCollectorDeps: async () => ({}),
 }));
 
+import { domainErrorMessage } from "../../../src/core/types/errors";
 import {
-	buildPromptCollector,
-	buildSkillRepository,
+	createPresetPromptCollector,
+	createSingleSkillRepository,
 	type ExecutionDeps,
-	formatDomainError,
 	runExecution,
 } from "../../../src/tui/screens/execution-runner";
 import { runAgentSkill } from "../../../src/usecase/run-agent-skill";
@@ -72,47 +72,49 @@ function createMockDeps(): ExecutionDeps {
 	return {
 		commandExecutor: { execute: vi.fn() },
 		hookExecutor: { execute: vi.fn() },
+		skillRepositoryFactory: createSingleSkillRepository,
+		promptCollectorFactory: createPresetPromptCollector,
 	};
 }
 
-describe("formatDomainError", () => {
+describe("domainErrorMessage", () => {
 	it("formats SKILL_NOT_FOUND with skill name", () => {
-		const result = formatDomainError({ type: "SKILL_NOT_FOUND", name: "my-skill" });
-		expect(result).toBe('Skill "my-skill" not found');
+		const result = domainErrorMessage({ type: "SKILL_NOT_FOUND", name: "my-skill" });
+		expect(result).toBe("Skill not found: my-skill");
 	});
 
 	it("formats PARSE_ERROR with message", () => {
-		const result = formatDomainError({ type: "PARSE_ERROR", message: "bad syntax" });
+		const result = domainErrorMessage({ type: "PARSE_ERROR", message: "bad syntax" });
 		expect(result).toBe("bad syntax");
 	});
 
 	it("formats EXECUTION_ERROR with message", () => {
-		const result = formatDomainError({ type: "EXECUTION_ERROR", message: "command failed" });
+		const result = domainErrorMessage({ type: "EXECUTION_ERROR", message: "command failed" });
 		expect(result).toBe("command failed");
 	});
 });
 
-describe("buildSkillRepository", () => {
+describe("createSingleSkillRepository", () => {
 	it("returns the skill from findByName", async () => {
 		const skill = createSkill("test", "template");
-		const repo = buildSkillRepository(skill);
+		const repo = createSingleSkillRepository(skill);
 		const result = await repo.findByName("anything");
 		expect(result).toEqual(ok(skill));
 	});
 
 	it("returns empty arrays for list methods", async () => {
 		const skill = createSkill("test", "template");
-		const repo = buildSkillRepository(skill);
+		const repo = createSingleSkillRepository(skill);
 		expect(await repo.listAll()).toEqual({ skills: [], failures: [] });
 		expect(await repo.listLocal()).toEqual({ skills: [], failures: [] });
 		expect(await repo.listGlobal()).toEqual({ skills: [], failures: [] });
 	});
 });
 
-describe("buildPromptCollector", () => {
+describe("createPresetPromptCollector", () => {
 	it("returns the provided variables", async () => {
 		const vars = { key: "value" };
-		const collector = buildPromptCollector(vars);
+		const collector = createPresetPromptCollector(vars);
 		const result = await collector.collect([], {});
 		expect(result).toEqual(ok({ key: "value" }));
 	});
@@ -220,7 +222,7 @@ describe("runExecution", () => {
 
 		await runExecution(skill, {}, null, view, deps);
 
-		expect(view.calls).toContain('appendOutput:\nError: Skill "tmpl-skill" not found\n');
+		expect(view.calls).toContain("appendOutput:\nError: Skill not found: tmpl-skill\n");
 		expect(view.calls).toContain("showSummary:0:0");
 	});
 

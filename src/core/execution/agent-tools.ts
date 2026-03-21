@@ -116,22 +116,21 @@ const askUserTool: Tool<AskUserInput, string> = {
 };
 
 // Tool<I, O> のジェネリクスが共変でないため、異なる I/O を持つツールを
-// 1つの Record にまとめるには any が必要（AI SDK の型設計上の制約）
-// biome-ignore lint/suspicious/noExplicitAny: Tool generic variance prevents strict typing with Record<ToolName, Tool>
-const allTools: Record<ToolName, Tool<any, any>> = {
-	bash: bashTool,
-	read: readTool,
-	write: writeTool,
-	glob: globTool,
-	ask_user: askUserTool,
+// 1つの Record にまとめるには型パラメータを消去する必要がある
+type AnyTool = Tool<Record<string, unknown>, unknown>;
+
+const allTools: Record<ToolName, AnyTool> = {
+	bash: bashTool as AnyTool,
+	read: readTool as AnyTool,
+	write: writeTool as AnyTool,
+	glob: globTool as AnyTool,
+	ask_user: askUserTool as AnyTool,
 };
 
 export function buildTools(
 	toolNames: readonly string[],
-	// biome-ignore lint/suspicious/noExplicitAny: Tool generic variance prevents strict typing
-): Result<Record<string, Tool<any, any>>, ExecutionError> {
-	// biome-ignore lint/suspicious/noExplicitAny: Tool generic variance prevents strict typing
-	const tools: Record<string, Tool<any, any>> = {};
+): Result<Record<string, AnyTool>, ExecutionError> {
+	const tools: Record<string, AnyTool> = {};
 	for (const name of toolNames) {
 		const t = allTools[name as ToolName];
 		if (t === undefined) {
@@ -142,5 +141,5 @@ export function buildTools(
 	return ok(tools);
 }
 
-export type { ToolName };
+export type { AnyTool, ToolName };
 export { TOOL_NAMES };

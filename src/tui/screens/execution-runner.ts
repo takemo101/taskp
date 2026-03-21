@@ -3,7 +3,7 @@ import { createAgentExecutor } from "../../adapter/agent-executor";
 import { createContextCollector } from "../../adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "../../adapter/context-collector-deps";
 import type { Skill } from "../../core/skill/skill";
-import type { DomainError } from "../../core/types/errors";
+import { domainErrorMessage } from "../../core/types/errors";
 import { ok } from "../../core/types/result";
 import type { HooksConfig } from "../../usecase/hook-runner";
 import type { CommandExecutor } from "../../usecase/port/command-executor";
@@ -18,10 +18,17 @@ import {
 	type ExecutionViewPort,
 } from "../tui-stream-writer";
 
+export type SkillRepositoryFactory = (skill: Skill) => SkillRepository;
+export type PromptCollectorFactory = (
+	variables: Readonly<Record<string, string>>,
+) => PromptCollector;
+
 export type ExecutionDeps = {
 	readonly commandExecutor: CommandExecutor;
 	readonly hookExecutor: HookExecutorPort;
 	readonly hooksConfig?: HooksConfig;
+	readonly skillRepositoryFactory: SkillRepositoryFactory;
+	readonly promptCollectorFactory: PromptCollectorFactory;
 };
 
 export async function runExecution(
@@ -51,14 +58,7 @@ export async function runExecution(
 	}
 }
 
-export function formatDomainError(error: DomainError): string {
-	if (error.type === "SKILL_NOT_FOUND") {
-		return `Skill "${error.name}" not found`;
-	}
-	return error.message;
-}
-
-export function buildSkillRepository(skill: Skill): SkillRepository {
+export function createSingleSkillRepository(skill: Skill): SkillRepository {
 	return {
 		findByName: async () => ok(skill),
 		listAll: async () => ({ skills: [], failures: [] }),
@@ -67,7 +67,9 @@ export function buildSkillRepository(skill: Skill): SkillRepository {
 	};
 }
 
-export function buildPromptCollector(variables: Readonly<Record<string, string>>): PromptCollector {
+export function createPresetPromptCollector(
+	variables: Readonly<Record<string, string>>,
+): PromptCollector {
 	return {
 		collect: async () => ok(variables as Record<string, string>),
 	};
@@ -90,8 +92,8 @@ async function executeAgentMode(
 	const result = await runAgentSkill(
 		{ name: skill.metadata.name, presets: variables, model },
 		{
-			skillRepository: buildSkillRepository(skill),
-			promptCollector: buildPromptCollector(variables),
+			skillRepository: deps.skillRepositoryFactory(skill),
+			promptCollector: deps.promptCollectorFactory(variables),
 			contextCollector,
 			agentExecutor,
 			progressWriter,
@@ -101,7 +103,7 @@ async function executeAgentMode(
 	);
 
 	if (!result.ok) {
-		viewPort.appendOutput(`\nError: ${formatDomainError(result.error)}\n`);
+		viewPort.appendOutput(`\nError: ${domainErrorMessage(result.error)}\n`);
 		viewPort.showSummary(0, 0);
 	}
 }
@@ -117,8 +119,8 @@ async function executeTemplateMode(
 	const result = await runSkill(
 		{ name: skill.metadata.name, presets: variables, dryRun: false, force: false },
 		{
-			skillRepository: buildSkillRepository(skill),
-			promptCollector: buildPromptCollector(variables),
+			skillRepository: deps.skillRepositoryFactory(skill),
+			promptCollector: deps.promptCollectorFactory(variables),
 			commandExecutor: deps.commandExecutor,
 			progressWriter,
 			hookExecutor: deps.hookExecutor,
@@ -138,7 +140,7 @@ async function executeTemplateMode(
 		}
 		viewPort.showSummary(0, result.value.commands.length);
 	} else {
-		viewPort.appendOutput(`\nError: ${formatDomainError(result.error)}\n`);
+		viewPort.appendOutput(`\nError: ${domainErrorMessage(result.error)}\n`);
 		viewPort.showSummary(0, 0);
 	}
 }

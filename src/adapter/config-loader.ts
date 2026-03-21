@@ -120,91 +120,36 @@ function parseConfig(raw: string, path: string): Result<Config, ConfigError> {
 	return ok(result.data);
 }
 
+function mergeOptional<T>(
+	global: T | undefined,
+	project: T | undefined,
+	merge: (g: T, p: T) => T,
+): T | undefined {
+	if (global === undefined && project === undefined) return undefined;
+	if (global === undefined) return project;
+	if (project === undefined) return global;
+	return merge(global, project);
+}
+
 function mergeConfigs(global: Config, project: Config): Config {
 	return {
-		ai: mergeAi(global.ai, project.ai),
-		hooks: mergeHooks(global.hooks, project.hooks),
-		cli: mergeCli(global.cli, project.cli),
-	};
-}
-
-function mergeAi(
-	global: AiConfig | undefined,
-	project: AiConfig | undefined,
-): AiConfig | undefined {
-	if (global === undefined && project === undefined) {
-		return undefined;
-	}
-	if (global === undefined) {
-		return project;
-	}
-	if (project === undefined) {
-		return global;
-	}
-
-	return {
-		default_provider: project.default_provider ?? global.default_provider,
-		default_model: project.default_model ?? global.default_model,
-		providers: mergeProviders(global.providers, project.providers),
-	};
-}
-
-function mergeHooks(
-	global: HooksConfig | undefined,
-	project: HooksConfig | undefined,
-): HooksConfig | undefined {
-	if (global === undefined && project === undefined) {
-		return undefined;
-	}
-	if (global === undefined) {
-		return project;
-	}
-	if (project === undefined) {
-		return global;
-	}
-
-	return {
-		on_success: project.on_success ?? global.on_success,
-		on_failure: project.on_failure ?? global.on_failure,
-	};
-}
-
-function mergeProviders(
-	global: Record<string, ProviderConfig> | undefined,
-	project: Record<string, ProviderConfig> | undefined,
-): Record<string, ProviderConfig> | undefined {
-	if (global === undefined && project === undefined) {
-		return undefined;
-	}
-	if (global === undefined) {
-		return project;
-	}
-	if (project === undefined) {
-		return global;
-	}
-
-	const merged: Record<string, ProviderConfig> = { ...global };
-	for (const [key, value] of Object.entries(project)) {
-		merged[key] = global[key] !== undefined ? { ...global[key], ...value } : value;
-	}
-	return merged;
-}
-
-function mergeCli(
-	global: CliConfig | undefined,
-	project: CliConfig | undefined,
-): CliConfig | undefined {
-	if (global === undefined && project === undefined) {
-		return undefined;
-	}
-	if (global === undefined) {
-		return project;
-	}
-	if (project === undefined) {
-		return global;
-	}
-
-	return {
-		command_timeout_ms: project.command_timeout_ms ?? global.command_timeout_ms,
+		ai: mergeOptional(global.ai, project.ai, (g, p) => ({
+			default_provider: p.default_provider ?? g.default_provider,
+			default_model: p.default_model ?? g.default_model,
+			providers: mergeOptional(g.providers, p.providers, (gp, pp) => {
+				const merged: Record<string, ProviderConfig> = { ...gp };
+				for (const [key, value] of Object.entries(pp)) {
+					merged[key] = gp[key] !== undefined ? { ...gp[key], ...value } : value;
+				}
+				return merged;
+			}),
+		})),
+		hooks: mergeOptional(global.hooks, project.hooks, (g, p) => ({
+			on_success: p.on_success ?? g.on_success,
+			on_failure: p.on_failure ?? g.on_failure,
+		})),
+		cli: mergeOptional(global.cli, project.cli, (g, p) => ({
+			command_timeout_ms: p.command_timeout_ms ?? g.command_timeout_ms,
+		})),
 	};
 }
