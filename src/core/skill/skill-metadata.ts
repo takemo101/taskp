@@ -35,12 +35,12 @@ type SkillMode = z.infer<typeof skillModeSchema>;
 type SkillMetadata = z.infer<typeof skillMetadataSchema>;
 
 function parseSkillMetadata(data: unknown): Result<SkillMetadata, ParseError> {
-	try {
-		return ok(skillMetadataSchema.parse(data));
-	} catch (e) {
-		const message = e instanceof Error ? e.message : String(e);
-		return err(parseError(`Invalid skill metadata: ${message}`));
+	const result = skillMetadataSchema.safeParse(data);
+	if (!result.success) {
+		const details = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+		return err(parseError(`Invalid skill metadata: ${details}`));
 	}
+	return ok(result.data);
 }
 
 export type { ContextSource, SkillInput, SkillMetadata, SkillMode };
