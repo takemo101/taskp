@@ -6,6 +6,7 @@ import { createCommandRunner } from "./adapter/command-runner";
 import { createDefaultConfigLoader } from "./adapter/config-loader";
 import { createContextCollector } from "./adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "./adapter/context-collector-deps";
+import { createCliProgressWriter } from "./adapter/progress-formatter";
 import { createPromptRunner } from "./adapter/prompt-runner";
 import { createSkillInitializer } from "./adapter/skill-initializer";
 import { createDefaultSkillLoader } from "./adapter/skill-loader";
@@ -287,7 +288,13 @@ async function runAgentMode(
 			presets,
 			model: languageModelResult.value,
 		},
-		{ skillRepository, promptCollector, contextCollector, agentExecutor },
+		{
+			skillRepository,
+			promptCollector,
+			contextCollector,
+			agentExecutor,
+			progressWriter: createCliProgressWriter(process.stdout),
+		},
 	);
 	if (!result.ok) {
 		console.error(formatError(result.error));

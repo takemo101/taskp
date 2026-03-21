@@ -1,4 +1,4 @@
-import type { ToolSet } from "ai";
+import type { ToolCallRepairFunction, ToolSet } from "ai";
 import { stepCountIs, streamText } from "ai";
 import { buildTools } from "../core/execution/agent-tools";
 import { executionError } from "../core/types/errors";
@@ -34,12 +34,13 @@ async function executeAgentLoop(
 			prompt: input.context,
 			tools,
 			stopWhen: stepCountIs(input.maxSteps),
+			experimental_repairToolCall: repairToolCall,
 		});
 
 		for await (const part of result.fullStream) {
 			switch (part.type) {
 				case "text-delta":
-					writer.writeText(part.text);
+					if (part.text) writer.writeText(part.text);
 					break;
 				case "tool-call":
 					writer.writeToolCall(part.toolName, part.input as Record<string, unknown>);
@@ -73,3 +74,26 @@ async function executeAgentLoop(
 		);
 	}
 }
+
+/**
+ * LLM が不正な JSON（制御文字を含む等）でツール呼び出しを生成した場合に
+ * 制御文字をエスケープして再パースを試みる。
+ * @internal テスト用にエクスポート
+ */
+export const repairToolCall: ToolCallRepairFunction<ToolSet> = async (options) => {
+	const raw = options.toolCall.input;
+	// 制御文字（U+0000〜U+001F）を \uXXXX にエスケープ
+	// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional match for JSON control chars
+	const escaped = raw.replace(/[\u0000-\u001f]/g, (ch: string) => {
+		const hex = ch.codePointAt(0)?.toString(16).padStart(4, "0") ?? "0000";
+		return `\\u${hex}`;
+	});
+	if (escaped === raw) return null; // 制御文字が原因ではない → 修復不可
+
+	try {
+		const parsed = JSON.parse(escaped) as Record<string, unknown>;
+		return { ...options.toolCall, input: JSON.stringify(parsed) };
+	} catch {
+		return null; // 修復失敗
+	}
+};
