@@ -5,7 +5,9 @@ import type { Result } from "../core/types/result";
 import { ok } from "../core/types/result";
 import type { ReservedVars } from "../core/variable/template-renderer";
 import { renderTemplate } from "../core/variable/template-renderer";
+import { type HooksConfig, runHooks } from "./hook-runner";
 import type { CommandExecutor, ExecResult } from "./port/command-executor";
+import type { HookContext, HookExecutorPort } from "./port/hook-executor";
 import { createNoopProgressWriter, type ProgressWriter } from "./port/progress-writer";
 import type { PromptCollector } from "./port/prompt-collector";
 import type { SkillRepository } from "./port/skill-repository";
@@ -35,6 +37,8 @@ export type RunSkillDeps = {
 	readonly promptCollector: PromptCollector;
 	readonly commandExecutor: CommandExecutor;
 	readonly progressWriter?: ProgressWriter;
+	readonly hookExecutor?: HookExecutorPort;
+	readonly hooksConfig?: HooksConfig;
 };
 
 export async function runSkill(
@@ -83,6 +87,8 @@ export async function runSkill(
 		});
 	}
 
+	const startTime = Date.now();
+
 	// template モードではマークダウン内の bash コードブロックを順に実行する。
 	// force=true なら1つ失敗しても残りを続行する（CI パイプライン的な使い方に対応）
 	const commandResults = await executeCommands(
@@ -92,15 +98,46 @@ export async function runSkill(
 		deps.commandExecutor,
 		{ force: input.force, timeout: skill.metadata.timeout },
 	);
+
+	const durationMs = Date.now() - startTime;
+
 	if (!commandResults.ok) {
+		await invokeHooks(deps, {
+			skillName: skill.metadata.name,
+			mode: "template",
+			status: "failed",
+			durationMs,
+			error: domainErrorMessage(commandResults.error),
+		});
 		return commandResults;
 	}
+
+	await invokeHooks(deps, {
+		skillName: skill.metadata.name,
+		mode: "template",
+		status: "success",
+		durationMs,
+	});
 
 	return ok({
 		skillName: skill.metadata.name,
 		rendered,
 		commands: commandResults.value,
 		dryRun: false,
+	});
+}
+
+async function invokeHooks(
+	deps: Pick<RunSkillDeps, "hookExecutor" | "hooksConfig">,
+	context: HookContext,
+): Promise<void> {
+	if (deps.hookExecutor === undefined || deps.hooksConfig === undefined) {
+		return;
+	}
+	await runHooks({
+		hookExecutor: deps.hookExecutor,
+		hooksConfig: deps.hooksConfig,
+		context,
 	});
 }
 
