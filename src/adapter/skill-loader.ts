@@ -3,10 +3,11 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { Skill, SkillScope } from "../core/skill/skill";
 import { parseSkill } from "../core/skill/skill";
+import type { ParseError } from "../core/types/errors";
 import { type SkillNotFoundError, skillNotFoundError } from "../core/types/errors";
 import type { Result } from "../core/types/result";
 import { err } from "../core/types/result";
-import type { SkillRepository } from "../usecase/port/skill-repository";
+import type { SkillLoadResult, SkillRepository } from "../usecase/port/skill-repository";
 
 const SKILL_DIR_NAME = ".taskp/skills";
 const SKILL_FILE_NAME = "SKILL.md";
@@ -42,65 +43,64 @@ async function findByName(
 ): Promise<Result<Skill, SkillNotFoundError>> {
 	const localPath = join(localSkillsDir, name, SKILL_FILE_NAME);
 	const localResult = await tryLoadSkill(localPath, "local");
-	if (localResult !== undefined) {
+	if (localResult?.ok) {
 		return localResult;
 	}
 
 	const globalPath = join(globalSkillsDir, name, SKILL_FILE_NAME);
 	const globalResult = await tryLoadSkill(globalPath, "global");
-	if (globalResult !== undefined) {
+	if (globalResult?.ok) {
 		return globalResult;
 	}
 
 	return err(skillNotFoundError(name));
 }
 
-async function listAll(localSkillsDir: string, globalSkillsDir: string): Promise<Skill[]> {
-	const [localSkills, globalSkills] = await Promise.all([
+async function listAll(localSkillsDir: string, globalSkillsDir: string): Promise<SkillLoadResult> {
+	const [localResult, globalResult] = await Promise.all([
 		scanDirectory(localSkillsDir, "local"),
 		scanDirectory(globalSkillsDir, "global"),
 	]);
 
-	// 同名スキルはローカルが優先（プロジェクト固有のカスタマイズを可能にする）
-	const localNames = new Set(localSkills.map((s) => s.metadata.name));
-	const uniqueGlobalSkills = globalSkills.filter((s) => !localNames.has(s.metadata.name));
+	const localNames = new Set(localResult.skills.map((s) => s.metadata.name));
+	const uniqueGlobalSkills = globalResult.skills.filter((s) => !localNames.has(s.metadata.name));
 
-	return [...localSkills, ...uniqueGlobalSkills];
+	return {
+		skills: [...localResult.skills, ...uniqueGlobalSkills],
+		failures: [...localResult.failures, ...globalResult.failures],
+	};
 }
 
-async function scanDirectory(skillsDir: string, scope: SkillScope): Promise<Skill[]> {
+async function scanDirectory(skillsDir: string, scope: SkillScope): Promise<SkillLoadResult> {
 	const entries = await readdir(skillsDir, { withFileTypes: true }).catch(() => []);
 
-	const results = await Promise.all(
-		entries
-			.filter((entry) => entry.isDirectory())
-			.map(async (entry) => {
-				const skillPath = join(skillsDir, entry.name, SKILL_FILE_NAME);
-				return tryLoadSkill(skillPath, scope);
-			}),
-	);
+	const skills: Skill[] = [];
+	const failures: { path: string; error: string }[] = [];
 
-	return results
-		.filter((r): r is Result<Skill, never> & { ok: true } => r !== undefined && r.ok === true)
-		.map((r) => r.value);
+	for (const entry of entries.filter((e) => e.isDirectory())) {
+		const skillPath = join(skillsDir, entry.name, SKILL_FILE_NAME);
+		const result = await tryLoadSkill(skillPath, scope);
+		if (result === undefined) {
+			continue;
+		}
+		if (result.ok) {
+			skills.push(result.value);
+		} else {
+			failures.push({ path: skillPath, error: result.error.message });
+		}
+	}
+
+	return { skills, failures };
 }
 
-// ファイル不在・パースエラーのいずれも undefined を返す（エラーを握りつぶす）。
-// スキル一覧のスキャン時に、壊れた1ファイルが全体の読み込みを止めないようにするため
 async function tryLoadSkill(
 	path: string,
 	scope: SkillScope,
-): Promise<Result<Skill, never> | undefined> {
+): Promise<Result<Skill, ParseError> | undefined> {
 	const raw = await readFile(path, "utf-8").catch(() => undefined);
 	if (raw === undefined) {
 		return undefined;
 	}
 
-	const result = parseSkill(raw, path, scope);
-	if (!result.ok) {
-		console.warn(`Warning: Failed to parse skill at ${path}: ${result.error.message}`);
-		return undefined;
-	}
-
-	return result as Result<Skill, never> & { ok: true };
+	return parseSkill(raw, path, scope);
 }

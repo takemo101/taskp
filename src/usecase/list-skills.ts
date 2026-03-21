@@ -1,5 +1,5 @@
 import type { Skill, SkillScope } from "../core/skill/skill";
-import type { SkillRepository } from "./port/skill-repository";
+import type { SkillLoadFailure, SkillLoadResult, SkillRepository } from "./port/skill-repository";
 
 export type ListSkillsFilter = {
 	readonly scope?: SkillScope;
@@ -7,6 +7,7 @@ export type ListSkillsFilter = {
 
 export type ListOutput = {
 	readonly skills: readonly Skill[];
+	readonly failures: readonly SkillLoadFailure[];
 };
 
 export type ListSkillsUseCase = {
@@ -16,8 +17,11 @@ export type ListSkillsUseCase = {
 export function createListSkillsUseCase(repository: SkillRepository): ListSkillsUseCase {
 	return {
 		execute: async (filter) => {
-			const skills = await fetchByScope(repository, filter.scope);
-			return { skills: deduplicateByLocalPriority(skills) };
+			const result = await fetchByScope(repository, filter.scope);
+			return {
+				skills: deduplicateByLocalPriority(result.skills),
+				failures: result.failures,
+			};
 		},
 	};
 }
@@ -25,7 +29,7 @@ export function createListSkillsUseCase(repository: SkillRepository): ListSkills
 async function fetchByScope(
 	repository: SkillRepository,
 	scope: SkillScope | undefined,
-): Promise<Skill[]> {
+): Promise<SkillLoadResult> {
 	switch (scope) {
 		case "local":
 			return repository.listLocal();
