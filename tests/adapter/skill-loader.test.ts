@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -170,6 +170,21 @@ describe("SkillLoader", () => {
 			expect(skills).toHaveLength(1);
 			expect(skills[0].metadata.name).toBe("valid");
 			expect(failures).toHaveLength(1);
+		});
+
+		it("ファイル読み取りエラー時に failures に記録する", async () => {
+			createSkillFile(localRoot, "unreadable", makeSkillMd("unreadable", "読み取れない"));
+			const filePath = join(localRoot, ".taskp", "skills", "unreadable", "SKILL.md");
+			chmodSync(filePath, 0o000);
+			const loader = createSkillLoader({ localRoot, globalRoot });
+
+			const { skills, failures } = await loader.listLocal();
+
+			chmodSync(filePath, 0o644);
+			expect(skills).toHaveLength(0);
+			expect(failures).toHaveLength(1);
+			expect(failures[0].path).toMatch(/unreadable/);
+			expect(failures[0].error).toMatch(/Failed to read skill file/);
 		});
 
 		it("ファイル不在時は failures に記録しない", async () => {
