@@ -37,7 +37,6 @@ temp/
 opencode.json
 opnecode.json
 .serena/
-.pi/
 
 # Worktrees (runtime)
 .worktrees/
