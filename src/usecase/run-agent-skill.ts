@@ -8,6 +8,7 @@ import type { ReservedVars } from "../core/variable/template-renderer";
 import { renderTemplate } from "../core/variable/template-renderer";
 import type { AgentExecutorPort, AgentExecutorResult } from "./port/agent-executor";
 import type { ContextCollectorPort } from "./port/context-collector";
+import { createNoopProgressWriter, type ProgressWriter } from "./port/progress-writer";
 import type { PromptCollector } from "./port/prompt-collector";
 import type { SkillRepository } from "./port/skill-repository";
 
@@ -29,6 +30,7 @@ export type RunAgentSkillDeps = {
 	readonly promptCollector: PromptCollector;
 	readonly contextCollector: ContextCollectorPort;
 	readonly agentExecutor: AgentExecutorPort;
+	readonly progressWriter?: ProgressWriter;
 };
 
 export async function runAgentSkill(
@@ -46,6 +48,9 @@ export async function runAgentSkill(
 		return collectResult;
 	}
 	const variables = collectResult.value;
+	const progress = deps.progressWriter ?? createNoopProgressWriter();
+
+	progress.writeInputs(skill.metadata.inputs, variables);
 
 	const reserved: ReservedVars = {
 		cwd: process.cwd(),
@@ -66,6 +71,8 @@ export async function runAgentSkill(
 	const contextParts: string[] = [systemPrompt];
 
 	if (skill.metadata.context.length > 0) {
+		progress.writeContextSources(skill.metadata.context);
+
 		// context ソース内の変数（{{__skill_dir__}} 等）を展開してからコレクタに渡す
 		// （SKILL-SPEC.md「展開タイミング」ステップ3: context のパス内の変数を展開）
 		const resolvedSources = resolveContextSources(skill.metadata.context, variables, reserved);

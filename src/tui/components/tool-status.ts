@@ -1,5 +1,5 @@
 import { type CliRenderer, TextRenderable } from "@opentui/core";
-import { SPINNER_FRAMES, SPINNER_INTERVAL_MS } from "./spinner";
+import { SPINNER_FRAMES, TOOL_SPINNER_INTERVAL_MS } from "./spinner";
 import { formatToolArgs } from "./tool-args-formatter";
 
 type ToolState = {
@@ -31,13 +31,14 @@ export class ToolStatusDisplay {
 			summary: formatToolArgs(toolName, args),
 		};
 		this.spinnerIndex = 0;
+		this.text.visible = true;
 		this.updateContent();
 
 		if (this.spinnerInterval) clearInterval(this.spinnerInterval);
 		this.spinnerInterval = setInterval(() => {
 			this.spinnerIndex = (this.spinnerIndex + 1) % SPINNER_FRAMES.length;
 			this.updateContent();
-		}, SPINNER_INTERVAL_MS);
+		}, TOOL_SPINNER_INTERVAL_MS);
 	}
 
 	clear(): void {
@@ -47,6 +48,7 @@ export class ToolStatusDisplay {
 		}
 		this.current = null;
 		this.text.content = "";
+		this.text.visible = false;
 	}
 
 	destroy(): void {

@@ -1,6 +1,7 @@
 import {
 	BoxRenderable,
 	type CliRenderer,
+	dim,
 	green,
 	InputRenderable,
 	InputRenderableEvents,
@@ -22,6 +23,7 @@ const TEXTAREA_DEFAULT_HEIGHT = 5;
 
 type FormElement = {
 	readonly input: SkillInput;
+	readonly label: TextRenderable;
 	readonly element: InputRenderable | SelectRenderable | TextareaRenderable;
 };
 
@@ -67,21 +69,21 @@ export async function showInputForm(
 				marginBottom: 1,
 			});
 
-			group.add(
-				new TextRenderable(renderer, {
-					id: `label-${input.name}`,
-					content: t`${green("❯")} ${input.message}`,
-				}),
-			);
+			const label = new TextRenderable(renderer, {
+				id: `label-${input.name}`,
+				content: t`${dim("○")} ${input.message}`,
+			});
+			group.add(label);
 
 			const element = createInputElement(renderer, input, (value) => {
 				values[input.name] = value;
+				label.content = t`${green("✔")} ${input.message}`;
 				advanceFocus();
 			});
 
 			group.add(element);
 			container.add(group);
-			elements.push({ input, element });
+			elements.push({ input, label, element });
 		}
 
 		container.add(
@@ -97,6 +99,15 @@ export async function showInputForm(
 		let focusIndex = 0;
 
 		function focusCurrent(): void {
+			for (let i = 0; i < elements.length; i++) {
+				const el = elements[i];
+				if (el.input.name in values) continue; // 回答済み（✔）はそのまま
+				if (i === focusIndex) {
+					el.label.content = t`${green("?")} ${el.input.message}`;
+				} else {
+					el.label.content = t`${dim("○")} ${el.input.message}`;
+				}
+			}
 			elements[focusIndex].element.focus();
 		}
 
@@ -132,7 +143,11 @@ export async function showInputForm(
 			}
 			if (key.name === "tab") {
 				if (key.shift) {
-					focusIndex = Math.max(0, focusIndex - 1);
+					const prevIndex = focusIndex - 1;
+					if (prevIndex < 0) return; // 先頭では何もしない
+					focusIndex = prevIndex;
+					// 戻った先が回答済みなら回答を取り消して再入力可能にする
+					delete (values as Record<string, string>)[elements[focusIndex].input.name];
 				} else {
 					focusIndex = Math.min(elements.length - 1, focusIndex + 1);
 				}

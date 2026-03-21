@@ -22,7 +22,11 @@ import { runSkill } from "../../usecase/run-skill";
 import { KeyHelp } from "../components/key-help";
 import { SPINNER_FRAMES, SPINNER_INTERVAL_MS } from "../components/spinner";
 import { ToolStatusDisplay } from "../components/tool-status";
-import { createTuiStreamWriter, type ExecutionViewPort } from "../tui-stream-writer";
+import {
+	createTuiProgressWriter,
+	createTuiStreamWriter,
+	type ExecutionViewPort,
+} from "../tui-stream-writer";
 
 const CONTAINER_ID = "exec-container";
 
@@ -57,6 +61,14 @@ export async function showExecution(
 			stickyStart: "bottom",
 		});
 
+		const contextInfo = new TextRenderable(renderer, {
+			id: "context-info",
+			width: "100%",
+			content: "",
+			fg: "#666666",
+			visible: false,
+		});
+
 		const markdown = new MarkdownRenderable(renderer, {
 			id: "output-markdown",
 			width: "100%",
@@ -65,14 +77,23 @@ export async function showExecution(
 			streaming: true,
 		});
 
+		scrollbox.add(contextInfo);
 		scrollbox.add(markdown);
 		container.add(scrollbox);
+
+		// サマリー＋ヘルプ用の固定領域を確保し、scrollbox と重ならないようにする
+		const footer = new BoxRenderable(renderer, {
+			id: "exec-footer",
+			width: "100%",
+			flexDirection: "column",
+			flexShrink: 0,
+		});
 
 		const summaryText = new TextRenderable(renderer, {
 			id: "summary",
 			content: "",
 		});
-		container.add(summaryText);
+		footer.add(summaryText);
 
 		const stopSpinner = startSpinner(summaryText);
 
@@ -86,12 +107,20 @@ export async function showExecution(
 				{ key: "Esc", description: "Quit" },
 			]),
 		);
-		container.add(helpBox);
+		footer.add(helpBox);
+		container.add(footer);
 
 		renderer.root.add(container);
 		container.focus();
 
+		let contextBuffer = "";
+
 		const viewPort: ExecutionViewPort = {
+			appendContext(text: string) {
+				contextInfo.visible = true;
+				contextBuffer += text;
+				contextInfo.content = contextBuffer;
+			},
 			appendOutput(text: string) {
 				markdown.content += text;
 			},
@@ -181,6 +210,7 @@ async function executeAgentMode(
 	viewPort: ExecutionViewPort,
 ): Promise<void> {
 	const writer = createTuiStreamWriter(viewPort);
+	const progressWriter = createTuiProgressWriter(viewPort);
 	const agentExecutor = createAgentExecutor(writer);
 
 	const contextCollectorDeps = await createDefaultContextCollectorDeps();
@@ -193,6 +223,7 @@ async function executeAgentMode(
 			promptCollector: buildPromptCollector(variables),
 			contextCollector,
 			agentExecutor,
+			progressWriter,
 		},
 	);
 
