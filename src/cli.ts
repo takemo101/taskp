@@ -138,6 +138,7 @@ const cli = Cli.create("taskp", {
 					presets,
 					dryRun: c.options.dryRun ?? false,
 					force: c.options.force ?? false,
+					noInput: c.options.noInput,
 				},
 				{ skillRepository, promptCollector, commandExecutor },
 			);
@@ -240,6 +241,7 @@ type RunCommandContext = {
 	readonly options: {
 		readonly model?: string;
 		readonly verbose?: boolean;
+		readonly noInput?: boolean;
 	};
 };
 
@@ -287,6 +289,7 @@ async function runAgentMode(
 			name: c.args.skill,
 			presets,
 			model: languageModelResult.value,
+			noInput: c.options.noInput,
 		},
 		{
 			skillRepository,

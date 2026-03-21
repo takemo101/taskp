@@ -54,7 +54,7 @@ describe("CLI E2E: init → list → run", () => {
 	});
 
 	it("list shows empty message when no skills exist", async () => {
-		const result = await run("list", projectDir);
+		const result = await run("list --local", projectDir);
 		expect(result.exitCode).toBe(0);
 		expect(result.stdout).toContain("No skills found");
 	});

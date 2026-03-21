@@ -14,6 +14,7 @@ export type RunSkillInput = {
 	readonly presets: Readonly<Record<string, string>>;
 	readonly dryRun: boolean;
 	readonly force: boolean;
+	readonly noInput?: boolean;
 };
 
 export type CommandResult = {
@@ -45,7 +46,9 @@ export async function runSkill(
 
 	const skill = findResult.value;
 
-	const collectResult = await deps.promptCollector.collect(skill.metadata.inputs, input.presets);
+	const collectResult = await deps.promptCollector.collect(skill.metadata.inputs, input.presets, {
+		noInput: input.noInput,
+	});
 	if (!collectResult.ok) {
 		return collectResult;
 	}

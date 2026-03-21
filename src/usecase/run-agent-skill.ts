@@ -18,6 +18,7 @@ export type RunAgentSkillInput = {
 	readonly name: string;
 	readonly presets: Readonly<Record<string, string>>;
 	readonly model: LanguageModelV3;
+	readonly noInput?: boolean;
 };
 
 export type RunAgentSkillOutput = {
@@ -43,7 +44,9 @@ export async function runAgentSkill(
 	}
 
 	const skill = findResult.value;
-	const collectResult = await deps.promptCollector.collect(skill.metadata.inputs, input.presets);
+	const collectResult = await deps.promptCollector.collect(skill.metadata.inputs, input.presets, {
+		noInput: input.noInput,
+	});
 	if (!collectResult.ok) {
 		return collectResult;
 	}

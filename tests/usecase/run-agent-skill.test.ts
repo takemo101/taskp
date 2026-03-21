@@ -190,4 +190,17 @@ describe("runAgentSkill", () => {
 		const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
 		expect(executorCall.model).toBe(mockModel);
 	});
+
+	it("passes noInput option to prompt collector", async () => {
+		const skill = createAgentSkill();
+		const deps = createMockDeps(skill);
+
+		await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel, noInput: true }, deps);
+
+		expect(deps.promptCollector.collect).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.anything(),
+			{ noInput: true },
+		);
+	});
 });

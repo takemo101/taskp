@@ -220,4 +220,20 @@ echo "step 2 {{env}}"
 		if (!result.ok) return;
 		expect(result.value.commands[0].command).toContain("deploying to production");
 	});
+
+	it("passes noInput option to prompt collector", async () => {
+		let receivedOptions: { noInput?: boolean } | undefined;
+		const deps = createDeps({
+			promptCollector: {
+				collect: async (_inputs, _presets, options) => {
+					receivedOptions = options;
+					return ok({ env: "staging" });
+				},
+			},
+		});
+
+		await runSkill(createInput({ noInput: true }), deps);
+
+		expect(receivedOptions).toEqual({ noInput: true });
+	});
 });
