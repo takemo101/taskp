@@ -20,6 +20,13 @@ const skillMetadataSchema = z.object({
 	mode: skillModeSchema.default("template"),
 	inputs: z.array(skillInputSchema).default([]),
 	model: z.string().min(1).optional(),
+	timeout: z
+		.number()
+		.int()
+		.positive()
+		.max(3_600_000)
+		.optional()
+		.describe("Timeout in milliseconds (max: 3,600,000 = 1 hour)"),
 	tools: z.array(z.string().min(1)).default([...DEFAULT_TOOLS]),
 	context: z.array(contextSourceSchema).default([]),
 });

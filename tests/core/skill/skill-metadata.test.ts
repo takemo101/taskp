@@ -18,6 +18,7 @@ describe("parseSkillMetadata", () => {
 			tools: ["bash", "read", "write"],
 			context: [],
 		});
+		expect(result.value.timeout).toBeUndefined();
 	});
 
 	it("全フィールド指定で正しくパースされる", () => {
@@ -140,6 +141,78 @@ describe("parseSkillMetadata", () => {
 		expect(result.value.inputs[0].default).toBe(true);
 		expect(result.value.inputs[0].required).toBe(false);
 		expect(result.value.inputs[1].validate).toBe("^[1-9][0-9]*$");
+	});
+
+	it("timeout が正の整数で正しくパースされる", () => {
+		const result = parseSkillMetadata({
+			name: "crawl",
+			description: "クロールする",
+			timeout: 300000,
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.timeout).toBe(300000);
+	});
+
+	it("timeout が 0 でエラーになる", () => {
+		const result = parseSkillMetadata({
+			name: "crawl",
+			description: "クロールする",
+			timeout: 0,
+		});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("PARSE_ERROR");
+	});
+
+	it("timeout が負の数でエラーになる", () => {
+		const result = parseSkillMetadata({
+			name: "crawl",
+			description: "クロールする",
+			timeout: -1000,
+		});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("PARSE_ERROR");
+	});
+
+	it("timeout が小数でエラーになる", () => {
+		const result = parseSkillMetadata({
+			name: "crawl",
+			description: "クロールする",
+			timeout: 1.5,
+		});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("PARSE_ERROR");
+	});
+
+	it("timeout が上限値（3,600,000ms）でパースされる", () => {
+		const result = parseSkillMetadata({
+			name: "crawl",
+			description: "クロールする",
+			timeout: 3_600_000,
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.timeout).toBe(3_600_000);
+	});
+
+	it("timeout が上限値を超えるとエラーになる", () => {
+		const result = parseSkillMetadata({
+			name: "crawl",
+			description: "クロールする",
+			timeout: 3_600_001,
+		});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("PARSE_ERROR");
 	});
 
 	it("name が未指定でエラーになる", () => {
