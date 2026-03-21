@@ -22,40 +22,41 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 		targetFps: 30,
 	});
 
-	renderer.on("selection", (selection) => {
-		const text = selection.getSelectedText();
-		if (text) {
-			copyToClipboard(text);
+	try {
+		renderer.on("selection", (selection) => {
+			const text = selection.getSelectedText();
+			if (text) {
+				copyToClipboard(text);
+			}
+		});
+
+		const skillRepository = createDefaultSkillLoader(process.cwd());
+		const { skills } = await skillRepository.listAll();
+
+		if (skills.length === 0) {
+			console.log("No skills found.");
+			return;
 		}
-	});
 
-	const skillRepository = createDefaultSkillLoader(process.cwd());
-	const { skills } = await skillRepository.listAll();
+		const { model, hooksConfig } = await resolveModelAndConfig(options);
 
-	if (skills.length === 0) {
+		const commandExecutor = createCommandRunner();
+		const hookExecutor = createHookExecutor(commandExecutor);
+		const executionDeps: ExecutionDeps = { commandExecutor, hookExecutor, hooksConfig };
+
+		while (true) {
+			const skill = await showSkillSelector(renderer, skills);
+			if (!skill) break;
+
+			const variables = await showInputForm(renderer, skill);
+			if (!variables) continue;
+
+			const action = await showExecution(renderer, skill, variables, model, executionDeps);
+			if (action === "exit") break;
+		}
+	} finally {
 		renderer.destroy();
-		console.log("No skills found.");
-		return;
 	}
-
-	const { model, hooksConfig } = await resolveModelAndConfig(options);
-
-	const commandExecutor = createCommandRunner();
-	const hookExecutor = createHookExecutor(commandExecutor);
-	const executionDeps: ExecutionDeps = { commandExecutor, hookExecutor, hooksConfig };
-
-	while (true) {
-		const skill = await showSkillSelector(renderer, skills);
-		if (!skill) break;
-
-		const variables = await showInputForm(renderer, skill);
-		if (!variables) continue;
-
-		const action = await showExecution(renderer, skill, variables, model, executionDeps);
-		if (action === "exit") break;
-	}
-
-	renderer.destroy();
 }
 
 type ModelAndConfig = {
