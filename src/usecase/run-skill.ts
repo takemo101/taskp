@@ -6,8 +6,8 @@ import { ok } from "../core/types/result";
 import type { ReservedVars } from "../core/variable/template-renderer";
 import { renderTemplate } from "../core/variable/template-renderer";
 import type { CommandExecutor, ExecResult } from "./port/command-executor";
-import type { PromptCollector } from "./port/prompt-collector";
 import { createNoopProgressWriter, type ProgressWriter } from "./port/progress-writer";
+import type { PromptCollector } from "./port/prompt-collector";
 import type { SkillRepository } from "./port/skill-repository";
 
 export type RunSkillInput = {
