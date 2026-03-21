@@ -3,7 +3,7 @@ import { createAgentExecutor } from "../../adapter/agent-executor";
 import { createContextCollector } from "../../adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "../../adapter/context-collector-deps";
 import type { Skill } from "../../core/skill/skill";
-import type { DomainError } from "../../core/types/errors";
+import { domainErrorMessage } from "../../core/types/errors";
 import { ok } from "../../core/types/result";
 import type { HooksConfig } from "../../usecase/hook-runner";
 import type { CommandExecutor } from "../../usecase/port/command-executor";
@@ -51,13 +51,6 @@ export async function runExecution(
 	}
 }
 
-export function formatDomainError(error: DomainError): string {
-	if (error.type === "SKILL_NOT_FOUND") {
-		return `Skill "${error.name}" not found`;
-	}
-	return error.message;
-}
-
 export function buildSkillRepository(skill: Skill): SkillRepository {
 	return {
 		findByName: async () => ok(skill),
@@ -101,7 +94,7 @@ async function executeAgentMode(
 	);
 
 	if (!result.ok) {
-		viewPort.appendOutput(`\nError: ${formatDomainError(result.error)}\n`);
+		viewPort.appendOutput(`\nError: ${domainErrorMessage(result.error)}\n`);
 		viewPort.showSummary(0, 0);
 	}
 }
@@ -138,7 +131,7 @@ async function executeTemplateMode(
 		}
 		viewPort.showSummary(0, result.value.commands.length);
 	} else {
-		viewPort.appendOutput(`\nError: ${formatDomainError(result.error)}\n`);
+		viewPort.appendOutput(`\nError: ${domainErrorMessage(result.error)}\n`);
 		viewPort.showSummary(0, 0);
 	}
 }

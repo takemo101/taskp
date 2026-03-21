@@ -15,7 +15,7 @@ import { createDefaultSkillLoader } from "./adapter/skill-loader";
 import { createStreamWriter } from "./adapter/stream-writer";
 import type { ContextSource } from "./core/skill/context-source";
 import type { SkillScope } from "./core/skill/skill";
-import { type DomainError, EXIT_CODE } from "./core/types/errors";
+import { type DomainError, domainErrorMessage, EXIT_CODE } from "./core/types/errors";
 import { type InitOutput, initSkill } from "./usecase/init-skill";
 import { createListSkillsUseCase } from "./usecase/list-skills";
 import { runAgentSkill } from "./usecase/run-agent-skill";
@@ -73,18 +73,7 @@ function formatInitOutput(output: InitOutput): string {
 }
 
 function formatError(error: DomainError): string {
-	switch (error.type) {
-		case "SKILL_NOT_FOUND":
-			return `Error: Skill "${error.name}" not found`;
-		case "PARSE_ERROR":
-			return `Error: ${error.message}`;
-		case "RENDER_ERROR":
-			return `Error: ${error.message}`;
-		case "EXECUTION_ERROR":
-			return `Error: ${error.message}`;
-		case "CONFIG_ERROR":
-			return `Error: ${error.message}`;
-	}
+	return `Error: ${domainErrorMessage(error)}`;
 }
 
 const cli = Cli.create("taskp", {

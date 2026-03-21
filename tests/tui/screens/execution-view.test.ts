@@ -17,11 +17,11 @@ vi.mock("../../../src/adapter/context-collector-deps", () => ({
 	createDefaultContextCollectorDeps: async () => ({}),
 }));
 
+import { domainErrorMessage } from "../../../src/core/types/errors";
 import {
 	buildPromptCollector,
 	buildSkillRepository,
 	type ExecutionDeps,
-	formatDomainError,
 	runExecution,
 } from "../../../src/tui/screens/execution-runner";
 import { runAgentSkill } from "../../../src/usecase/run-agent-skill";
@@ -75,19 +75,19 @@ function createMockDeps(): ExecutionDeps {
 	};
 }
 
-describe("formatDomainError", () => {
+describe("domainErrorMessage", () => {
 	it("formats SKILL_NOT_FOUND with skill name", () => {
-		const result = formatDomainError({ type: "SKILL_NOT_FOUND", name: "my-skill" });
-		expect(result).toBe('Skill "my-skill" not found');
+		const result = domainErrorMessage({ type: "SKILL_NOT_FOUND", name: "my-skill" });
+		expect(result).toBe("Skill not found: my-skill");
 	});
 
 	it("formats PARSE_ERROR with message", () => {
-		const result = formatDomainError({ type: "PARSE_ERROR", message: "bad syntax" });
+		const result = domainErrorMessage({ type: "PARSE_ERROR", message: "bad syntax" });
 		expect(result).toBe("bad syntax");
 	});
 
 	it("formats EXECUTION_ERROR with message", () => {
-		const result = formatDomainError({ type: "EXECUTION_ERROR", message: "command failed" });
+		const result = domainErrorMessage({ type: "EXECUTION_ERROR", message: "command failed" });
 		expect(result).toBe("command failed");
 	});
 });
@@ -220,7 +220,7 @@ describe("runExecution", () => {
 
 		await runExecution(skill, {}, null, view, deps);
 
-		expect(view.calls).toContain('appendOutput:\nError: Skill "tmpl-skill" not found\n');
+		expect(view.calls).toContain("appendOutput:\nError: Skill not found: tmpl-skill\n");
 		expect(view.calls).toContain("showSummary:0:0");
 	});
 
