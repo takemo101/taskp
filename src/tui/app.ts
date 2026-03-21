@@ -11,7 +11,12 @@ import { type ExecutionDeps, showExecution } from "./screens/execution-view";
 import { showInputForm } from "./screens/input-form";
 import { showSkillSelector } from "./screens/skill-selector";
 
-export async function startTui(): Promise<void> {
+export type TuiOptions = {
+	readonly model?: string;
+	readonly provider?: string;
+};
+
+export async function startTui(options?: TuiOptions): Promise<void> {
 	const renderer = await createCliRenderer({
 		exitOnCtrlC: true,
 		targetFps: 30,
@@ -33,7 +38,7 @@ export async function startTui(): Promise<void> {
 		return;
 	}
 
-	const { model, hooksConfig } = await resolveModelAndConfig();
+	const { model, hooksConfig } = await resolveModelAndConfig(options);
 
 	const commandExecutor = createCommandRunner();
 	const hookExecutor = createHookExecutor(commandExecutor);
@@ -60,7 +65,7 @@ type ModelAndConfig = {
 
 // config.toml からデフォルトの LLM モデルとフック設定を解決する。
 // モデル解決がいずれかの段階で失敗した場合は null を返す（agent モード実行時にエラー表示）
-async function resolveModelAndConfig(): Promise<ModelAndConfig> {
+async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConfig> {
 	const configLoader = createDefaultConfigLoader(process.cwd());
 	const configResult = await configLoader.load();
 	if (!configResult.ok) return { model: null, hooksConfig: undefined };
@@ -68,7 +73,11 @@ async function resolveModelAndConfig(): Promise<ModelAndConfig> {
 	const hooksConfig = configResult.value.hooks;
 
 	const aiConfig = configResult.value.ai ?? {};
-	const specResult = resolveModelSpec({ config: aiConfig });
+	const specResult = resolveModelSpec({
+		cliModel: options?.model,
+		cliProvider: options?.provider,
+		config: aiConfig,
+	});
 	if (!specResult.ok) return { model: null, hooksConfig };
 
 	const modelResult = createLanguageModel(specResult.value, aiConfig);

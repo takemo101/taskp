@@ -240,9 +240,17 @@ const cli = Cli.create("taskp", {
 	})
 	.command("tui", {
 		description: "Launch interactive TUI",
-		async run() {
+		options: z.object({
+			model: z.string().optional().describe("LLM model to use"),
+			provider: z.string().optional().describe("LLM provider"),
+		}),
+		alias: {
+			model: "m",
+			provider: "p",
+		},
+		async run(c) {
 			const { startTui } = await import("./tui/app");
-			await startTui();
+			await startTui({ model: c.options.model, provider: c.options.provider });
 		},
 	})
 	.command("serve", {
@@ -256,6 +264,7 @@ type RunCommandContext = {
 	readonly args: { readonly skill: string };
 	readonly options: {
 		readonly model?: string;
+		readonly provider?: string;
 		readonly verbose?: boolean;
 		readonly skipPrompt?: boolean;
 	};
@@ -277,6 +286,7 @@ async function runAgentMode(
 	const aiConfig = configResult.value.ai ?? {};
 	const modelSpecResult = resolveModelSpec({
 		cliModel: c.options.model,
+		cliProvider: c.options.provider,
 		config: aiConfig,
 	});
 	if (!modelSpecResult.ok) {

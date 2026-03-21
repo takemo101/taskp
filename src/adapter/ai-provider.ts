@@ -17,6 +17,7 @@ export type ModelSpec = {
 
 export type ModelSource = {
 	readonly cliModel?: string;
+	readonly cliProvider?: string;
 	readonly skillModel?: string;
 	readonly config: AiConfig;
 };
@@ -85,7 +86,14 @@ function createCloudFactory(
 	};
 }
 
-function createLocalFactory(defaultBaseUrl?: string): ProviderFactory {
+type LocalFactoryOptions = {
+	readonly useResponsesApi?: boolean;
+};
+
+function createLocalFactory(
+	defaultBaseUrl?: string,
+	options?: LocalFactoryOptions,
+): ProviderFactory {
 	return (model, config) => {
 		const baseUrl = config?.base_url ?? defaultBaseUrl;
 
@@ -98,7 +106,10 @@ function createLocalFactory(defaultBaseUrl?: string): ProviderFactory {
 		const apiKey = config?.api_key_env ? (process.env[config.api_key_env] ?? "local") : "local";
 
 		const provider = createOpenAI({ apiKey, baseURL: baseUrl });
-		return ok(provider(model));
+
+		// Responses API をサポートするサーバー（omlx 等）はデフォルト形式を使い、
+		// それ以外（ollama, lmstudio 等）は Chat Completions API を使う
+		return ok(options?.useResponsesApi ? provider(model) : provider.chat(model));
 	};
 }
 
@@ -131,10 +142,15 @@ registerProvider(
 	}),
 );
 
-// Local providers (OpenAI-compatible)
+// Ollama はステートレス実装のため item_reference 非対応 → Chat Completions API を使う
 registerProvider("ollama", createLocalFactory("http://localhost:11434/v1"));
-registerProvider("omlx", createLocalFactory("http://localhost:8000/v1"));
-registerProvider("lmstudio", createLocalFactory("http://localhost:1234/v1"));
+
+// omlx, LM Studio は Responses API (item_reference) をサポート
+registerProvider("omlx", createLocalFactory("http://localhost:8000/v1", { useResponsesApi: true }));
+registerProvider(
+	"lmstudio",
+	createLocalFactory("http://localhost:1234/v1", { useResponsesApi: true }),
+);
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -159,7 +175,20 @@ export function parseModelSpec(spec: string): Result<ModelSpec, ConfigError> {
 }
 
 export function resolveModelSpec(source: ModelSource): Result<ModelSpec, ConfigError> {
-	const rawSpec = source.cliModel ?? source.skillModel ?? source.config.default_model;
+	// 1. CLI / スキル指定があればそれを優先
+	const explicitSpec = source.cliModel ?? source.skillModel;
+	if (explicitSpec !== undefined) {
+		return resolveWithProvider(explicitSpec, source);
+	}
+
+	// 2. provider を解決（CLI --provider > config default_provider）
+	const resolvedProvider = source.cliProvider ?? source.config.default_provider;
+
+	// 3. 解決された provider の default_model > トップレベル default_model
+	const providerDefaultModel = resolvedProvider
+		? source.config.providers?.[resolvedProvider]?.default_model
+		: undefined;
+	const rawSpec = providerDefaultModel ?? source.config.default_model;
 
 	if (rawSpec === undefined) {
 		return err(
@@ -167,6 +196,10 @@ export function resolveModelSpec(source: ModelSource): Result<ModelSpec, ConfigE
 		);
 	}
 
+	return resolveWithProvider(rawSpec, source);
+}
+
+function resolveWithProvider(rawSpec: string, source: ModelSource): Result<ModelSpec, ConfigError> {
 	const parseResult = parseModelSpec(rawSpec);
 	if (!parseResult.ok) {
 		return parseResult;
@@ -178,8 +211,8 @@ export function resolveModelSpec(source: ModelSource): Result<ModelSpec, ConfigE
 		return ok({ provider, model });
 	}
 
-	const defaultProvider = source.config.default_provider;
-	if (defaultProvider === undefined) {
+	const resolvedProvider = source.cliProvider ?? source.config.default_provider;
+	if (resolvedProvider === undefined) {
 		return err(
 			configError(
 				`Model "${rawSpec}" has no provider prefix. Set default_provider in config or use "provider/model" format.`,
@@ -187,7 +220,7 @@ export function resolveModelSpec(source: ModelSource): Result<ModelSpec, ConfigE
 		);
 	}
 
-	return ok({ provider: defaultProvider, model });
+	return ok({ provider: resolvedProvider, model });
 }
 
 export function createLanguageModel(
