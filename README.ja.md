@@ -19,6 +19,13 @@ bun add -g github:takemo101/taskp
 
 > **必要環境:** Bun >= 1.2.0
 
+インストール後に `taskp` が見つからない場合は、Bun のグローバル bin ディレクトリを PATH に追加してください：
+
+```bash
+echo 'export PATH="$HOME/.bun/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
 ### アップデート
 
 ```bash
