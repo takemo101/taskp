@@ -5,3 +5,11 @@ default_model = "Qwen3.5-4B-MLX-4bit"
 [ai.providers.omlx]
 base_url = "http://127.0.0.1:8124/v1"
 api_key_env = "OMLX_API_KEY"
+
+[hooks]
+on_success = [
+    'terminal-notifier -title "taskp ✅" -message "${TASKP_SKILL_NAME} completed (${TASKP_DURATION_MS}ms)" -sound default',
+]
+on_failure = [
+    'terminal-notifier -title "taskp ❌" -message "${TASKP_SKILL_NAME} failed: ${TASKP_ERROR}" -sound Basso',
+]

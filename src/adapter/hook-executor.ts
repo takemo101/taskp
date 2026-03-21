@@ -4,6 +4,16 @@ import type { HookContext, HookExecutorPort, HookResult } from "../usecase/port/
 const TIMEOUT_MS = 30_000;
 const MAX_ERROR_LENGTH = 1024;
 
+function getParentEnv(): Record<string, string> {
+	const result: Record<string, string> = {};
+	for (const [key, value] of Object.entries(process.env)) {
+		if (value !== undefined) {
+			result[key] = value;
+		}
+	}
+	return result;
+}
+
 function buildEnvVars(context: HookContext): Record<string, string> {
 	const errorValue = context.error ?? "";
 	return {
@@ -30,7 +40,7 @@ export function createHookExecutor(commandExecutor: CommandExecutor): HookExecut
 
 			for (const command of commands) {
 				const result = await commandExecutor.execute(command, {
-					env,
+					env: { ...getParentEnv(), ...env },
 					timeout: TIMEOUT_MS,
 				});
 
