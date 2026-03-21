@@ -4,6 +4,7 @@ import type { Skill } from "../../src/core/skill/skill";
 import { ok } from "../../src/core/types/result";
 import type { AgentExecutorPort } from "../../src/usecase/port/agent-executor";
 import type { ContextCollectorPort } from "../../src/usecase/port/context-collector";
+import type { HookContext, HookExecutorPort } from "../../src/usecase/port/hook-executor";
 import type { PromptCollector } from "../../src/usecase/port/prompt-collector";
 import type { SkillRepository } from "../../src/usecase/port/skill-repository";
 import { runAgentSkill } from "../../src/usecase/run-agent-skill";
@@ -179,6 +180,125 @@ describe("runAgentSkill", () => {
 		expect(result.ok).toBe(false);
 		if (result.ok) return;
 		expect(result.error.type).toBe("EXECUTION_ERROR");
+	});
+
+	describe("hooks", () => {
+		function stubHookExecutor(): HookExecutorPort & {
+			calls: { commands: readonly string[]; context: HookContext }[];
+		} {
+			const calls: { commands: readonly string[]; context: HookContext }[] = [];
+			return {
+				calls,
+				execute: vi.fn(async (commands, context) => {
+					calls.push({ commands, context });
+					return commands.map((cmd: string) => ({ command: cmd, success: true }));
+				}),
+			};
+		}
+
+		it("calls on_success hook after successful agent execution", async () => {
+			const skill = createAgentSkill();
+			const hookExecutor = stubHookExecutor();
+			const deps = {
+				...createMockDeps(skill),
+				hookExecutor,
+				hooksConfig: { on_success: ["echo agent-done"], on_failure: ["echo agent-fail"] },
+			};
+
+			const result = await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel },
+				deps,
+			);
+
+			expect(result.ok).toBe(true);
+			expect(hookExecutor.execute).toHaveBeenCalledOnce();
+			expect(hookExecutor.calls[0].context.status).toBe("success");
+			expect(hookExecutor.calls[0].context.mode).toBe("agent");
+			expect(hookExecutor.calls[0].context.skillName).toBe("test-agent");
+			expect(hookExecutor.calls[0].context.durationMs).toBeGreaterThanOrEqual(0);
+			expect(hookExecutor.calls[0].commands).toEqual(["echo agent-done"]);
+		});
+
+		it("calls on_failure hook after failed agent execution", async () => {
+			const skill = createAgentSkill();
+			const hookExecutor = stubHookExecutor();
+			const deps = {
+				...createMockDeps(skill),
+				hookExecutor,
+				hooksConfig: { on_success: ["echo ok"], on_failure: ["echo fail"] },
+				agentExecutor: {
+					execute: vi.fn().mockResolvedValue({
+						ok: false,
+						error: { type: "EXECUTION_ERROR", message: "Agent crashed" },
+					}),
+				},
+			};
+
+			const result = await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel },
+				deps,
+			);
+
+			expect(result.ok).toBe(false);
+			expect(hookExecutor.execute).toHaveBeenCalledOnce();
+			expect(hookExecutor.calls[0].context.status).toBe("failed");
+			expect(hookExecutor.calls[0].context.error).toBe("Agent crashed");
+			expect(hookExecutor.calls[0].commands).toEqual(["echo fail"]);
+		});
+
+		it("works without hookExecutor and hooksConfig (backward compatible)", async () => {
+			const skill = createAgentSkill();
+			const deps = createMockDeps(skill);
+
+			const result = await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel },
+				deps,
+			);
+
+			expect(result.ok).toBe(true);
+		});
+
+		it("does not call executor when on_success is empty", async () => {
+			const skill = createAgentSkill();
+			const hookExecutor = stubHookExecutor();
+			const deps = {
+				...createMockDeps(skill),
+				hookExecutor,
+				hooksConfig: { on_success: [], on_failure: [] },
+			};
+
+			await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+
+			expect(hookExecutor.execute).not.toHaveBeenCalled();
+		});
+
+		it("returns original error result even when hooks are configured", async () => {
+			const skill = createAgentSkill();
+			const hookExecutor = stubHookExecutor();
+			const deps = {
+				...createMockDeps(skill),
+				hookExecutor,
+				hooksConfig: { on_failure: ["notify"] },
+				agentExecutor: {
+					execute: vi.fn().mockResolvedValue({
+						ok: false,
+						error: { type: "EXECUTION_ERROR", message: "Agent timeout" },
+					}),
+				},
+			};
+
+			const result = await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel },
+				deps,
+			);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("EXECUTION_ERROR");
+			if (result.error.type === "EXECUTION_ERROR") {
+				expect(result.error.message).toBe("Agent timeout");
+			}
+		});
 	});
 
 	it("resolves model priority: CLI model takes precedence", async () => {

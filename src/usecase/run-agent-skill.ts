@@ -1,13 +1,15 @@
 import { dirname } from "node:path";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import type { ContextSource } from "../core/skill/context-source";
-import type { DomainError } from "../core/types/errors";
+import { type DomainError, domainErrorMessage } from "../core/types/errors";
 import type { Result } from "../core/types/result";
 import { ok } from "../core/types/result";
 import type { ReservedVars } from "../core/variable/template-renderer";
 import { renderTemplate } from "../core/variable/template-renderer";
+import { type HooksConfig, runHooks } from "./hook-runner";
 import type { AgentExecutorPort, AgentExecutorResult } from "./port/agent-executor";
 import type { ContextCollectorPort } from "./port/context-collector";
+import type { HookContext, HookExecutorPort } from "./port/hook-executor";
 import { createNoopProgressWriter, type ProgressWriter } from "./port/progress-writer";
 import type { PromptCollector } from "./port/prompt-collector";
 import type { SkillRepository } from "./port/skill-repository";
@@ -32,6 +34,8 @@ export type RunAgentSkillDeps = {
 	readonly contextCollector: ContextCollectorPort;
 	readonly agentExecutor: AgentExecutorPort;
 	readonly progressWriter?: ProgressWriter;
+	readonly hookExecutor?: HookExecutorPort;
+	readonly hooksConfig?: HooksConfig;
 };
 
 export async function runAgentSkill(
@@ -91,6 +95,8 @@ export async function runAgentSkill(
 
 	const context = contextParts.join("\n\n");
 
+	const startTime = Date.now();
+
 	const executeResult = await deps.agentExecutor.execute({
 		model: input.model,
 		systemPrompt,
@@ -98,13 +104,44 @@ export async function runAgentSkill(
 		toolNames: skill.metadata.tools,
 		maxSteps: MAX_STEPS,
 	});
+
+	const durationMs = Date.now() - startTime;
+
 	if (!executeResult.ok) {
+		await invokeHooks(deps, {
+			skillName: skill.metadata.name,
+			mode: "agent",
+			status: "failed",
+			durationMs,
+			error: domainErrorMessage(executeResult.error),
+		});
 		return executeResult;
 	}
+
+	await invokeHooks(deps, {
+		skillName: skill.metadata.name,
+		mode: "agent",
+		status: "success",
+		durationMs,
+	});
 
 	return ok({
 		skillName: skill.metadata.name,
 		result: executeResult.value,
+	});
+}
+
+async function invokeHooks(
+	deps: Pick<RunAgentSkillDeps, "hookExecutor" | "hooksConfig">,
+	hookContext: HookContext,
+): Promise<void> {
+	if (deps.hookExecutor === undefined || deps.hooksConfig === undefined) {
+		return;
+	}
+	await runHooks({
+		hookExecutor: deps.hookExecutor,
+		hooksConfig: deps.hooksConfig,
+		context: hookContext,
 	});
 }
 

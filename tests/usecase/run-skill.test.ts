@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Skill } from "../../src/core/skill/skill";
 import { createSkillBody } from "../../src/core/skill/skill-body";
 import { executionError, skillNotFoundError } from "../../src/core/types/errors";
 import { err, ok } from "../../src/core/types/result";
 import type { CommandExecutor } from "../../src/usecase/port/command-executor";
+import type { HookContext, HookExecutorPort } from "../../src/usecase/port/hook-executor";
 import { createNoopProgressWriter } from "../../src/usecase/port/progress-writer";
 import type { PromptCollector } from "../../src/usecase/port/prompt-collector";
 import type { SkillRepository } from "../../src/usecase/port/skill-repository";
@@ -313,5 +314,106 @@ echo "step 2 {{env}}"
 		const result = await runSkill(createInput(), deps);
 
 		expect(result.ok).toBe(true);
+	});
+
+	describe("hooks", () => {
+		function stubHookExecutor(): HookExecutorPort & {
+			calls: { commands: readonly string[]; context: HookContext }[];
+		} {
+			const calls: { commands: readonly string[]; context: HookContext }[] = [];
+			return {
+				calls,
+				execute: vi.fn(async (commands, context) => {
+					calls.push({ commands, context });
+					return commands.map((cmd: string) => ({ command: cmd, success: true }));
+				}),
+			};
+		}
+
+		it("calls on_success hook after successful execution", async () => {
+			const hookExecutor = stubHookExecutor();
+			const deps = createDeps({
+				hookExecutor,
+				hooksConfig: { on_success: ["echo done"], on_failure: ["echo fail"] },
+			});
+
+			const result = await runSkill(createInput(), deps);
+
+			expect(result.ok).toBe(true);
+			expect(hookExecutor.execute).toHaveBeenCalledOnce();
+			expect(hookExecutor.calls[0].context.status).toBe("success");
+			expect(hookExecutor.calls[0].context.mode).toBe("template");
+			expect(hookExecutor.calls[0].context.skillName).toBe("deploy");
+			expect(hookExecutor.calls[0].context.durationMs).toBeGreaterThanOrEqual(0);
+			expect(hookExecutor.calls[0].commands).toEqual(["echo done"]);
+		});
+
+		it("calls on_failure hook after failed execution", async () => {
+			const hookExecutor = stubHookExecutor();
+			const deps = createDeps({
+				commandExecutor: stubExecutor("fail"),
+				hookExecutor,
+				hooksConfig: { on_success: ["echo done"], on_failure: ["echo fail"] },
+			});
+
+			const result = await runSkill(createInput(), deps);
+
+			expect(result.ok).toBe(false);
+			expect(hookExecutor.execute).toHaveBeenCalledOnce();
+			expect(hookExecutor.calls[0].context.status).toBe("failed");
+			expect(hookExecutor.calls[0].context.error).toBeDefined();
+			expect(hookExecutor.calls[0].commands).toEqual(["echo fail"]);
+		});
+
+		it("works without hookExecutor and hooksConfig (backward compatible)", async () => {
+			const deps = createDeps();
+
+			const result = await runSkill(createInput(), deps);
+
+			expect(result.ok).toBe(true);
+		});
+
+		it("does not call executor when on_success is empty", async () => {
+			const hookExecutor = stubHookExecutor();
+			const deps = createDeps({
+				hookExecutor,
+				hooksConfig: { on_success: [], on_failure: [] },
+			});
+
+			await runSkill(createInput(), deps);
+
+			expect(hookExecutor.execute).not.toHaveBeenCalled();
+		});
+
+		it("returns original result even when hook returns failure results", async () => {
+			const hookExecutor: HookExecutorPort = {
+				execute: vi.fn(async (commands: readonly string[]) =>
+					commands.map((cmd) => ({ command: cmd, success: false, error: "hook failed" })),
+				),
+			};
+			const deps = createDeps({
+				hookExecutor,
+				hooksConfig: { on_success: ["failing-hook"] },
+			});
+
+			const result = await runSkill(createInput(), deps);
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.skillName).toBe("deploy");
+		});
+
+		it("does not invoke hooks in dry-run mode", async () => {
+			const hookExecutor = stubHookExecutor();
+			const deps = createDeps({
+				hookExecutor,
+				hooksConfig: { on_success: ["echo done"] },
+			});
+
+			const result = await runSkill(createInput({ dryRun: true }), deps);
+
+			expect(result.ok).toBe(true);
+			expect(hookExecutor.execute).not.toHaveBeenCalled();
+		});
 	});
 });
