@@ -11,7 +11,7 @@ type CollectedContext = {
 	readonly content: string;
 };
 
-type ContextCollectorDeps = {
+export type ContextCollectorDeps = {
 	readonly executeCommand: (
 		command: string,
 		cwd: string,

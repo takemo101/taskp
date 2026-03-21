@@ -11,9 +11,10 @@ import {
 import { createAgentExecutor } from "../../adapter/agent-executor";
 import { createCommandRunner } from "../../adapter/command-runner";
 import { createContextCollector } from "../../adapter/context-collector";
+import { createDefaultContextCollectorDeps } from "../../adapter/context-collector-deps";
 import type { Skill } from "../../core/skill/skill";
-import { type DomainError, executionError } from "../../core/types/errors";
-import { err, ok } from "../../core/types/result";
+import type { DomainError } from "../../core/types/errors";
+import { ok } from "../../core/types/result";
 import type { PromptCollector } from "../../usecase/port/prompt-collector";
 import type { SkillRepository } from "../../usecase/port/skill-repository";
 import { runAgentSkill } from "../../usecase/run-agent-skill";
@@ -182,41 +183,8 @@ async function executeAgentMode(
 	const writer = createTuiStreamWriter(viewPort);
 	const agentExecutor = createAgentExecutor(writer);
 
-	const contextCollector = createContextCollector({
-		executeCommand: async (command, cwd) => {
-			const { execaCommand } = await import("execa");
-			const result = await execaCommand(command, { shell: true, cwd, reject: false });
-			return ok(result.stdout);
-		},
-		fetchUrl: async (url) => {
-			try {
-				const response = await fetch(url);
-				if (!response.ok) {
-					return err(executionError(`Failed to fetch URL (HTTP ${response.status}): ${url}`));
-				}
-				return ok(await response.text());
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				return err(executionError(`Network error fetching ${url}: ${message}`));
-			}
-		},
-		scanGlob: async (pattern, cwd) => {
-			try {
-				const { glob } = await import("node:fs/promises");
-				const matches: string[] = [];
-				for await (const entry of glob(pattern, { cwd })) {
-					matches.push(entry);
-				}
-				return ok(matches);
-			} catch (e) {
-				return err(
-					executionError(
-						`Failed to scan glob: ${pattern} (${e instanceof Error ? e.message : String(e)})`,
-					),
-				);
-			}
-		},
-	});
+	const contextCollectorDeps = await createDefaultContextCollectorDeps();
+	const contextCollector = createContextCollector(contextCollectorDeps);
 
 	const result = await runAgentSkill(
 		{ name: skill.metadata.name, presets: variables, model },
