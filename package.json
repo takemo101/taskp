@@ -1,6 +1,6 @@
 {
 	"name": "taskp",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "Markdown-defined skill runner with interactive argument collection and LLM execution",
 	"license": "MIT",
 	"type": "module",
