@@ -22,9 +22,9 @@
 	],
 	"scripts": {
 		"prepare": "lefthook install || true",
-    "postinstall": "bun build src/cli.ts --outdir dist --target bun",
+    "postinstall": "bun build src/cli.ts --outdir dist --target bun --banner '#!/usr/bin/env bun'",
 		"dev": "bun run src/cli.ts",
-		"build": "bun build src/cli.ts --outdir dist --target bun",
+		"build": "bun build src/cli.ts --outdir dist --target bun --banner '#!/usr/bin/env bun'",
 		"check": "biome check .",
 		"fix": "biome check --write .",
 		"typecheck": "tsc --noEmit",
