@@ -22,46 +22,12 @@ export type ModelSource = {
 	readonly config: AiConfig;
 };
 
-type ProviderFactory = (
+export type ProviderFactory = (
 	model: string,
 	config: ProviderConfig | undefined,
 ) => Result<LanguageModelV3, ConfigError>;
 
-// ---------------------------------------------------------------------------
-// Provider Registry
-// ---------------------------------------------------------------------------
-
-const providerRegistry = new Map<string, ProviderFactory>();
-
-function registerProvider(name: string, factory: ProviderFactory): void {
-	providerRegistry.set(name, factory);
-}
-
-function resolveProvider(
-	providerName: string,
-	model: string,
-	providerConfig: ProviderConfig | undefined,
-): Result<LanguageModelV3, ConfigError> {
-	const factory = providerRegistry.get(providerName);
-	if (factory !== undefined) {
-		return factory(model, providerConfig);
-	}
-
-	// 未知のプロバイダ名でも base_url があれば OpenAI 互換プロトコルで接続を試みる。
-	// LM Studio や vLLM など、OpenAI API 互換のローカルサーバーを
-	// 事前登録なしで利用可能にするため
-	if (providerConfig?.base_url !== undefined) {
-		return createLocalFactory()(model, providerConfig);
-	}
-
-	const knownNames = [...providerRegistry.keys()].join(", ");
-	return err(
-		configError(
-			`Unknown provider: "${providerName}". Built-in: ${knownNames}. ` +
-				`For custom OpenAI-compatible servers, set base_url in [ai.providers.${providerName}].`,
-		),
-	);
-}
+export type ProviderRegistry = ReadonlyMap<string, ProviderFactory>;
 
 // ---------------------------------------------------------------------------
 // Factory builders
@@ -114,43 +80,80 @@ function createLocalFactory(
 }
 
 // ---------------------------------------------------------------------------
-// Built-in provider registration
+// Provider Registry Factory
 // ---------------------------------------------------------------------------
 
-// Cloud providers
-registerProvider(
-	"anthropic",
-	createCloudFactory("ANTHROPIC_API_KEY", (opts) => {
-		const p = createAnthropic(opts);
-		return (model) => p(model);
-	}),
-);
+export function createDefaultProviderRegistry(): ProviderRegistry {
+	const registry = new Map<string, ProviderFactory>();
 
-registerProvider(
-	"openai",
-	createCloudFactory("OPENAI_API_KEY", (opts) => {
-		const p = createOpenAI(opts);
-		return (model) => p(model);
-	}),
-);
+	// Cloud providers
+	registry.set(
+		"anthropic",
+		createCloudFactory("ANTHROPIC_API_KEY", (opts) => {
+			const p = createAnthropic(opts);
+			return (model) => p(model);
+		}),
+	);
 
-registerProvider(
-	"google",
-	createCloudFactory("GOOGLE_GENERATIVE_AI_KEY", (opts) => {
-		const p = createGoogleGenerativeAI(opts);
-		return (model) => p(model);
-	}),
-);
+	registry.set(
+		"openai",
+		createCloudFactory("OPENAI_API_KEY", (opts) => {
+			const p = createOpenAI(opts);
+			return (model) => p(model);
+		}),
+	);
 
-// Ollama はステートレス実装のため item_reference 非対応 → Chat Completions API を使う
-registerProvider("ollama", createLocalFactory("http://localhost:11434/v1"));
+	registry.set(
+		"google",
+		createCloudFactory("GOOGLE_GENERATIVE_AI_KEY", (opts) => {
+			const p = createGoogleGenerativeAI(opts);
+			return (model) => p(model);
+		}),
+	);
 
-// omlx, LM Studio は Responses API (item_reference) をサポート
-registerProvider("omlx", createLocalFactory("http://localhost:8000/v1", { useResponsesApi: true }));
-registerProvider(
-	"lmstudio",
-	createLocalFactory("http://localhost:1234/v1", { useResponsesApi: true }),
-);
+	// Ollama はステートレス実装のため item_reference 非対応 → Chat Completions API を使う
+	registry.set("ollama", createLocalFactory("http://localhost:11434/v1"));
+
+	// omlx, LM Studio は Responses API (item_reference) をサポート
+	registry.set("omlx", createLocalFactory("http://localhost:8000/v1", { useResponsesApi: true }));
+	registry.set(
+		"lmstudio",
+		createLocalFactory("http://localhost:1234/v1", { useResponsesApi: true }),
+	);
+
+	return registry;
+}
+
+// ---------------------------------------------------------------------------
+// Provider Resolution
+// ---------------------------------------------------------------------------
+
+function resolveProvider(
+	providerName: string,
+	model: string,
+	providerConfig: ProviderConfig | undefined,
+	registry: ProviderRegistry,
+): Result<LanguageModelV3, ConfigError> {
+	const factory = registry.get(providerName);
+	if (factory !== undefined) {
+		return factory(model, providerConfig);
+	}
+
+	// 未知のプロバイダ名でも base_url があれば OpenAI 互換プロトコルで接続を試みる。
+	// LM Studio や vLLM など、OpenAI API 互換のローカルサーバーを
+	// 事前登録なしで利用可能にするため
+	if (providerConfig?.base_url !== undefined) {
+		return createLocalFactory()(model, providerConfig);
+	}
+
+	const knownNames = [...registry.keys()].join(", ");
+	return err(
+		configError(
+			`Unknown provider: "${providerName}". Built-in: ${knownNames}. ` +
+				`For custom OpenAI-compatible servers, set base_url in [ai.providers.${providerName}].`,
+		),
+	);
+}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -226,9 +229,10 @@ function resolveWithProvider(rawSpec: string, source: ModelSource): Result<Model
 export function createLanguageModel(
 	spec: ModelSpec,
 	config: AiConfig,
+	registry: ProviderRegistry = createDefaultProviderRegistry(),
 ): Result<LanguageModelV3, ConfigError> {
 	const providerConfig = config.providers?.[spec.provider];
-	return resolveProvider(spec.provider, spec.model, providerConfig);
+	return resolveProvider(spec.provider, spec.model, providerConfig, registry);
 }
 
 // ---------------------------------------------------------------------------

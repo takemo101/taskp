@@ -15,7 +15,12 @@ import { ToolStatusDisplay } from "../components/tool-status";
 import type { ExecutionViewPort } from "../tui-stream-writer";
 import { type ExecutionDeps, runExecution } from "./execution-runner";
 
-export type { ExecutionDeps } from "./execution-runner";
+export type {
+	ExecutionDeps,
+	PromptCollectorFactory,
+	SkillRepositoryFactory,
+} from "./execution-runner";
+export { createPresetPromptCollector, createSingleSkillRepository } from "./execution-runner";
 
 const CONTAINER_ID = "exec-container";
 

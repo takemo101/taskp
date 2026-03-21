@@ -93,23 +93,36 @@ async function collectGlob(
 	if (!scanResult.ok) {
 		return scanResult;
 	}
-	const matches: CollectedContext[] = [];
 	const paths = scanResult.value;
 	const total = paths.length;
 
-	for (let i = 0; i < total; i++) {
-		const path = paths[i];
-		const fullPath = join(cwd, path);
-		const readResult = await tryCatch(
-			() => readFile(fullPath, "utf-8"),
-			(e) =>
-				executionError(`Failed to read glob match (${i + 1}/${total}): ${fullPath}: ${e.message}`),
-		);
-		if (!readResult.ok) return readResult;
-		matches.push({ source: { type: "glob", pattern }, content: readResult.value });
+	const results = await Promise.all(
+		paths.map((path, i) => readGlobMatch(pattern, join(cwd, path), i, total)),
+	);
+
+	for (const result of results) {
+		if (!result.ok) {
+			return result;
+		}
 	}
 
-	return ok(matches);
+	return ok(results.filter((r) => r.ok).map((r) => r.value));
+}
+
+async function readGlobMatch(
+	pattern: string,
+	fullPath: string,
+	index: number,
+	total: number,
+): Promise<Result<CollectedContext, ExecutionError>> {
+	return tryCatch(
+		async () => {
+			const content = await readFile(fullPath, "utf-8");
+			return { source: { type: "glob" as const, pattern }, content };
+		},
+		(e) =>
+			executionError(`Failed to read glob match (${index + 1}/${total}): ${fullPath}: ${e.message}`),
+	);
 }
 
 async function collectCommand(
