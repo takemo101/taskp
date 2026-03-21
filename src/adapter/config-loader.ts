@@ -32,14 +32,25 @@ export const hooksConfigSchema = z.object({
 	on_failure: z.array(z.string().min(1)).optional().describe("Commands to run on skill failure"),
 });
 
+export const cliConfigSchema = z.object({
+	command_timeout_ms: z
+		.number()
+		.int()
+		.positive()
+		.optional()
+		.describe("Default timeout for command execution in milliseconds"),
+});
+
 export const configSchema = z.object({
 	ai: aiConfigSchema.optional().describe("AI/LLM settings"),
 	hooks: hooksConfigSchema.optional().describe("Lifecycle hooks"),
+	cli: cliConfigSchema.optional().describe("CLI behavior settings"),
 });
 
 export type ProviderConfig = z.infer<typeof providerConfigSchema>;
 export type AiConfig = z.infer<typeof aiConfigSchema>;
 export type HooksConfig = z.infer<typeof hooksConfigSchema>;
+export type CliConfig = z.infer<typeof cliConfigSchema>;
 export type Config = z.infer<typeof configSchema>;
 
 type ConfigLoaderDeps = {
@@ -114,6 +125,7 @@ function mergeConfigs(global: Config, project: Config): Config {
 	return {
 		ai: mergeAi(global.ai, project.ai),
 		hooks: mergeHooks(global.hooks, project.hooks),
+		cli: mergeCli(global.cli, project.cli),
 	};
 }
 
@@ -177,4 +189,23 @@ function mergeProviders(
 		merged[key] = global[key] !== undefined ? { ...global[key], ...value } : value;
 	}
 	return merged;
+}
+
+function mergeCli(
+	global: CliConfig | undefined,
+	project: CliConfig | undefined,
+): CliConfig | undefined {
+	if (global === undefined && project === undefined) {
+		return undefined;
+	}
+	if (global === undefined) {
+		return project;
+	}
+	if (project === undefined) {
+		return global;
+	}
+
+	return {
+		command_timeout_ms: project.command_timeout_ms ?? global.command_timeout_ms,
+	};
 }

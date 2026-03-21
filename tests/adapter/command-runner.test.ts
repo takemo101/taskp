@@ -46,4 +46,21 @@ describe("CommandRunner", () => {
 		if (!result.ok) return;
 		expect(result.value.stdout).toContain("/tmp");
 	});
+
+	it("uses defaultTimeoutMs from deps", async () => {
+		const runner = createCommandRunner({ defaultTimeoutMs: 100 });
+		const result = await runner.execute("sleep 10");
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("EXECUTION_ERROR");
+		expect(result.error.message).toMatch(/timed out/i);
+	});
+
+	it("per-call timeout overrides defaultTimeoutMs", async () => {
+		const runner = createCommandRunner({ defaultTimeoutMs: 100 });
+		const result = await runner.execute("sleep 0.05", { timeout: 5000 });
+
+		expect(result.ok).toBe(true);
+	});
 });

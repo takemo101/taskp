@@ -38,9 +38,9 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 			return;
 		}
 
-		const { model, hooksConfig } = await resolveModelAndConfig(options);
+		const { model, hooksConfig, commandTimeoutMs } = await resolveModelAndConfig(options);
 
-		const commandExecutor = createCommandRunner();
+		const commandExecutor = createCommandRunner({ defaultTimeoutMs: commandTimeoutMs });
 		const hookExecutor = createHookExecutor(commandExecutor);
 		const executionDeps: ExecutionDeps = { commandExecutor, hookExecutor, hooksConfig };
 
@@ -57,11 +57,13 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 	} finally {
 		renderer.destroy();
 	}
+
 }
 
 type ModelAndConfig = {
 	readonly model: LanguageModelV3 | null;
 	readonly hooksConfig: HooksConfig | undefined;
+	readonly commandTimeoutMs: number | undefined;
 };
 
 // config.toml からデフォルトの LLM モデルとフック設定を解決する。
@@ -69,9 +71,10 @@ type ModelAndConfig = {
 async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConfig> {
 	const configLoader = createDefaultConfigLoader(process.cwd());
 	const configResult = await configLoader.load();
-	if (!configResult.ok) return { model: null, hooksConfig: undefined };
+	if (!configResult.ok) return { model: null, hooksConfig: undefined, commandTimeoutMs: undefined };
 
 	const hooksConfig = configResult.value.hooks;
+	const commandTimeoutMs = configResult.value.cli?.command_timeout_ms;
 
 	const aiConfig = configResult.value.ai ?? {};
 	const specResult = resolveModelSpec({
@@ -79,10 +82,10 @@ async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConf
 		cliProvider: options?.provider,
 		config: aiConfig,
 	});
-	if (!specResult.ok) return { model: null, hooksConfig };
+	if (!specResult.ok) return { model: null, hooksConfig, commandTimeoutMs };
 
 	const modelResult = createLanguageModel(specResult.value, aiConfig);
-	if (!modelResult.ok) return { model: null, hooksConfig };
+	if (!modelResult.ok) return { model: null, hooksConfig, commandTimeoutMs };
 
-	return { model: modelResult.value, hooksConfig };
+	return { model: modelResult.value, hooksConfig, commandTimeoutMs };
 }

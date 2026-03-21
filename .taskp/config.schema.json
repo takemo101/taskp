@@ -69,6 +69,19 @@
         }
       },
       "additionalProperties": false
+    },
+    "cli": {
+      "description": "CLI behavior settings",
+      "type": "object",
+      "properties": {
+        "command_timeout_ms": {
+          "description": "Default timeout for command execution in milliseconds",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false
