@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import type { Skill, SkillScope } from "../core/skill/skill";
 import { parseSkill } from "../core/skill/skill";
 import type { ParseError } from "../core/types/errors";
-import { type SkillNotFoundError, skillNotFoundError } from "../core/types/errors";
+import { parseError, type SkillNotFoundError, skillNotFoundError } from "../core/types/errors";
 import type { Result } from "../core/types/result";
 import { err } from "../core/types/result";
 import type { SkillLoadResult, SkillRepository } from "../usecase/port/skill-repository";
@@ -97,10 +97,19 @@ async function tryLoadSkill(
 	path: string,
 	scope: SkillScope,
 ): Promise<Result<Skill, ParseError> | undefined> {
-	const raw = await readFile(path, "utf-8").catch(() => undefined);
-	if (raw === undefined) {
-		return undefined;
+	let raw: string;
+	try {
+		raw = await readFile(path, "utf-8");
+	} catch (e: unknown) {
+		if (isFileNotFound(e)) {
+			return undefined;
+		}
+		return err(parseError(`Failed to read skill file: ${path}`));
 	}
 
 	return parseSkill(raw, path, scope);
+}
+
+function isFileNotFound(e: unknown): boolean {
+	return e instanceof Error && "code" in e && e.code === "ENOENT";
 }

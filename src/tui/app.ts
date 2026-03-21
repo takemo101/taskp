@@ -7,7 +7,12 @@ import { createHookExecutor } from "../adapter/hook-executor";
 import { createDefaultSkillLoader } from "../adapter/skill-loader";
 import type { HooksConfig } from "../usecase/hook-runner";
 import { copyToClipboard } from "./clipboard";
-import { type ExecutionDeps, showExecution } from "./screens/execution-view";
+import {
+	createPresetPromptCollector,
+	createSingleSkillRepository,
+	type ExecutionDeps,
+	showExecution,
+} from "./screens/execution-view";
 import { showInputForm } from "./screens/input-form";
 import { showSkillSelector } from "./screens/skill-selector";
 
@@ -42,7 +47,13 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 
 		const commandExecutor = createCommandRunner({ defaultTimeoutMs: commandTimeoutMs });
 		const hookExecutor = createHookExecutor(commandExecutor);
-		const executionDeps: ExecutionDeps = { commandExecutor, hookExecutor, hooksConfig };
+		const executionDeps: ExecutionDeps = {
+			commandExecutor,
+			hookExecutor,
+			hooksConfig,
+			skillRepositoryFactory: createSingleSkillRepository,
+			promptCollectorFactory: createPresetPromptCollector,
+		};
 
 		while (true) {
 			const skill = await showSkillSelector(renderer, skills);
