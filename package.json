@@ -21,7 +21,7 @@
 		"src/"
 	],
 	"scripts": {
-		"prepare": "lefthook install",
+		"prepare": "lefthook install || true",
     "postinstall": "bun build src/cli.ts --outdir dist --target bun",
 		"dev": "bun run src/cli.ts",
 		"build": "bun build src/cli.ts --outdir dist --target bun",
