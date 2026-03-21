@@ -101,8 +101,11 @@ async function collectGlob(
 		try {
 			const content = await readFile(fullPath, "utf-8");
 			matches.push({ source: { type: "glob", pattern }, content });
-		} catch {
-			return err(executionError(`Failed to read glob match (${i + 1}/${total}): ${fullPath}`));
+		} catch (e) {
+			const message = e instanceof Error ? e.message : String(e);
+			return err(
+				executionError(`Failed to read glob match (${i + 1}/${total}): ${fullPath}: ${message}`),
+			);
 		}
 	}
 
