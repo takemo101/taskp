@@ -27,12 +27,19 @@ export const aiConfigSchema = z.object({
 		.describe("Per-provider settings"),
 });
 
+export const hooksConfigSchema = z.object({
+	on_success: z.array(z.string().min(1)).optional().describe("Commands to run on skill success"),
+	on_failure: z.array(z.string().min(1)).optional().describe("Commands to run on skill failure"),
+});
+
 export const configSchema = z.object({
 	ai: aiConfigSchema.optional().describe("AI/LLM settings"),
+	hooks: hooksConfigSchema.optional().describe("Lifecycle hooks"),
 });
 
 export type ProviderConfig = z.infer<typeof providerConfigSchema>;
 export type AiConfig = z.infer<typeof aiConfigSchema>;
+export type HooksConfig = z.infer<typeof hooksConfigSchema>;
 export type Config = z.infer<typeof configSchema>;
 
 type ConfigLoaderDeps = {
@@ -104,25 +111,50 @@ function parseConfig(raw: string, path: string): Result<Config, ConfigError> {
 }
 
 function mergeConfigs(global: Config, project: Config): Config {
-	const globalAi = global.ai;
-	const projectAi = project.ai;
+	return {
+		ai: mergeAi(global.ai, project.ai),
+		hooks: mergeHooks(global.hooks, project.hooks),
+	};
+}
 
-	if (globalAi === undefined && projectAi === undefined) {
-		return {};
+function mergeAi(
+	global: AiConfig | undefined,
+	project: AiConfig | undefined,
+): AiConfig | undefined {
+	if (global === undefined && project === undefined) {
+		return undefined;
 	}
-	if (globalAi === undefined) {
-		return { ai: projectAi };
+	if (global === undefined) {
+		return project;
 	}
-	if (projectAi === undefined) {
-		return { ai: globalAi };
+	if (project === undefined) {
+		return global;
 	}
 
 	return {
-		ai: {
-			default_provider: projectAi.default_provider ?? globalAi.default_provider,
-			default_model: projectAi.default_model ?? globalAi.default_model,
-			providers: mergeProviders(globalAi.providers, projectAi.providers),
-		},
+		default_provider: project.default_provider ?? global.default_provider,
+		default_model: project.default_model ?? global.default_model,
+		providers: mergeProviders(global.providers, project.providers),
+	};
+}
+
+function mergeHooks(
+	global: HooksConfig | undefined,
+	project: HooksConfig | undefined,
+): HooksConfig | undefined {
+	if (global === undefined && project === undefined) {
+		return undefined;
+	}
+	if (global === undefined) {
+		return project;
+	}
+	if (project === undefined) {
+		return global;
+	}
+
+	return {
+		on_success: project.on_success ?? global.on_success,
+		on_failure: project.on_failure ?? global.on_failure,
 	};
 }
 
