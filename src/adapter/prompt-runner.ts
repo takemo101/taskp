@@ -7,7 +7,7 @@ import type { Result } from "../core/types/result";
 import { err, ok } from "../core/types/result";
 import type { PromptCollector } from "../usecase/port/prompt-collector";
 
-type PromptFn = (skillInput: SkillInput) => Promise<string>;
+type PromptFn = (skillInput: SkillInput) => Promise<Result<string, ExecutionError>>;
 
 const promptByType: Record<string, PromptFn> = {
 	text: askText,
@@ -35,14 +35,9 @@ export function createPromptRunner(): PromptCollector {
 				}
 
 				const promptFn = promptByType[skillInput.type];
-				try {
-					results[skillInput.name] = await promptFn(skillInput);
-				} catch (error: unknown) {
-					if (error instanceof ExitPromptError) {
-						return err(executionError("User cancelled the prompt"));
-					}
-					return err(executionError(toErrorMessage(error)));
-				}
+				const promptResult = await promptFn(skillInput);
+				if (!promptResult.ok) return promptResult;
+				results[skillInput.name] = promptResult.value;
 			}
 
 			return ok(results);
@@ -57,26 +52,49 @@ function toErrorMessage(error: unknown): string {
 	return String(error);
 }
 
-async function askText(skillInput: SkillInput): Promise<string> {
-	return input({
-		message: skillInput.message,
-		default: skillInput.default as string | undefined,
-		required: skillInput.required ?? false,
-		validate: buildValidator(skillInput),
-	});
+function wrapPromptError(error: unknown): Result<never, ExecutionError> {
+	if (error instanceof ExitPromptError) {
+		return err(executionError("User cancelled the prompt"));
+	}
+	return err(executionError(toErrorMessage(error)));
 }
 
-async function askTextarea(skillInput: SkillInput): Promise<string> {
-	return editor({
-		message: skillInput.message,
-		default: skillInput.default as string | undefined,
-		validate: buildValidator(skillInput),
-	});
+async function askText(skillInput: SkillInput): Promise<Result<string, ExecutionError>> {
+	const validatorResult = buildValidator(skillInput);
+	if (!validatorResult.ok) return validatorResult;
+
+	try {
+		const value = await input({
+			message: skillInput.message,
+			default: skillInput.default as string | undefined,
+			required: skillInput.required ?? false,
+			validate: validatorResult.value,
+		});
+		return ok(value);
+	} catch (error: unknown) {
+		return wrapPromptError(error);
+	}
 }
 
-async function askSelect(skillInput: SkillInput): Promise<string> {
+async function askTextarea(skillInput: SkillInput): Promise<Result<string, ExecutionError>> {
+	const validatorResult = buildValidator(skillInput);
+	if (!validatorResult.ok) return validatorResult;
+
+	try {
+		const value = await editor({
+			message: skillInput.message,
+			default: skillInput.default as string | undefined,
+			validate: validatorResult.value,
+		});
+		return ok(value);
+	} catch (error: unknown) {
+		return wrapPromptError(error);
+	}
+}
+
+async function askSelect(skillInput: SkillInput): Promise<Result<string, ExecutionError>> {
 	if (!skillInput.choices) {
-		throw new Error(`choices is required for select input: ${skillInput.name}`);
+		return err(executionError(`choices is required for select input: ${skillInput.name}`));
 	}
 
 	const choices = skillInput.choices.map((choice) => ({
@@ -84,71 +102,101 @@ async function askSelect(skillInput: SkillInput): Promise<string> {
 		value: choice,
 	}));
 
-	return select({
-		message: skillInput.message,
-		choices,
-		default: skillInput.default as string | undefined,
-	});
+	try {
+		const value = await select({
+			message: skillInput.message,
+			choices,
+			default: skillInput.default as string | undefined,
+		});
+		return ok(value);
+	} catch (error: unknown) {
+		return wrapPromptError(error);
+	}
 }
 
-async function askConfirm(skillInput: SkillInput): Promise<string> {
-	const result = await confirm({
-		message: skillInput.message,
-		default: skillInput.default as boolean | undefined,
-	});
-
-	return String(result);
+async function askConfirm(skillInput: SkillInput): Promise<Result<string, ExecutionError>> {
+	try {
+		const result = await confirm({
+			message: skillInput.message,
+			default: skillInput.default as boolean | undefined,
+		});
+		return ok(String(result));
+	} catch (error: unknown) {
+		return wrapPromptError(error);
+	}
 }
 
-async function askNumber(skillInput: SkillInput): Promise<string> {
-	const result = await number({
-		message: skillInput.message,
-		default: skillInput.default as number | undefined,
-		required: skillInput.required ?? false,
-		validate: buildNumberValidator(skillInput),
-	});
+async function askNumber(skillInput: SkillInput): Promise<Result<string, ExecutionError>> {
+	const validatorResult = buildNumberValidator(skillInput);
+	if (!validatorResult.ok) return validatorResult;
 
-	return String(result);
+	try {
+		const result = await number({
+			message: skillInput.message,
+			default: skillInput.default as number | undefined,
+			required: skillInput.required ?? false,
+			validate: validatorResult.value,
+		});
+		return ok(String(result));
+	} catch (error: unknown) {
+		return wrapPromptError(error);
+	}
 }
 
-async function askPassword(skillInput: SkillInput): Promise<string> {
-	return password({
-		message: skillInput.message,
-		validate: buildValidator(skillInput),
-	});
+async function askPassword(skillInput: SkillInput): Promise<Result<string, ExecutionError>> {
+	const validatorResult = buildValidator(skillInput);
+	if (!validatorResult.ok) return validatorResult;
+
+	try {
+		const value = await password({
+			message: skillInput.message,
+			validate: validatorResult.value,
+		});
+		return ok(value);
+	} catch (error: unknown) {
+		return wrapPromptError(error);
+	}
 }
 
-function buildValidator(skillInput: SkillInput): ((value: string) => string | true) | undefined {
-	if (!skillInput.validate) return undefined;
+function buildValidator(
+	skillInput: SkillInput,
+): Result<((value: string) => string | true) | undefined, ExecutionError> {
+	if (!skillInput.validate) return ok(undefined);
 
-	const regex = compileRegex(skillInput.validate);
-	return (value: string) => {
+	const regexResult = compileRegex(skillInput.validate);
+	if (!regexResult.ok) return regexResult;
+
+	const regex = regexResult.value;
+	return ok((value: string) => {
 		if (!regex.test(value)) {
 			return `Input must match pattern: ${skillInput.validate}`;
 		}
 		return true;
-	};
+	});
 }
 
 function buildNumberValidator(
 	skillInput: SkillInput,
-): ((value: number | undefined) => string | true) | undefined {
-	if (!skillInput.validate) return undefined;
+): Result<((value: number | undefined) => string | true) | undefined, ExecutionError> {
+	if (!skillInput.validate) return ok(undefined);
 
-	const regex = compileRegex(skillInput.validate);
-	return (value: number | undefined) => {
+	const regexResult = compileRegex(skillInput.validate);
+	if (!regexResult.ok) return regexResult;
+
+	const regex = regexResult.value;
+	return ok((value: number | undefined) => {
 		if (value === undefined) return true;
 		if (!regex.test(String(value))) {
 			return `Input must match pattern: ${skillInput.validate}`;
 		}
 		return true;
-	};
+	});
 }
 
-function compileRegex(pattern: string): RegExp {
+function compileRegex(pattern: string): Result<RegExp, ExecutionError> {
 	try {
-		return new RegExp(pattern);
-	} catch (cause) {
-		throw new Error(`Invalid regex pattern: ${pattern}`, { cause });
+		return ok(new RegExp(pattern));
+	} catch {
+		return err(executionError(`Invalid regex pattern: ${pattern}`));
 	}
 }
