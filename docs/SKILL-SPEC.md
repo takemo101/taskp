@@ -60,6 +60,7 @@ npm run deploy:{{environment}}
 | `mode` | `"template" \| "agent"` | `"template"` | 実行モード |
 | `inputs` | `Input[]` | `[]` | 入力定義（質問リスト） |
 | `model` | `string` | 設定ファイルのデフォルト | 使用する LLM モデル |
+| `timeout` | `number` | `30000` | template モードのコマンド実行タイムアウト（ミリ秒、最大: 3,600,000）。agent モードでは無視される |
 | `tools` | `string[]` | `["bash", "read", "write"]` | agent モードで使用するツール |
 | `context` | `ContextSource[]` | `[]` | 自動的にコンテキストに含めるソース |
 

@@ -29,7 +29,14 @@ echo "deploying to {{env}}"
 \`\`\`
 `;
 
-function createTestSkill(rawMarkdown: string = TEMPLATE_SKILL_MD): Skill {
+type MetadataOverrides = {
+	readonly timeout?: number;
+};
+
+function createTestSkill(
+	rawMarkdown: string = TEMPLATE_SKILL_MD,
+	overrides?: MetadataOverrides,
+): Skill {
 	return {
 		metadata: {
 			name: "deploy",
@@ -46,6 +53,7 @@ function createTestSkill(rawMarkdown: string = TEMPLATE_SKILL_MD): Skill {
 			model: undefined,
 			tools: ["bash", "read", "write"],
 			context: [],
+			...overrides,
 		},
 		body: createSkillBody(rawMarkdown),
 		location: "/skills/deploy",
@@ -219,6 +227,44 @@ echo "step 2 {{env}}"
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.value.commands[0].command).toContain("deploying to production");
+	});
+
+	it("metadata の timeout が executor に渡される", async () => {
+		let receivedOptions: Record<string, unknown> | undefined;
+
+		const deps = createDeps({
+			skillRepository: stubRepository(createTestSkill(TEMPLATE_SKILL_MD, { timeout: 300000 })),
+			commandExecutor: {
+				execute: async (_command, options) => {
+					receivedOptions = options as Record<string, unknown>;
+					return ok({ stdout: "ok", stderr: "", exitCode: 0 });
+				},
+			},
+		});
+
+		const result = await runSkill(createInput(), deps);
+
+		expect(result.ok).toBe(true);
+		expect(receivedOptions).toBeDefined();
+		expect(receivedOptions?.timeout).toBe(300000);
+	});
+
+	it("timeout 未設定のとき executor に options が渡されない", async () => {
+		let receivedOptions: unknown = "NOT_CALLED";
+
+		const deps = createDeps({
+			commandExecutor: {
+				execute: async (_command, options) => {
+					receivedOptions = options;
+					return ok({ stdout: "ok", stderr: "", exitCode: 0 });
+				},
+			},
+		});
+
+		const result = await runSkill(createInput(), deps);
+
+		expect(result.ok).toBe(true);
+		expect(receivedOptions).toBeUndefined();
 	});
 
 	it("passes noInput option to prompt collector", async () => {

@@ -84,8 +84,8 @@ export async function runSkill(
 		codeBlocks,
 		variables,
 		reserved,
-		input.force,
 		deps.commandExecutor,
+		{ force: input.force, timeout: skill.metadata.timeout },
 	);
 	if (!commandResults.ok) {
 		return commandResults;
@@ -99,12 +99,17 @@ export async function runSkill(
 	});
 }
 
+type ExecuteCommandsOptions = {
+	readonly force: boolean;
+	readonly timeout?: number;
+};
+
 async function executeCommands(
 	codeBlocks: readonly CodeBlock[],
 	variables: Record<string, string>,
 	reserved: ReservedVars,
-	force: boolean,
 	executor: CommandExecutor,
+	options: ExecuteCommandsOptions,
 ): Promise<Result<readonly CommandResult[], DomainError>> {
 	const results: CommandResult[] = [];
 
@@ -114,9 +119,12 @@ async function executeCommands(
 			return renderResult;
 		}
 
-		const execResult = await executor.execute(renderResult.value);
+		const execResult = await executor.execute(
+			renderResult.value,
+			options.timeout !== undefined ? { timeout: options.timeout } : undefined,
+		);
 		if (!execResult.ok) {
-			if (!force) {
+			if (!options.force) {
 				return execResult;
 			}
 			results.push({
