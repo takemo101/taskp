@@ -3,6 +3,7 @@ import { createCliRenderer } from "@opentui/core";
 import { createLanguageModel, resolveModelSpec } from "../adapter/ai-provider";
 import { createDefaultConfigLoader } from "../adapter/config-loader";
 import { createDefaultSkillLoader } from "../adapter/skill-loader";
+import type { HooksConfig } from "../usecase/hook-runner";
 import { copyToClipboard } from "./clipboard";
 import { showExecution } from "./screens/execution-view";
 import { showInputForm } from "./screens/input-form";
@@ -30,7 +31,7 @@ export async function startTui(): Promise<void> {
 		return;
 	}
 
-	const model = await resolveModel();
+	const { model, hooksConfig } = await resolveModelAndConfig();
 
 	while (true) {
 		const skill = await showSkillSelector(renderer, skills);
@@ -39,26 +40,33 @@ export async function startTui(): Promise<void> {
 		const variables = await showInputForm(renderer, skill);
 		if (!variables) continue;
 
-		const action = await showExecution(renderer, skill, variables, model);
+		const action = await showExecution(renderer, skill, variables, model, hooksConfig);
 		if (action === "exit") break;
 	}
 
 	renderer.destroy();
 }
 
-// config.toml からデフォルトの LLM モデルを解決する。
-// いずれかの段階で失敗した場合は null を返す（agent モード実行時にエラー表示）
-async function resolveModel(): Promise<LanguageModelV3 | null> {
+type ModelAndConfig = {
+	readonly model: LanguageModelV3 | null;
+	readonly hooksConfig: HooksConfig | undefined;
+};
+
+// config.toml からデフォルトの LLM モデルとフック設定を解決する。
+// モデル解決がいずれかの段階で失敗した場合は null を返す（agent モード実行時にエラー表示）
+async function resolveModelAndConfig(): Promise<ModelAndConfig> {
 	const configLoader = createDefaultConfigLoader(process.cwd());
 	const configResult = await configLoader.load();
-	if (!configResult.ok) return null;
+	if (!configResult.ok) return { model: null, hooksConfig: undefined };
+
+	const hooksConfig = configResult.value.hooks;
 
 	const aiConfig = configResult.value.ai ?? {};
 	const specResult = resolveModelSpec({ config: aiConfig });
-	if (!specResult.ok) return null;
+	if (!specResult.ok) return { model: null, hooksConfig };
 
 	const modelResult = createLanguageModel(specResult.value, aiConfig);
-	if (!modelResult.ok) return null;
+	if (!modelResult.ok) return { model: null, hooksConfig };
 
-	return modelResult.value;
+	return { model: modelResult.value, hooksConfig };
 }
