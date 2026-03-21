@@ -9,14 +9,14 @@ import {
 	TextRenderable,
 } from "@opentui/core";
 import { createAgentExecutor } from "../../adapter/agent-executor";
-import { createCommandRunner } from "../../adapter/command-runner";
 import { createContextCollector } from "../../adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "../../adapter/context-collector-deps";
-import { createHookExecutor } from "../../adapter/hook-executor";
 import type { Skill } from "../../core/skill/skill";
 import type { DomainError } from "../../core/types/errors";
 import { ok } from "../../core/types/result";
 import type { HooksConfig } from "../../usecase/hook-runner";
+import type { CommandExecutor } from "../../usecase/port/command-executor";
+import type { HookExecutorPort } from "../../usecase/port/hook-executor";
 import type { PromptCollector } from "../../usecase/port/prompt-collector";
 import type { SkillRepository } from "../../usecase/port/skill-repository";
 import { runAgentSkill } from "../../usecase/run-agent-skill";
@@ -32,12 +32,18 @@ import {
 
 const CONTAINER_ID = "exec-container";
 
+export type ExecutionDeps = {
+	readonly commandExecutor: CommandExecutor;
+	readonly hookExecutor: HookExecutorPort;
+	readonly hooksConfig?: HooksConfig;
+};
+
 export async function showExecution(
 	renderer: CliRenderer,
 	skill: Skill,
 	variables: Readonly<Record<string, string>>,
 	model: LanguageModelV3 | null,
-	hooksConfig?: HooksConfig,
+	deps: ExecutionDeps,
 ): Promise<"back" | "exit"> {
 	return new Promise((resolve) => {
 		clearScreen(renderer);
@@ -142,7 +148,7 @@ export async function showExecution(
 			},
 		};
 
-		runExecution(skill, variables, model, viewPort, hooksConfig).then(() => {
+		runExecution(skill, variables, model, viewPort, deps).then(() => {
 			const doneHandler = (key: KeyEvent) => {
 				if (key.name === "return") {
 					cleanup(doneHandler);
@@ -170,7 +176,7 @@ async function runExecution(
 	variables: Readonly<Record<string, string>>,
 	model: LanguageModelV3 | null,
 	viewPort: ExecutionViewPort,
-	hooksConfig?: HooksConfig,
+	deps: ExecutionDeps,
 ): Promise<void> {
 	if (skill.metadata.mode === "agent" && model === null) {
 		viewPort.appendOutput("Error: LLM model not configured.\n");
@@ -181,9 +187,9 @@ async function runExecution(
 
 	try {
 		if (skill.metadata.mode === "agent" && model !== null) {
-			await executeAgentMode(skill, variables, model, viewPort, hooksConfig);
+			await executeAgentMode(skill, variables, model, viewPort, deps);
 		} else {
-			await executeTemplateMode(skill, variables, viewPort, hooksConfig);
+			await executeTemplateMode(skill, variables, viewPort, deps);
 		}
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -212,13 +218,11 @@ async function executeAgentMode(
 	variables: Readonly<Record<string, string>>,
 	model: LanguageModelV3,
 	viewPort: ExecutionViewPort,
-	hooksConfig?: HooksConfig,
+	deps: ExecutionDeps,
 ): Promise<void> {
 	const writer = createTuiStreamWriter(viewPort);
 	const progressWriter = createTuiProgressWriter(viewPort);
 	const agentExecutor = createAgentExecutor(writer);
-	const commandExecutor = createCommandRunner();
-	const hookExecutor = createHookExecutor(commandExecutor);
 
 	const contextCollectorDeps = await createDefaultContextCollectorDeps();
 	const contextCollector = createContextCollector(contextCollectorDeps);
@@ -231,8 +235,8 @@ async function executeAgentMode(
 			contextCollector,
 			agentExecutor,
 			progressWriter,
-			hookExecutor,
-			hooksConfig,
+			hookExecutor: deps.hookExecutor,
+			hooksConfig: deps.hooksConfig,
 		},
 	);
 
@@ -246,21 +250,19 @@ async function executeTemplateMode(
 	skill: Skill,
 	variables: Readonly<Record<string, string>>,
 	viewPort: ExecutionViewPort,
-	hooksConfig?: HooksConfig,
+	deps: ExecutionDeps,
 ): Promise<void> {
-	const commandExecutor = createCommandRunner();
 	const progressWriter = createTuiProgressWriter(viewPort);
-	const hookExecutor = createHookExecutor(commandExecutor);
 
 	const result = await runSkill(
 		{ name: skill.metadata.name, presets: variables, dryRun: false, force: false },
 		{
 			skillRepository: buildSkillRepository(skill),
 			promptCollector: buildPromptCollector(variables),
-			commandExecutor,
+			commandExecutor: deps.commandExecutor,
 			progressWriter,
-			hookExecutor,
-			hooksConfig,
+			hookExecutor: deps.hookExecutor,
+			hooksConfig: deps.hooksConfig,
 		},
 	);
 

@@ -1,11 +1,13 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { createCliRenderer } from "@opentui/core";
 import { createLanguageModel, resolveModelSpec } from "../adapter/ai-provider";
+import { createCommandRunner } from "../adapter/command-runner";
 import { createDefaultConfigLoader } from "../adapter/config-loader";
+import { createHookExecutor } from "../adapter/hook-executor";
 import { createDefaultSkillLoader } from "../adapter/skill-loader";
 import type { HooksConfig } from "../usecase/hook-runner";
 import { copyToClipboard } from "./clipboard";
-import { showExecution } from "./screens/execution-view";
+import { type ExecutionDeps, showExecution } from "./screens/execution-view";
 import { showInputForm } from "./screens/input-form";
 import { showSkillSelector } from "./screens/skill-selector";
 
@@ -33,6 +35,10 @@ export async function startTui(): Promise<void> {
 
 	const { model, hooksConfig } = await resolveModelAndConfig();
 
+	const commandExecutor = createCommandRunner();
+	const hookExecutor = createHookExecutor(commandExecutor);
+	const executionDeps: ExecutionDeps = { commandExecutor, hookExecutor, hooksConfig };
+
 	while (true) {
 		const skill = await showSkillSelector(renderer, skills);
 		if (!skill) break;
@@ -40,7 +46,7 @@ export async function startTui(): Promise<void> {
 		const variables = await showInputForm(renderer, skill);
 		if (!variables) continue;
 
-		const action = await showExecution(renderer, skill, variables, model, hooksConfig);
+		const action = await showExecution(renderer, skill, variables, model, executionDeps);
 		if (action === "exit") break;
 	}
 

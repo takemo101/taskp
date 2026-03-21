@@ -35,12 +35,12 @@ export function createHookExecutor(commandExecutor: CommandExecutor): HookExecut
 				return [];
 			}
 
-			const env = buildEnvVars(context);
+			const mergedEnv = { ...getParentEnv(), ...buildEnvVars(context) };
 			const results: HookResult[] = [];
 
 			for (const command of commands) {
 				const result = await commandExecutor.execute(command, {
-					env: { ...getParentEnv(), ...env },
+					env: mergedEnv,
 					timeout: TIMEOUT_MS,
 				});
 
