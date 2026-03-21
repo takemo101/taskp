@@ -67,26 +67,32 @@ function isTruthy(value: string): boolean {
 	return value !== "" && value !== "false";
 }
 
-// {{#if var}}...{{else}}...{{/if}} を展開する。
-// 条件変数が未定義の場合やネストが検出された場合はエラーとして報告する。
+function checkForNestedIfs(template: string): RenderError | undefined {
+	for (const match of template.matchAll(CONDITIONAL_PATTERN)) {
+		const ifBlock = match[2];
+		const elseBlock = match[3] ?? "";
+		if (NESTED_IF_PATTERN.test(ifBlock) || NESTED_IF_PATTERN.test(elseBlock)) {
+			return renderError("Nested {{#if}} blocks are not supported");
+		}
+	}
+	return undefined;
+}
+
 function expandConditionals(
 	template: string,
 	variables: Record<string, string>,
 	reserved: ReservedVars,
 ): Result<string, RenderError> {
+	const nestedError = checkForNestedIfs(template);
+	if (nestedError !== undefined) {
+		return err(nestedError);
+	}
+
 	const undefinedConditionVars: string[] = [];
 
 	const expanded = template.replace(
 		CONDITIONAL_PATTERN,
 		(_match, name: string, ifBlock: string, elseBlock: string | undefined) => {
-			// ネストされた {{#if}} はサポートしない。
-			// サイレントに壊れるのを防ぐため、分岐内にネストを検出したらエラーにする。
-			const selectedBlock = elseBlock ?? "";
-			if (NESTED_IF_PATTERN.test(ifBlock) || NESTED_IF_PATTERN.test(selectedBlock)) {
-				undefinedConditionVars.push("__nested_if__");
-				return "";
-			}
-
 			const value = resolveVariable(name, variables, reserved);
 			if (value === undefined) {
 				undefinedConditionVars.push(name);
@@ -95,10 +101,6 @@ function expandConditionals(
 			return isTruthy(value) ? ifBlock : (elseBlock ?? "");
 		},
 	);
-
-	if (undefinedConditionVars.includes("__nested_if__")) {
-		return err(renderError("Nested {{#if}} blocks are not supported"));
-	}
 
 	if (undefinedConditionVars.length > 0) {
 		const unique = [...new Set(undefinedConditionVars)];
