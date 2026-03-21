@@ -15,7 +15,7 @@ build: deps
     bun run build
 
 # ローカルにインストール (bun link)
-# postinstall スクリプトがビルド + shebang 付与を行う
+# bin は src/cli.ts を直接指すため、ビルド不要で動作する
 install: deps
     bun link
     @echo ""
