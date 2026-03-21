@@ -62,7 +62,7 @@ function resolveNonInteractive(skillInput: SkillInput): Result<string, Execution
 	if (skillInput.required !== false) {
 		return err(
 			executionError(
-				`Input "${skillInput.name}" is required but has no default value (--no-input mode)`,
+				`Input "${skillInput.name}" is required but has no default value (--skip-prompt mode)`,
 			),
 		);
 	}
