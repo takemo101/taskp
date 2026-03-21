@@ -103,9 +103,9 @@ describe("buildSkillRepository", () => {
 	it("returns empty arrays for list methods", async () => {
 		const skill = createSkill("test", "template");
 		const repo = buildSkillRepository(skill);
-		expect(await repo.listAll()).toEqual([]);
-		expect(await repo.listLocal()).toEqual([]);
-		expect(await repo.listGlobal()).toEqual([]);
+		expect(await repo.listAll()).toEqual({ skills: [], failures: [] });
+		expect(await repo.listLocal()).toEqual({ skills: [], failures: [] });
+		expect(await repo.listGlobal()).toEqual({ skills: [], failures: [] });
 	});
 });
 

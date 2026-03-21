@@ -61,9 +61,9 @@ export function formatDomainError(error: DomainError): string {
 export function buildSkillRepository(skill: Skill): SkillRepository {
 	return {
 		findByName: async () => ok(skill),
-		listAll: async () => [],
-		listLocal: async () => [],
-		listGlobal: async () => [],
+		listAll: async () => ({ skills: [], failures: [] }),
+		listLocal: async () => ({ skills: [], failures: [] }),
+		listGlobal: async () => ({ skills: [], failures: [] }),
 	};
 }
 

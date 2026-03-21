@@ -9,9 +9,9 @@ import type { SkillRepository } from "../../src/usecase/port/skill-repository";
 function stubRepository(skills: Skill[] = []): SkillRepository {
 	return {
 		findByName: () => Promise.resolve(err({ type: ErrorType.SkillNotFound, name: "" })),
-		listAll: () => Promise.resolve(skills),
-		listLocal: () => Promise.resolve([]),
-		listGlobal: () => Promise.resolve([]),
+		listAll: () => Promise.resolve({ skills, failures: [] }),
+		listLocal: () => Promise.resolve({ skills: [], failures: [] }),
+		listGlobal: () => Promise.resolve({ skills: [], failures: [] }),
 	};
 }
 

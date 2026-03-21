@@ -21,12 +21,14 @@
 		"src/"
 	],
 	"scripts": {
-		"prepare": "lefthook install || true",
+		"prepare": "bun run generate-config-schema && lefthook install || true",
 
 		"dev": "bun run src/cli.ts",
 		"build": "bun build src/cli.ts --outdir dist --target bun",
 		"check": "biome check .",
 		"fix": "biome check --write .",
+		"generate-config-schema": "bun run scripts/generate-config-schema.ts",
+		"verify-config-schema": "bun run scripts/verify-config-schema.ts",
 		"typecheck": "tsc --noEmit",
 		"test": "bun x vitest run",
 		"test:watch": "bun x vitest"

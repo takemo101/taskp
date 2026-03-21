@@ -307,4 +307,75 @@ default_model = "qwen2.5-coder:32b"
 		expect(result.value.ai?.providers?.ollama?.base_url).toBe("http://localhost:11434/v1");
 		expect(result.value.ai?.providers?.ollama?.default_model).toBe("qwen2.5-coder:32b");
 	});
+
+	describe("[cli] section", () => {
+		it("loads command_timeout_ms", async () => {
+			writeConfig(
+				projectRoot,
+				`
+[cli]
+command_timeout_ms = 60000
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.cli?.command_timeout_ms).toBe(60000);
+		});
+
+		it("project cli config overrides global", async () => {
+			writeConfig(
+				globalRoot,
+				`
+[cli]
+command_timeout_ms = 30000
+`,
+			);
+			writeConfig(
+				projectRoot,
+				`
+[cli]
+command_timeout_ms = 120000
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.cli?.command_timeout_ms).toBe(120000);
+		});
+
+		it("falls back to global cli config when project has none", async () => {
+			writeConfig(
+				globalRoot,
+				`
+[cli]
+command_timeout_ms = 45000
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.cli?.command_timeout_ms).toBe(45000);
+		});
+
+		it("rejects non-positive command_timeout_ms", async () => {
+			writeConfig(
+				projectRoot,
+				`
+[cli]
+command_timeout_ms = -1
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(false);
+		});
+	});
 });

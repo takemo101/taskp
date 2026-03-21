@@ -93,7 +93,10 @@ export const repairToolCall: ToolCallRepairFunction<ToolSet> = async (options) =
 	try {
 		const parsed = JSON.parse(escaped) as Record<string, unknown>;
 		return { ...options.toolCall, input: JSON.stringify(parsed) };
-	} catch {
-		return null; // 修復失敗
+	} catch (error) {
+		console.debug(
+			`[taskp] Tool call repair failed. Original: ${raw}, Escaped: ${escaped}, Error: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		return null;
 	}
 };

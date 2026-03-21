@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createSkillLoader } from "../../src/adapter/skill-loader";
 
 function createSkillFile(baseDir: string, name: string, content: string): void {
@@ -92,7 +92,7 @@ describe("SkillLoader", () => {
 			createSkillFile(globalRoot, "lint", makeSkillMd("lint", "リント"));
 			const loader = createSkillLoader({ localRoot, globalRoot });
 
-			const skills = await loader.listAll();
+			const { skills } = await loader.listAll();
 
 			expect(skills).toHaveLength(2);
 			const names = skills.map((s) => s.metadata.name);
@@ -105,7 +105,7 @@ describe("SkillLoader", () => {
 			createSkillFile(globalRoot, "deploy", makeSkillMd("deploy", "グローバル版"));
 			const loader = createSkillLoader({ localRoot, globalRoot });
 
-			const skills = await loader.listAll();
+			const { skills } = await loader.listAll();
 
 			expect(skills).toHaveLength(1);
 			expect(skills[0].metadata.description).toBe("ローカル版");
@@ -114,9 +114,10 @@ describe("SkillLoader", () => {
 		it("スキルディレクトリが存在しない場合は空配列を返す", async () => {
 			const loader = createSkillLoader({ localRoot, globalRoot });
 
-			const skills = await loader.listAll();
+			const { skills, failures } = await loader.listAll();
 
 			expect(skills).toEqual([]);
+			expect(failures).toEqual([]);
 		});
 	});
 
@@ -126,7 +127,7 @@ describe("SkillLoader", () => {
 			createSkillFile(globalRoot, "lint", makeSkillMd("lint", "リント"));
 			const loader = createSkillLoader({ localRoot, globalRoot });
 
-			const skills = await loader.listLocal();
+			const { skills } = await loader.listLocal();
 
 			expect(skills).toHaveLength(1);
 			expect(skills[0].metadata.name).toBe("deploy");
@@ -139,34 +140,24 @@ describe("SkillLoader", () => {
 			createSkillFile(globalRoot, "lint", makeSkillMd("lint", "リント"));
 			const loader = createSkillLoader({ localRoot, globalRoot });
 
-			const skills = await loader.listGlobal();
+			const { skills } = await loader.listGlobal();
 
 			expect(skills).toHaveLength(1);
 			expect(skills[0].metadata.name).toBe("lint");
 		});
 	});
 
-	describe("parse error warning", () => {
-		let warnSpy: MockInstance;
-
-		beforeEach(() => {
-			warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-		});
-
-		afterEach(() => {
-			warnSpy.mockRestore();
-		});
-
-		it("パースエラー時に警告を出力する", async () => {
+	describe("failures", () => {
+		it("パースエラー時に failures に記録する", async () => {
 			createSkillFile(localRoot, "broken", "---\ninvalid: :\n  bad: [\n---\n# Broken");
 			const loader = createSkillLoader({ localRoot, globalRoot });
 
-			const skills = await loader.listAll();
+			const { skills, failures } = await loader.listAll();
 
 			expect(skills).toHaveLength(0);
-			expect(warnSpy).toHaveBeenCalledOnce();
-			expect(warnSpy.mock.calls[0][0]).toMatch(/Warning: Failed to parse skill at/);
-			expect(warnSpy.mock.calls[0][0]).toMatch(/broken/);
+			expect(failures).toHaveLength(1);
+			expect(failures[0].path).toMatch(/broken/);
+			expect(failures[0].error).toBeTruthy();
 		});
 
 		it("パースエラーがあっても他のスキルは読み込める", async () => {
@@ -174,20 +165,50 @@ describe("SkillLoader", () => {
 			createSkillFile(localRoot, "valid", makeSkillMd("valid", "正常なスキル"));
 			const loader = createSkillLoader({ localRoot, globalRoot });
 
-			const skills = await loader.listAll();
+			const { skills, failures } = await loader.listAll();
 
 			expect(skills).toHaveLength(1);
 			expect(skills[0].metadata.name).toBe("valid");
-			expect(warnSpy).toHaveBeenCalledOnce();
+			expect(failures).toHaveLength(1);
 		});
 
-		it("ファイル不在時は警告を出さない", async () => {
+		it("ファイル不在時は failures に記録しない", async () => {
 			const loader = createSkillLoader({ localRoot, globalRoot });
 
-			const skills = await loader.listAll();
+			const { skills, failures } = await loader.listAll();
 
 			expect(skills).toHaveLength(0);
-			expect(warnSpy).not.toHaveBeenCalled();
+			expect(failures).toHaveLength(0);
+		});
+
+		it("ローカルとグローバル両方の failures を集約する", async () => {
+			createSkillFile(localRoot, "broken-local", "---\nbad: [\n---\n# Broken");
+			createSkillFile(globalRoot, "broken-global", "---\nbad: [\n---\n# Broken");
+			const loader = createSkillLoader({ localRoot, globalRoot });
+
+			const { failures } = await loader.listAll();
+
+			expect(failures).toHaveLength(2);
+			expect(failures.some((f) => f.path.includes("broken-local"))).toBe(true);
+			expect(failures.some((f) => f.path.includes("broken-global"))).toBe(true);
+		});
+
+		it("listLocal で failures を返す", async () => {
+			createSkillFile(localRoot, "broken", "---\nbad: [\n---\n# Broken");
+			const loader = createSkillLoader({ localRoot, globalRoot });
+
+			const { failures } = await loader.listLocal();
+
+			expect(failures).toHaveLength(1);
+		});
+
+		it("listGlobal で failures を返す", async () => {
+			createSkillFile(globalRoot, "broken", "---\nbad: [\n---\n# Broken");
+			const loader = createSkillLoader({ localRoot, globalRoot });
+
+			const { failures } = await loader.listGlobal();
+
+			expect(failures).toHaveLength(1);
 		});
 	});
 });

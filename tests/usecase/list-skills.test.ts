@@ -28,9 +28,9 @@ function createInMemoryRepository(skills: readonly Skill[]): SkillRepository {
 			const found = skills.find((s) => s.metadata.name === name);
 			return found ? ok(found) : err(skillNotFoundError(name));
 		},
-		listAll: async () => [...skills],
-		listLocal: async () => skills.filter((s) => s.scope === "local"),
-		listGlobal: async () => skills.filter((s) => s.scope === "global"),
+		listAll: async () => ({ skills: [...skills], failures: [] }),
+		listLocal: async () => ({ skills: skills.filter((s) => s.scope === "local"), failures: [] }),
+		listGlobal: async () => ({ skills: skills.filter((s) => s.scope === "global"), failures: [] }),
 	};
 }
 

@@ -48,7 +48,11 @@ export type { ContextCollectorPort } from "./usecase/port/context-collector";
 export type { PromptCollector } from "./usecase/port/prompt-collector";
 export type { InitOptions, SkillInitializer } from "./usecase/port/skill-initializer";
 // Port interfaces
-export type { SkillRepository } from "./usecase/port/skill-repository";
+export type {
+	SkillLoadFailure,
+	SkillLoadResult,
+	SkillRepository,
+} from "./usecase/port/skill-repository";
 export type {
 	RunAgentSkillDeps,
 	RunAgentSkillInput,
