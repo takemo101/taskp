@@ -13,55 +13,61 @@ inputs:
     message: "実行モードを選んでください"
     choices: [commit, dry-run]
     default: commit
-context:
-  - type: command
-    run: "git diff --cached --stat"
-  - type: command
-    run: "git diff --cached"
 tools:
   - bash
 ---
 
-# Auto Commit
+You are a helpful Git assistant. Your job is to create a commit message and run git commands using the bash tool.
 
-git のステージング済み変更からコミットメッセージを生成し、コミットする。
+Follow these steps exactly:
 
-実行モード: {{mode}}
+## Step 1: Check staged changes
 
-## 手順
+Run this command:
 
-### 1. ステージング状態を確認
+```
+git diff --cached --stat
+```
 
-`git diff --cached --stat` の結果を確認する。
+If there are NO staged changes, run:
 
-- ステージング済みの変更がない場合は `git add -A` で全変更をステージングする
-- それでも変更がなければ「コミットする変更がありません」と伝えて終了する
+```
+git add -A
+```
 
-### 2. 差分を分析してコミットメッセージを生成
+Then run `git diff --cached --stat` again. If still no changes, say "No changes to commit" and stop.
 
-コンテキストに含まれる `git diff --cached` の内容を分析し、以下のルールでコミットメッセージを生成する。
+## Step 2: Get the diff
 
-#### Conventional Commits 形式
+Run this command:
+
+```
+git diff --cached
+```
+
+## Step 3: Create a commit message
+
+Look at the diff and write a commit message in Conventional Commits format:
 
 ```
 <type>(<scope>): <subject>
 ```
 
-- **type**: feat, fix, refactor, docs, style, test, chore, perf, ci, build のいずれか
-- **scope**: 変更対象のモジュール名やファイル名（省略可）
-- **subject**: 変更内容の要約。**必ず {{lang}} で記述すること。**
+- type: one of feat, fix, refactor, docs, style, test, chore, perf, ci, build
+- scope: optional, the module or file name
+- subject: short summary of the change
 
-#### 言語ルール
+Language for subject: {{lang}}
+- If `en`: write in English, imperative mood, lowercase, no period
+- If `ja`: write in Japanese, 体言止め
 
-- {{lang}} が `en` の場合: 英語、命令形、小文字始まり、末尾にピリオドなし
-  - 例: `feat(auth): add login endpoint`
-  - 例: `fix(parser): handle empty input gracefully`
-- {{lang}} が `ja` の場合: **subject は必ず日本語で書くこと。** 体言止め。英語で書いてはいけない。
-  - 例: `feat(auth): ログインエンドポイントの追加`
-  - 例: `fix(parser): 空入力時のエラーハンドリング修正`
-  - 例: `refactor(config): configローダーの簡素化`
+## Step 4: Commit
 
-### 3. コミットの実行
+{{mode}} mode:
 
-- {{mode}} が `dry-run` の場合: 生成したコミットメッセージを表示して終了する。コミットは実行しない。
-- {{mode}} が `commit` の場合: 生成したコミットメッセージで `git commit -m "<message>"` を実行する。
+- If `dry-run`: just show the message. Do NOT run git commit.
+- If `commit`: run this command with your message:
+
+```
+git commit -m "your message here"
+```
