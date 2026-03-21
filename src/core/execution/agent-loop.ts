@@ -8,28 +8,28 @@ import { buildTools } from "./agent-tools";
 // 50 ステップは複雑なタスクでも十分だが、暴走時のコスト爆発を防げる値
 const MAX_STEPS = 50;
 
-export type AgentResult = {
+export type AgentLoopResult = {
 	readonly output: string;
 	readonly steps: number;
 };
 
-export type AgentExecutorInput = {
+export type AgentLoopInput = {
 	readonly model: LanguageModelV3;
 	readonly systemPrompt: string;
 	readonly context: string;
 	readonly toolNames: readonly string[];
 };
 
-export function createAgentExecutor() {
+export function createAgentLoop() {
 	return {
-		execute: (input: AgentExecutorInput): Promise<Result<AgentResult, ExecutionError>> =>
+		execute: (input: AgentLoopInput): Promise<Result<AgentLoopResult, ExecutionError>> =>
 			executeAgentLoop(input),
 	};
 }
 
 async function executeAgentLoop(
-	input: AgentExecutorInput,
-): Promise<Result<AgentResult, ExecutionError>> {
+	input: AgentLoopInput,
+): Promise<Result<AgentLoopResult, ExecutionError>> {
 	const toolsResult = buildTools(input.toolNames);
 	if (!toolsResult.ok) {
 		return toolsResult;

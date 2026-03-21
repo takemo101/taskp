@@ -2,7 +2,7 @@ import type { LanguageModelV3FinishReason, LanguageModelV3StreamPart } from "@ai
 import { simulateReadableStream } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createAgentExecutor } from "../../../src/core/execution/agent-executor";
+import { createAgentLoop } from "../../../src/core/execution/agent-loop";
 
 function mockUsage() {
 	return {
@@ -21,7 +21,7 @@ function finishChunk(
 	};
 }
 
-describe("AgentExecutor", () => {
+describe("AgentLoop", () => {
 	let stdoutWriteSpy: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(() => {
@@ -48,8 +48,8 @@ describe("AgentExecutor", () => {
 				}),
 			});
 
-			const executor = createAgentExecutor();
-			const result = await executor.execute({
+			const loop = createAgentLoop();
+			const result = await loop.execute({
 				model,
 				systemPrompt: "You are helpful.",
 				context: "Say hello",
@@ -77,8 +77,8 @@ describe("AgentExecutor", () => {
 				}),
 			});
 
-			const executor = createAgentExecutor();
-			await executor.execute({
+			const loop = createAgentLoop();
+			await loop.execute({
 				model,
 				systemPrompt: "test",
 				context: "test",
@@ -128,8 +128,8 @@ describe("AgentExecutor", () => {
 				},
 			});
 
-			const executor = createAgentExecutor();
-			const result = await executor.execute({
+			const loop = createAgentLoop();
+			const result = await loop.execute({
 				model,
 				systemPrompt: "You are an agent.",
 				context: "Run echo hello",
@@ -162,8 +162,8 @@ describe("AgentExecutor", () => {
 				}),
 			});
 
-			const executor = createAgentExecutor();
-			const result = await executor.execute({
+			const loop = createAgentLoop();
+			const result = await loop.execute({
 				model,
 				systemPrompt: "test",
 				context: "test",
