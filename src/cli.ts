@@ -132,6 +132,7 @@ const cli = Cli.create("taskp", {
 			}
 
 			const commandExecutor = createCommandRunner();
+			const progressWriter = createCliProgressWriter(process.stdout);
 			const result = await runSkill(
 				{
 					name: c.args.skill,
@@ -140,7 +141,7 @@ const cli = Cli.create("taskp", {
 					force: c.options.force ?? false,
 					noInput: c.options.skipPrompt,
 				},
-				{ skillRepository, promptCollector, commandExecutor },
+				{ skillRepository, promptCollector, commandExecutor, progressWriter },
 			);
 
 			if (!result.ok) {
