@@ -314,25 +314,24 @@ function resolveScope(
 	return undefined;
 }
 
+// ANSI カラーコード
+const ansi = {
+	bold: (s: string) => `\x1b[1m${s}\x1b[22m`,
+	cyan: (s: string) => `\x1b[36m${s}\x1b[39m`,
+	dim: (s: string) => `\x1b[2m${s}\x1b[22m`,
+} as const;
+
 function printSkillTable(
-	skills: ReadonlyArray<{ metadata: { name: string; description: string }; location: string }>,
+	skills: ReadonlyArray<{
+		metadata: { name: string; description: string };
+		location: string;
+		scope: SkillScope;
+	}>,
 ): void {
-	const header = { name: "Name", description: "Description", location: "Location" };
-	const rows = skills.map((s) => ({
-		name: s.metadata.name,
-		description: s.metadata.description,
-		location: s.location,
-	}));
-
-	const nameWidth = Math.max(header.name.length, ...rows.map((r) => r.name.length));
-	const descWidth = Math.max(header.description.length, ...rows.map((r) => r.description.length));
-
-	const formatRow = (name: string, desc: string, loc: string): string =>
-		`${name.padEnd(nameWidth)}  ${desc.padEnd(descWidth)}  ${loc}`;
-
-	console.log(formatRow(header.name, header.description, header.location));
-	for (const row of rows) {
-		console.log(formatRow(row.name, row.description, row.location));
+	for (const skill of skills) {
+		const scopeLabel = ansi.dim(`(${skill.scope})`);
+		console.log(`${ansi.bold(ansi.cyan(skill.metadata.name))} ${scopeLabel}`);
+		console.log(`  ${skill.metadata.description}`);
 	}
 }
 
