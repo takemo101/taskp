@@ -5,6 +5,7 @@ import { parse as parseToml } from "smol-toml";
 import { z } from "zod";
 import { type ConfigError, configError } from "../core/types/errors";
 import { err, ok, type Result } from "../core/types/result";
+import { tryCatchSync } from "./error-handler-utils";
 
 const CONFIG_PATH = ".taskp/config.toml";
 
@@ -105,15 +106,13 @@ async function loadSingleConfig(path: string): Promise<Result<Config, ConfigErro
 }
 
 function parseConfig(raw: string, path: string): Result<Config, ConfigError> {
-	let parsed: unknown;
-	try {
-		parsed = parseToml(raw);
-	} catch (e) {
-		const message = e instanceof Error ? e.message : String(e);
-		return err(configError(`Failed to parse TOML (${path}): ${message}`));
-	}
+	const parseResult = tryCatchSync(
+		() => parseToml(raw),
+		(e) => configError(`Failed to parse TOML (${path}): ${e.message}`),
+	);
+	if (!parseResult.ok) return parseResult;
 
-	const result = configSchema.safeParse(parsed);
+	const result = configSchema.safeParse(parseResult.value);
 	if (!result.success) {
 		return err(configError(`Invalid config (${path}): ${result.error.message}`));
 	}

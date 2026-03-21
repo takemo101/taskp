@@ -6,6 +6,7 @@ import { executionError } from "../core/types/errors";
 import type { Result } from "../core/types/result";
 import { err, ok } from "../core/types/result";
 import type { PromptCollectOptions, PromptCollector } from "../usecase/port/prompt-collector";
+import { toErrorMessage, tryCatchSync } from "./error-handler-utils";
 
 type PromptFn = (skillInput: SkillInput) => Promise<Result<string, ExecutionError>>;
 
@@ -67,13 +68,6 @@ function resolveNonInteractive(skillInput: SkillInput): Result<string, Execution
 		);
 	}
 	return ok("");
-}
-
-function toErrorMessage(error: unknown): string {
-	if (error instanceof Error) {
-		return error.message;
-	}
-	return String(error);
 }
 
 function wrapPromptError(error: unknown): Result<never, ExecutionError> {
@@ -218,9 +212,8 @@ function buildNumberValidator(
 }
 
 function compileRegex(pattern: string): Result<RegExp, ExecutionError> {
-	try {
-		return ok(new RegExp(pattern));
-	} catch {
-		return err(executionError(`Invalid regex pattern: ${pattern}`));
-	}
+	return tryCatchSync(
+		() => new RegExp(pattern),
+		() => executionError(`Invalid regex pattern: ${pattern}`),
+	);
 }
