@@ -2,8 +2,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type { Result } from "../core/types/result";
-import { err, ok } from "../core/types/result";
 import type { InitOptions, SkillInitializer } from "../usecase/port/skill-initializer";
+import { tryCatch } from "./error-handler-utils";
 
 const SKILL_DIR_NAME = ".taskp/skills";
 const SKILL_FILE_NAME = "SKILL.md";
@@ -57,15 +57,14 @@ export function createSkillInitializer(deps: SkillInitializerDeps): SkillInitial
 			const skillDir = join(deps.baseDir, SKILL_DIR_NAME, name);
 			const skillPath = join(skillDir, SKILL_FILE_NAME);
 
-			try {
-				await mkdir(skillDir, { recursive: true });
-				await writeFile(skillPath, generateSkillContent(name, options), "utf-8");
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				return err(new Error(`Failed to create skill "${name}": ${message}`));
-			}
-
-			return ok(skillPath);
+			return tryCatch(
+				async () => {
+					await mkdir(skillDir, { recursive: true });
+					await writeFile(skillPath, generateSkillContent(name, options), "utf-8");
+					return skillPath;
+				},
+				(e) => new Error(`Failed to create skill "${name}": ${e.message}`),
+			);
 		},
 	};
 }

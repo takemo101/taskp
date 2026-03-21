@@ -4,7 +4,8 @@ import type { ContextSource } from "../core/skill/context-source";
 import type { ExecutionError } from "../core/types/errors";
 import { executionError } from "../core/types/errors";
 import type { Result } from "../core/types/result";
-import { err, ok } from "../core/types/result";
+import { ok } from "../core/types/result";
+import { tryCatch } from "./error-handler-utils";
 
 type CollectedContext = {
 	readonly source: ContextSource;
@@ -74,12 +75,13 @@ async function collectFile(
 	cwd: string,
 ): Promise<Result<readonly CollectedContext[], ExecutionError>> {
 	const fullPath = join(cwd, path);
-	try {
-		const content = await readFile(fullPath, "utf-8");
-		return ok([{ source: { type: "file", path }, content }]);
-	} catch {
-		return err(executionError(`Failed to read file: ${fullPath}`));
-	}
+	return tryCatch(
+		async () => {
+			const content = await readFile(fullPath, "utf-8");
+			return [{ source: { type: "file" as const, path }, content }];
+		},
+		() => executionError(`Failed to read file: ${fullPath}`),
+	);
 }
 
 async function collectGlob(
@@ -100,7 +102,7 @@ async function collectGlob(
 
 	for (const result of results) {
 		if (!result.ok) {
-			return err(result.error);
+			return result;
 		}
 	}
 
@@ -113,15 +115,14 @@ async function readGlobMatch(
 	index: number,
 	total: number,
 ): Promise<Result<CollectedContext, ExecutionError>> {
-	try {
-		const content = await readFile(fullPath, "utf-8");
-		return ok({ source: { type: "glob", pattern }, content });
-	} catch (e) {
-		const message = e instanceof Error ? e.message : String(e);
-		return err(
-			executionError(`Failed to read glob match (${index + 1}/${total}): ${fullPath}: ${message}`),
-		);
-	}
+	return tryCatch(
+		async () => {
+			const content = await readFile(fullPath, "utf-8");
+			return { source: { type: "glob" as const, pattern }, content };
+		},
+		(e) =>
+			executionError(`Failed to read glob match (${index + 1}/${total}): ${fullPath}: ${e.message}`),
+	);
 }
 
 async function collectCommand(
