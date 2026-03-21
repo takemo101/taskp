@@ -28,6 +28,176 @@ type FormElement = {
 	readonly element: InputRenderable | SelectRenderable | TextareaRenderable;
 };
 
+class FormController {
+	private focusIndex = 0;
+	private readonly values: Record<string, string> = {};
+	private elements: readonly FormElement[] = [];
+	private readonly onComplete: (result: Record<string, string>) => void;
+
+	constructor(onComplete: (result: Record<string, string>) => void) {
+		this.onComplete = onComplete;
+	}
+
+	setElements(elements: readonly FormElement[]): void {
+		this.elements = elements;
+	}
+
+	advanceFocus(): void {
+		if (this.focusIndex < this.elements.length - 1) {
+			this.focusIndex++;
+			this.applyFocus();
+		} else {
+			this.completeForm();
+		}
+	}
+
+	moveFocusForward(): void {
+		if (this.focusIndex >= this.elements.length - 1) return;
+		this.focusIndex++;
+		this.applyFocus();
+	}
+
+	retreatFocus(): void {
+		if (this.focusIndex <= 0) return;
+		this.focusIndex--;
+		delete this.values[this.elements[this.focusIndex].input.name];
+		this.applyFocus();
+	}
+
+	setValue(name: string, value: string): void {
+		this.values[name] = value;
+		const el = this.elements.find((e) => e.input.name === name);
+		if (el) {
+			el.label.content = t`${green("✔")} ${el.input.message}`;
+		}
+	}
+
+	applyFocus(): void {
+		for (let i = 0; i < this.elements.length; i++) {
+			const el = this.elements[i];
+			if (el.input.name in this.values) continue;
+			if (i === this.focusIndex) {
+				el.label.content = t`${green("?")} ${el.input.message}`;
+			} else {
+				el.label.content = t`${dim("○")} ${el.input.message}`;
+			}
+		}
+		this.elements[this.focusIndex].element.focus();
+	}
+
+	private completeForm(): void {
+		const result: Record<string, string> = {};
+		for (const { input } of this.elements) {
+			if (input.name in this.values) {
+				result[input.name] = this.values[input.name];
+			} else if (input.default !== undefined) {
+				result[input.name] = String(input.default);
+			} else {
+				result[input.name] = "";
+			}
+		}
+		this.onComplete(result);
+	}
+}
+
+function createFormElements(
+	renderer: CliRenderer,
+	inputs: readonly SkillInput[],
+	controller: FormController,
+): FormElement[] {
+	return inputs.map((input) => {
+		const label = new TextRenderable(renderer, {
+			id: `label-${input.name}`,
+			content: t`${dim("○")} ${input.message}`,
+		});
+
+		const element = createInputElement(renderer, input, (value) => {
+			controller.setValue(input.name, value);
+			controller.advanceFocus();
+		});
+
+		return { input, label, element };
+	});
+}
+
+function buildFormUI(
+	renderer: CliRenderer,
+	skill: Skill,
+	elements: readonly FormElement[],
+): BoxRenderable {
+	const container = new BoxRenderable(renderer, {
+		id: CONTAINER_ID,
+		width: "100%",
+		height: "100%",
+		borderStyle: "rounded",
+		title: skill.metadata.name,
+		padding: 1,
+		flexDirection: "column",
+		justifyContent: "flex-start",
+	});
+
+	container.add(
+		new TextRenderable(renderer, {
+			id: "form-description",
+			content: skill.metadata.description,
+			fg: "#888888",
+		}),
+	);
+
+	// 入力項目が多い場合にターミナル高さを超えても操作できるよう、
+	// スクロール可能なコンテナに入力グループを配置する
+	const scrollbox = new ScrollBoxRenderable(renderer, {
+		id: "form-scrollbox",
+		width: "100%",
+		flexGrow: 1,
+		stickyScroll: true,
+		stickyStart: "top",
+	});
+
+	for (const { input, label, element } of elements) {
+		const group = new BoxRenderable(renderer, {
+			id: `group-${input.name}`,
+			width: "100%",
+			flexDirection: "column",
+			marginBottom: 1,
+		});
+		group.add(label);
+		group.add(element);
+		scrollbox.add(group);
+	}
+
+	container.add(scrollbox);
+
+	container.add(
+		KeyHelp([
+			{ key: "Tab", description: "Next" },
+			{ key: "Shift+Tab", description: "Prev" },
+			{ key: "Esc", description: "Back" },
+		]),
+	);
+
+	return container;
+}
+
+function createKeyHandler(
+	controller: FormController,
+	onCancel: () => void,
+): (key: KeyEvent) => void {
+	return (key: KeyEvent) => {
+		if (key.name === "escape") {
+			onCancel();
+			return;
+		}
+		if (key.name === "tab") {
+			if (key.shift) {
+				controller.retreatFocus();
+			} else {
+				controller.moveFocusForward();
+			}
+		}
+	};
+}
+
 export async function showInputForm(
 	renderer: CliRenderer,
 	skill: Skill,
@@ -40,142 +210,29 @@ export async function showInputForm(
 	return new Promise((resolve) => {
 		clearScreen(renderer);
 
-		const container = new BoxRenderable(renderer, {
-			id: CONTAINER_ID,
-			width: "100%",
-			height: "100%",
-			borderStyle: "rounded",
-			title: skill.metadata.name,
-			padding: 1,
-			flexDirection: "column",
-			justifyContent: "flex-start",
-		});
-
-		container.add(
-			new TextRenderable(renderer, {
-				id: "form-description",
-				content: skill.metadata.description,
-				fg: "#888888",
-			}),
-		);
-
-		// 入力項目が多い場合にターミナル高さを超えても操作できるよう、
-		// スクロール可能なコンテナに入力グループを配置する
-		const scrollbox = new ScrollBoxRenderable(renderer, {
-			id: "form-scrollbox",
-			width: "100%",
-			flexGrow: 1,
-			stickyScroll: true,
-			stickyStart: "top",
-		});
-
-		const values: Record<string, string> = {};
-		const elements: FormElement[] = [];
-
-		for (const input of inputs) {
-			const group = new BoxRenderable(renderer, {
-				id: `group-${input.name}`,
-				width: "100%",
-				flexDirection: "column",
-				marginBottom: 1,
-			});
-
-			const label = new TextRenderable(renderer, {
-				id: `label-${input.name}`,
-				content: t`${dim("○")} ${input.message}`,
-			});
-			group.add(label);
-
-			const element = createInputElement(renderer, input, (value) => {
-				values[input.name] = value;
-				label.content = t`${green("✔")} ${input.message}`;
-				advanceFocus();
-			});
-
-			group.add(element);
-			scrollbox.add(group);
-			elements.push({ input, label, element });
-		}
-
-		container.add(scrollbox);
-
-		container.add(
-			KeyHelp([
-				{ key: "Tab", description: "Next" },
-				{ key: "Shift+Tab", description: "Prev" },
-				{ key: "Esc", description: "Back" },
-			]),
-		);
-
-		renderer.root.add(container);
-
-		let focusIndex = 0;
-
-		function focusCurrent(): void {
-			for (let i = 0; i < elements.length; i++) {
-				const el = elements[i];
-				if (el.input.name in values) continue; // 回答済み（✔）はそのまま
-				if (i === focusIndex) {
-					el.label.content = t`${green("?")} ${el.input.message}`;
-				} else {
-					el.label.content = t`${dim("○")} ${el.input.message}`;
-				}
-			}
-			elements[focusIndex].element.focus();
-		}
-
-		function advanceFocus(): void {
-			if (focusIndex < elements.length - 1) {
-				focusIndex++;
-				focusCurrent();
-			} else {
-				completeForm();
-			}
-		}
-
-		function completeForm(): void {
-			const result: Record<string, string> = {};
-			for (const { input } of elements) {
-				if (input.name in values) {
-					result[input.name] = values[input.name];
-				} else if (input.default !== undefined) {
-					result[input.name] = String(input.default);
-				} else {
-					result[input.name] = "";
-				}
-			}
-			cleanup();
-			resolve(result);
-		}
-
-		const keyHandler = (key: KeyEvent) => {
-			if (key.name === "escape") {
-				cleanup();
-				resolve(null);
-				return;
-			}
-			if (key.name === "tab") {
-				if (key.shift) {
-					const prevIndex = focusIndex - 1;
-					if (prevIndex < 0) return; // 先頭では何もしない
-					focusIndex = prevIndex;
-					// 戻った先が回答済みなら回答を取り消して再入力可能にする
-					delete (values as Record<string, string>)[elements[focusIndex].input.name];
-				} else {
-					focusIndex = Math.min(elements.length - 1, focusIndex + 1);
-				}
-				focusCurrent();
-			}
-		};
-
-		renderer.keyInput.on("keypress", keyHandler);
-
-		function cleanup(): void {
+		const cleanup = () => {
 			renderer.keyInput.off("keypress", keyHandler);
 			renderer.root.remove(CONTAINER_ID);
-		}
+		};
 
-		focusCurrent();
+		const controller = new FormController((result) => {
+			cleanup();
+			resolve(result);
+		});
+
+		const elements = createFormElements(renderer, inputs, controller);
+		controller.setElements(elements);
+
+		const ui = buildFormUI(renderer, skill, elements);
+		const keyHandler = createKeyHandler(controller, () => {
+			cleanup();
+			resolve(null);
+		});
+
+		renderer.root.add(ui);
+		renderer.keyInput.on("keypress", keyHandler);
+
+		controller.applyFocus();
 	});
 }
 
