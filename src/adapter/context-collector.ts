@@ -121,7 +121,9 @@ async function readGlobMatch(
 			return { source: { type: "glob" as const, pattern }, content };
 		},
 		(e) =>
-			executionError(`Failed to read glob match (${index + 1}/${total}): ${fullPath}: ${e.message}`),
+			executionError(
+				`Failed to read glob match (${index + 1}/${total}): ${fullPath}: ${e.message}`,
+			),
 	);
 }
 
