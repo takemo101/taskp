@@ -2,6 +2,7 @@ import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { createAgentExecutor } from "../../adapter/agent-executor";
 import { createContextCollector } from "../../adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "../../adapter/context-collector-deps";
+import { resolveActionConfig } from "../../core/skill/action";
 import type { Skill } from "../../core/skill/skill";
 import { domainErrorMessage } from "../../core/types/errors";
 import { ok } from "../../core/types/result";
@@ -39,8 +40,11 @@ export async function runExecution(
 	model: LanguageModelV3 | null,
 	viewPort: ExecutionViewPort,
 	deps: ExecutionDeps,
+	actionName?: string,
 ): Promise<void> {
-	if (skill.metadata.mode === "agent" && model === null) {
+	const effectiveMode = resolveEffectiveMode(skill, actionName);
+
+	if (effectiveMode === "agent" && model === null) {
 		viewPort.appendOutput("Error: LLM model not configured.\n");
 		viewPort.appendOutput("Set default_provider and default_model in .taskp/config.toml\n");
 		viewPort.showSummary(0, 0);
@@ -48,10 +52,10 @@ export async function runExecution(
 	}
 
 	try {
-		if (skill.metadata.mode === "agent" && model !== null) {
-			await executeAgentMode(skill, variables, model, viewPort, deps);
+		if (effectiveMode === "agent" && model !== null) {
+			await executeAgentMode(skill, variables, model, viewPort, deps, actionName);
 		} else {
-			await executeTemplateMode(skill, variables, viewPort, deps);
+			await executeTemplateMode(skill, variables, viewPort, deps, actionName);
 		}
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -77,12 +81,20 @@ export function createPresetPromptCollector(
 	};
 }
 
+function resolveEffectiveMode(skill: Skill, actionName?: string): "template" | "agent" {
+	if (!actionName || !skill.metadata.actions) return skill.metadata.mode;
+	const action = skill.metadata.actions[actionName];
+	if (!action) return skill.metadata.mode;
+	return resolveActionConfig(action, skill.metadata).mode;
+}
+
 async function executeAgentMode(
 	skill: Skill,
 	variables: Readonly<Record<string, string>>,
 	model: LanguageModelV3,
 	viewPort: ExecutionViewPort,
 	deps: ExecutionDeps,
+	actionName?: string,
 ): Promise<void> {
 	const writer = createTuiStreamWriter(viewPort);
 	const progressWriter = createTuiProgressWriter(viewPort);
@@ -92,7 +104,7 @@ async function executeAgentMode(
 	const contextCollector = createContextCollector(contextCollectorDeps);
 
 	const result = await runAgentSkill(
-		{ name: skill.metadata.name, presets: variables, model },
+		{ name: skill.metadata.name, action: actionName, presets: variables, model },
 		{
 			skillRepository: deps.skillRepositoryFactory(skill),
 			promptCollector: deps.promptCollectorFactory(variables),
@@ -116,11 +128,18 @@ async function executeTemplateMode(
 	variables: Readonly<Record<string, string>>,
 	viewPort: ExecutionViewPort,
 	deps: ExecutionDeps,
+	actionName?: string,
 ): Promise<void> {
 	const progressWriter = createTuiProgressWriter(viewPort);
 
 	const result = await runSkill(
-		{ name: skill.metadata.name, presets: variables, dryRun: false, force: false },
+		{
+			name: skill.metadata.name,
+			action: actionName,
+			presets: variables,
+			dryRun: false,
+			force: false,
+		},
 		{
 			skillRepository: deps.skillRepositoryFactory(skill),
 			promptCollector: deps.promptCollectorFactory(variables),

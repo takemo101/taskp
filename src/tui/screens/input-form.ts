@@ -201,8 +201,9 @@ function createKeyHandler(
 export async function showInputForm(
 	renderer: CliRenderer,
 	skill: Skill,
+	inputsOverride?: readonly SkillInput[],
 ): Promise<Readonly<Record<string, string>> | null> {
-	const inputs = skill.metadata.inputs;
+	const inputs = inputsOverride ?? skill.metadata.inputs;
 	if (inputs.length === 0) {
 		return {};
 	}

@@ -6,6 +6,9 @@ import { createDefaultConfigLoader } from "../adapter/config-loader";
 import { createHookExecutor } from "../adapter/hook-executor";
 import { createDefaultSkillLoader } from "../adapter/skill-loader";
 import { createSystemPromptResolver } from "../adapter/system-prompt-resolver";
+import { resolveActionConfig } from "../core/skill/action";
+import type { Skill } from "../core/skill/skill";
+import type { SkillInput } from "../core/skill/skill-input";
 import type { HooksConfig } from "../usecase/hook-runner";
 import { copyToClipboard } from "./clipboard";
 import {
@@ -58,18 +61,21 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 		};
 
 		while (true) {
-			const skill = await showSkillSelector(renderer, skills);
-			if (!skill) break;
+			const selection = await showSkillSelector(renderer, skills);
+			if (!selection) break;
 
-			const variables = await showInputForm(renderer, skill);
+			const { skill, actionName } = selection;
+
+			const actionInputs = resolveActionInputs(skill, actionName);
+			const variables = await showInputForm(renderer, skill, actionInputs);
 			if (!variables) continue;
 
-			const action = await showExecution(
+			const navAction = await showExecution(
 				renderer,
-				{ skill, variables, model, modelSpec },
+				{ skill, variables, model, modelSpec, actionName },
 				executionDeps,
 			);
-			if (action === "exit") break;
+			if (navAction === "exit") break;
 		}
 	} finally {
 		renderer.destroy();
@@ -105,4 +111,11 @@ async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConf
 	if (!modelResult.ok) return { model: null, modelSpec: null, hooksConfig, commandTimeoutMs };
 
 	return { model: modelResult.value, modelSpec: specResult.value, hooksConfig, commandTimeoutMs };
+}
+
+function resolveActionInputs(skill: Skill, actionName?: string): readonly SkillInput[] | undefined {
+	if (!actionName || !skill.metadata.actions) return undefined;
+	const action = skill.metadata.actions[actionName];
+	if (!action) return undefined;
+	return resolveActionConfig(action, skill.metadata).inputs;
 }
