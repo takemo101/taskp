@@ -159,7 +159,7 @@ describe("taskp run (E2E)", () => {
 			reject: false,
 		});
 
-		expect(result.exitCode).toBe(2);
+		expect(result.exitCode).toBe(3);
 		expect(result.stderr).toContain("Invalid skill reference");
 	});
 

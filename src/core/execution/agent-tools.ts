@@ -13,6 +13,7 @@ import { type RunOutput, runSkill } from "../../usecase/run-skill";
 import type { Action } from "../skill/action";
 import { resolveActionConfig } from "../skill/action";
 import type { Skill } from "../skill/skill";
+import { parseSkillRef } from "../skill/skill-ref";
 import { domainErrorMessage, type ExecutionError, executionError } from "../types/errors";
 import { err, ok, type Result } from "../types/result";
 
@@ -165,17 +166,6 @@ type TaskpRunDeps = {
 	readonly hooksConfig?: HooksConfig;
 };
 
-function parseSkillRef(ref: string): {
-	readonly name: string;
-	readonly action: string | undefined;
-} {
-	const colonIndex = ref.indexOf(":");
-	if (colonIndex === -1) {
-		return { name: ref, action: undefined };
-	}
-	return { name: ref.slice(0, colonIndex), action: ref.slice(colonIndex + 1) };
-}
-
 function buildTaskpRunOutput(runOutput: RunOutput): string {
 	const parts: string[] = [runOutput.rendered];
 	for (const cmd of runOutput.commands) {
@@ -192,7 +182,11 @@ function createTaskpRunTool(deps: TaskpRunDeps, description: string): AnyTool {
 		description,
 		inputSchema: zodToJsonSchema(taskpRunParams),
 		execute: async ({ skill, set }) => {
-			const ref = parseSkillRef(skill);
+			const refResult = parseSkillRef(skill);
+			if (!refResult.ok) {
+				return { status: "failed" as const, output: "", error: refResult.error.message };
+			}
+			const ref = refResult.value;
 			const skillId = ref.action ? `${ref.name}:${ref.action}` : ref.name;
 
 			if (callStack.includes(skillId)) {

@@ -13,3 +13,5 @@ export type { InputType, SkillInput } from "./skill-input";
 export { parseSkillInput } from "./skill-input";
 export type { SkillMetadata, SkillMode } from "./skill-metadata";
 export { parseSkillMetadata } from "./skill-metadata";
+export type { SkillRef } from "./skill-ref";
+export { parseSkillRef } from "./skill-ref";
