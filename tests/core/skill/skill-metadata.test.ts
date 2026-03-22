@@ -235,4 +235,67 @@ describe("parseSkillMetadata", () => {
 		expect(result.error.message).toContain("name:");
 		expect(result.error.message).toContain("description:");
 	});
+
+	it("actions 付きメタデータが正しくパースされる", () => {
+		const result = parseSkillMetadata({
+			name: "multi-action",
+			description: "複数アクションを持つスキル",
+			mode: "agent",
+			actions: {
+				lint: {
+					description: "Lint を実行する",
+					mode: "template",
+				},
+				fix: {
+					description: "自動修正する",
+					mode: "agent",
+					model: "claude-sonnet-4-20250514",
+					inputs: [{ name: "target", type: "text", message: "対象ファイル" }],
+					context: [{ type: "file", path: "src/" }],
+					tools: ["bash", "read", "write"],
+					timeout: 120000,
+				},
+			},
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.actions).toBeDefined();
+		const { actions } = result.value;
+		expect(actions).toBeDefined();
+		if (!actions) return;
+		expect(Object.keys(actions)).toStrictEqual(["lint", "fix"]);
+		expect(actions.lint.description).toBe("Lint を実行する");
+		expect(actions.fix.model).toBe("claude-sonnet-4-20250514");
+	});
+
+	it("actions が空オブジェクトでエラーになる", () => {
+		const result = parseSkillMetadata({
+			name: "test",
+			description: "test",
+			actions: {},
+		});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("PARSE_ERROR");
+		expect(result.error.message).toContain("actions must not be empty");
+	});
+
+	it("アクション名にコロンを含む場合エラーになる", () => {
+		const result = parseSkillMetadata({
+			name: "test",
+			description: "test",
+			actions: {
+				"ns:action": {
+					description: "invalid name",
+				},
+			},
+		});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("PARSE_ERROR");
+		expect(result.error.message).toContain("action name must not contain ':'");
+	});
 });
