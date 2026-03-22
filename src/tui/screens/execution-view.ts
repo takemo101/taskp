@@ -30,6 +30,7 @@ export type ExecutionParams = {
 	readonly variables: Readonly<Record<string, string>>;
 	readonly model: LanguageModelV3 | null;
 	readonly modelSpec: ModelSpec | null;
+	readonly actionName?: string;
 };
 
 export async function showExecution(
@@ -37,18 +38,19 @@ export async function showExecution(
 	params: ExecutionParams,
 	deps: ExecutionDeps,
 ): Promise<"back" | "exit"> {
-	const { skill, variables, model, modelSpec } = params;
+	const { skill, variables, model, modelSpec, actionName } = params;
 	return new Promise((resolve) => {
 		clearScreen(renderer);
 
 		const modelLabel = modelSpec ? ` ─── ${modelSpec.provider}/${modelSpec.model}` : "";
+		const skillLabel = actionName ? `${skill.metadata.name}:${actionName}` : skill.metadata.name;
 
 		const container = new BoxRenderable(renderer, {
 			id: CONTAINER_ID,
 			width: "100%",
 			height: "100%",
 			borderStyle: "rounded",
-			title: `${skill.metadata.name} [Running]${modelLabel}`,
+			title: `${skillLabel} [Running]${modelLabel}`,
 			padding: 1,
 			flexDirection: "column",
 			justifyContent: "flex-start",
@@ -138,12 +140,12 @@ export async function showExecution(
 				stopSpinner();
 				const seconds = (elapsedMs / 1000).toFixed(1);
 				summaryText.content = `Done in ${seconds}s (${steps} steps)`;
-				container.title = `${skill.metadata.name} [Done]${modelLabel}`;
+				container.title = `${skillLabel} [Done]${modelLabel}`;
 				helpBox.visible = true;
 			},
 		};
 
-		runExecution(skill, variables, model, viewPort, deps).then(() => {
+		runExecution(skill, variables, model, viewPort, deps, actionName).then(() => {
 			const doneHandler = (key: KeyEvent) => {
 				if (key.name === "return") {
 					cleanup(doneHandler);
