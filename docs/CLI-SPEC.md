@@ -270,6 +270,63 @@ Inputs:
   priority   select   優先度は？          [low, medium, high] (default: medium)
 ```
 
+### taskp setup
+
+プロジェクトまたはグローバルの初期設定を行う。
+
+```bash
+taskp setup
+taskp setup --global
+taskp setup --force
+```
+
+#### オプション
+
+| オプション | 短縮 | 型 | デフォルト | 説明 |
+|-----------|------|-----|----------|------|
+| `--global` | `-g` | `boolean` | `false` | グローバル設定を初期化 |
+| `--force` | `-f` | `boolean` | `false` | 既存ファイルを上書き |
+
+#### 生成ファイル
+
+**プロジェクト (`taskp setup`)**:
+
+| ファイル | 説明 |
+|---------|------|
+| `.taskp/config.toml` | プロジェクト設定ファイル（コメント付きテンプレート） |
+| `.taskp/config.schema.json` | JSON Schema（エディタ補完用） |
+| `.taskp/skills/` | スキル格納ディレクトリ |
+| `.taplo.toml` | Taplo（TOML LSP）設定 |
+
+**グローバル (`taskp setup --global`)**:
+
+| ファイル | 説明 |
+|---------|------|
+| `~/.taskp/config.toml` | グローバル設定ファイル（コメント付きテンプレート） |
+| `~/.taskp/skills/` | グローバルスキル格納ディレクトリ |
+
+> グローバル初期化では `config.schema.json` と `.taplo.toml` は生成しない。
+
+#### 動作
+
+- `--force` なし: 既存ファイルはスキップされる
+- `--force` あり: 既存ファイルを上書きする
+
+#### 出力
+
+```typescript
+interface SetupOutput {
+  location: "project" | "global";  // 初期化先
+  created: string[];               // 作成されたファイル
+  skipped: string[];               // スキップされたファイル
+}
+```
+
+#### 終了コード
+
+- 正常終了: `0`
+- 設定エラー（ファイル書き込み失敗等）: `4`
+
 ## 終了コード
 
 | コード | 意味 |

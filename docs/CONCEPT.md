@@ -65,11 +65,14 @@ taskp init my-task
 
 ```bash
 taskp setup
-# → .taskp/config.toml, config.schema.json, skills/, .taplo.toml が生成される
-# → config.toml はコメント付きテンプレート。設定を有効にするにはコメントを外すだけ
+# → .taskp/config.toml（設定テンプレート）
+# → .taskp/config.schema.json（エディタ補完用）
+# → .taskp/skills/（スキル格納ディレクトリ）
+# → .taplo.toml（TOML LSP 設定）
 
 taskp setup --global
-# → ~/.taskp/config.toml, ~/.taskp/skills/ が生成される
+# → ~/.taskp/config.toml（グローバル設定テンプレート）
+# → ~/.taskp/skills/（グローバルスキル格納ディレクトリ）
 ```
 
 ## 設計方針

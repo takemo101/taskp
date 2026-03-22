@@ -9,6 +9,7 @@ import { createContextCollector } from "./adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "./adapter/context-collector-deps";
 import { createHookExecutor } from "./adapter/hook-executor";
 import { createCliProgressWriter } from "./adapter/progress-formatter";
+import { createProjectInitializer } from "./adapter/project-initializer";
 import { createPromptRunner } from "./adapter/prompt-runner";
 import { createSkillInitializer } from "./adapter/skill-initializer";
 import { createDefaultSkillLoader } from "./adapter/skill-loader";
@@ -24,6 +25,8 @@ import { createListSkillsUseCase } from "./usecase/list-skills";
 import { runAgentSkill } from "./usecase/run-agent-skill";
 import type { RunOutput } from "./usecase/run-skill";
 import { runSkill } from "./usecase/run-skill";
+import type { SetupOutput } from "./usecase/setup-project";
+import { setupProject } from "./usecase/setup-project";
 import type { ShowOutput } from "./usecase/show-skill";
 import { showSkill } from "./usecase/show-skill";
 
@@ -96,6 +99,29 @@ function formatRunOutput(output: RunOutput): string {
 
 function formatInitOutput(output: InitOutput): string {
 	return `Created ${output.mode} skill "${output.name}" at ${output.path}`;
+}
+
+function formatSetupOutput(output: SetupOutput): string {
+	const lines: string[] = [];
+	lines.push(`Setup ${output.location} configuration:`);
+
+	if (output.created.length > 0) {
+		lines.push("");
+		lines.push("Created:");
+		for (const path of output.created) {
+			lines.push(`  ${path}`);
+		}
+	}
+
+	if (output.skipped.length > 0) {
+		lines.push("");
+		lines.push("Skipped (already exists):");
+		for (const path of output.skipped) {
+			lines.push(`  ${path}`);
+		}
+	}
+
+	return lines.join("\n");
 }
 
 function formatError(error: DomainError): string {
@@ -315,6 +341,38 @@ const cli = Cli.create("taskp", {
 			}
 
 			console.log(formatShowOutput(result.value));
+		},
+	})
+	.command("setup", {
+		description: "Initialize project configuration",
+		options: z.object({
+			global: z.boolean().optional().describe("Initialize global configuration"),
+			force: z.boolean().optional().describe("Overwrite existing files"),
+		}),
+		alias: {
+			global: "g",
+			force: "f",
+		},
+		async run(c) {
+			const isGlobal = c.options.global ?? false;
+			const baseDir = isGlobal ? homedir() : process.cwd();
+
+			const projectInitializer = createProjectInitializer({
+				baseDir,
+				location: isGlobal ? "global" : "project",
+			});
+
+			const result = await setupProject(
+				{ projectInitializer },
+				{ global: isGlobal, force: c.options.force ?? false },
+			);
+
+			if (!result.ok) {
+				console.error(formatError(result.error));
+				process.exit(EXIT_CODE[result.error.type]);
+			}
+
+			console.log(formatSetupOutput(result.value));
 		},
 	})
 	.command("tui", {
