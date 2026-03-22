@@ -22,6 +22,7 @@ export type RunSkillInput = {
 	readonly dryRun: boolean;
 	readonly force: boolean;
 	readonly noInput?: boolean;
+	readonly callerSkill?: string;
 };
 
 export type CommandResult = {
@@ -226,6 +227,7 @@ async function executeAndReport(
 				status: "failed",
 				durationMs,
 				error: domainErrorMessage(commandResults.error),
+				callerSkill: input.callerSkill,
 			},
 		});
 		return commandResults;
@@ -240,6 +242,7 @@ async function executeAndReport(
 			mode: "template",
 			status: "success",
 			durationMs,
+			callerSkill: input.callerSkill,
 		},
 	});
 

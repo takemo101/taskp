@@ -80,6 +80,7 @@ describe("HookExecutor", () => {
 			TASKP_STATUS: "success",
 			TASKP_DURATION_MS: "1234",
 			TASKP_ERROR: "",
+			TASKP_CALLER_SKILL: "",
 		});
 	});
 
@@ -191,6 +192,30 @@ describe("HookExecutor", () => {
 
 		expect(results).toEqual([]);
 		expect(executor.executedCommands).toHaveLength(0);
+	});
+
+	it("injects TASKP_CALLER_SKILL when callerSkill is present", async () => {
+		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
+		const hookExecutor = createHookExecutor(executor);
+		const contextWithCaller: HookContext = {
+			...successContext,
+			callerSkill: "diagnose",
+		};
+
+		await hookExecutor.execute(["echo test"], contextWithCaller);
+
+		const env = executor.executedCommands[0].options?.env;
+		expect(env?.TASKP_CALLER_SKILL).toBe("diagnose");
+	});
+
+	it("sets TASKP_CALLER_SKILL to empty string when callerSkill is undefined", async () => {
+		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
+		const hookExecutor = createHookExecutor(executor);
+
+		await hookExecutor.execute(["echo test"], successContext);
+
+		const env = executor.executedCommands[0].options?.env;
+		expect(env?.TASKP_CALLER_SKILL).toBe("");
 	});
 
 	it("sets timeout to 30 seconds", async () => {

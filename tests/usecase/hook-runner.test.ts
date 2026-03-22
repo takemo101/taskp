@@ -144,6 +144,43 @@ describe("runHooks", () => {
 		expect(executor.calls[0].context.actionName).toBe("add");
 	});
 
+	it("passes callerSkill in context when present", async () => {
+		const executor = createMockExecutor();
+		const context: HookContext = {
+			skillName: "build",
+			mode: "template",
+			status: "success",
+			durationMs: 100,
+			callerSkill: "diagnose",
+		};
+
+		await runHooks({
+			hookExecutor: executor,
+			hooksConfig: { on_success: ["echo ok"] },
+			context,
+		});
+
+		expect(executor.calls[0].context.callerSkill).toBe("diagnose");
+	});
+
+	it("omits callerSkill in context for direct execution", async () => {
+		const executor = createMockExecutor();
+		const context: HookContext = {
+			skillName: "deploy",
+			mode: "template",
+			status: "success",
+			durationMs: 100,
+		};
+
+		await runHooks({
+			hookExecutor: executor,
+			hooksConfig: { on_success: ["echo ok"] },
+			context,
+		});
+
+		expect(executor.calls[0].context.callerSkill).toBeUndefined();
+	});
+
 	it("omits actionName in context for single skill execution", async () => {
 		const executor = createMockExecutor();
 		const context: HookContext = {

@@ -4,7 +4,9 @@ import type { JSONSchema7, Tool } from "ai";
 import { jsonSchema } from "ai";
 import { execa } from "execa";
 import { toJSONSchema, z } from "zod";
+import type { HooksConfig } from "../../usecase/hook-runner";
 import type { CommandExecutor } from "../../usecase/port/command-executor";
+import type { HookExecutorPort } from "../../usecase/port/hook-executor";
 import type { PromptCollector } from "../../usecase/port/prompt-collector";
 import type { SkillRepository } from "../../usecase/port/skill-repository";
 import { type RunOutput, runSkill } from "../../usecase/run-skill";
@@ -158,6 +160,9 @@ type TaskpRunDeps = {
 	readonly commandExecutor: CommandExecutor;
 	readonly promptCollector: PromptCollector;
 	readonly callStack?: readonly string[];
+	readonly callerSkillName?: string;
+	readonly hookExecutor?: HookExecutorPort;
+	readonly hooksConfig?: HooksConfig;
 };
 
 function parseSkillRef(ref: string): {
@@ -229,11 +234,14 @@ function createTaskpRunTool(deps: TaskpRunDeps, description: string): AnyTool {
 					dryRun: false,
 					force: false,
 					noInput: true,
+					callerSkill: deps.callerSkillName,
 				},
 				{
 					skillRepository: deps.skillRepository,
 					commandExecutor: deps.commandExecutor,
 					promptCollector: deps.promptCollector,
+					hookExecutor: deps.hookExecutor,
+					hooksConfig: deps.hooksConfig,
 				},
 			);
 
