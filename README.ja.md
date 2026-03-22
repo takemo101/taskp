@@ -8,6 +8,7 @@
 
 - **マークダウンでスキル定義** — 人間が読み書きしやすく、Git 管理も容易
 - **2つの実行モード** — テンプレート展開（LLM 不要）と AI エージェント実行
+- **マルチアクション** — 関連する操作（追加/削除/一覧）を1つのスキルにまとめられる
 - **マルチプロバイダ対応** — Anthropic / OpenAI / Google / Ollama をサポート
 - **MCP サーバー** — Claude Code や pi などの AI ツールからも利用可能
 
@@ -97,6 +98,61 @@ taskp run deploy
 taskp run code-review --model anthropic/claude-sonnet-4-20250514
 ```
 
+### 5. マルチアクションスキルを作成する
+
+`actions` で関連する操作を1つのスキルにまとめられます：
+
+```markdown
+---
+name: task
+description: タスクを管理する
+mode: template
+actions:
+  add:
+    description: タスクを追加する
+    inputs:
+      - name: title
+        type: text
+        message: "タスク名は？"
+  list:
+    description: タスク一覧を表示する
+  delete:
+    description: タスクを削除する
+    mode: agent
+    tools: [bash]
+    inputs:
+      - name: id
+        type: text
+        message: "タスクIDは？"
+---
+
+# タスク管理
+
+## action:add
+
+｀｀｀bash
+echo "タスク追加: {{title}}"
+｀｀｀
+
+## action:list
+
+｀｀｀bash
+echo "タスク一覧..."
+｀｀｀
+
+## action:delete
+
+タスク {{id}} を確認してから削除してください。
+```
+
+```bash
+taskp run task:add                 # 特定のアクションを実行
+taskp run task:add --set title="買い物"
+taskp tui                          # TUI でアクションを選択
+```
+
+各アクションは独自の `mode`、`model`、`inputs`、`tools`、`context` を持てます。1つのスキル内で template と agent モードを混在できます。
+
 ## コマンド一覧
 
 ### `taskp run <skill>`
@@ -109,12 +165,12 @@ taskp run deploy --model ollama/qwen2.5-coder:32b
 taskp run deploy --dry-run
 taskp run deploy --set environment=production --set branch=main
 taskp run deploy --no-input
+taskp run task:add               # 特定のアクションを実行
 ```
 
 | オプション | 短縮 | 説明 |
 |-----------|------|------|
-| `--model` | `-m` | 使用する LLM モデル |
-| `--provider` | `-p` | LLM プロバイダ |
+| `--model` | `-m` | 使用する LLM モデル（`provider/model` 形式対応） |
 | `--dry-run` | | 実行計画を表示するが実行しない |
 | `--force` | `-f` | エラー時も続行する（template モード） |
 | `--verbose` | `-v` | 詳細ログを表示 |
@@ -139,6 +195,7 @@ taskp list --local
 taskp init my-task
 taskp init my-task --global
 taskp init my-task --mode agent
+taskp init my-task --actions add,delete,list
 ```
 
 ### `taskp show <skill>`
@@ -147,6 +204,7 @@ taskp init my-task --mode agent
 
 ```bash
 taskp show deploy
+taskp show task:add              # アクション詳細を表示
 ```
 
 ### `taskp tui`
@@ -210,7 +268,7 @@ inputs:                 # 入力定義
   - name: target
     type: text
     message: "対象は？"
-model: anthropic/claude-sonnet-4-20250514  # agent モード用（省略可）
+model: anthropic/claude-sonnet-4-20250514  # agent モード用（provider/model 形式）
 tools:                  # agent モードで使用するツール（省略可）
   - bash
   - read
@@ -220,7 +278,45 @@ context:                # 自動的にコンテキストに含めるソース（
     path: "src/{{target}}"
   - type: command
     run: "git diff --cached"
+actions:                # マルチアクション定義（省略可）
+  build:
+    description: プロジェクトをビルドする
+    inputs:
+      - name: target
+        type: text
+        message: "ビルド対象は？"
+  test:
+    description: テストを実行する
+    mode: agent
+    tools: [bash, read]
 ---
+```
+
+### アクション
+
+`actions` フィールドで1つのスキルに複数のアクションを定義できます。各アクションは `mode`、`model`、`inputs`、`tools`、`context`、`timeout` を個別に上書き可能で、未指定のフィールドはスキルレベルの値を継承します。
+
+`actions` が定義されている場合、スキルレベルの `inputs` は無視されます。
+
+アクションの実行手順は本文中の `## action:<name>` セクションで定義します：
+
+```markdown
+## action:build
+
+｀｀｀bash
+npm run build --target={{target}}
+｀｀｀
+
+## action:test
+
+テストカバレッジを分析し、改善点を提案してください。
+```
+
+コロン区切りでアクションを実行：
+
+```bash
+taskp run my-skill:build
+taskp run my-skill:test --model anthropic/claude-sonnet-4-20250514
 ```
 
 ### 入力タイプ
@@ -237,6 +333,26 @@ context:                # 自動的にコンテキストに含めるソース（
 ### 変数展開
 
 本文中で `{{変数名}}` を使って入力値を展開できます。
+
+### 組み込みツール: `taskp_run`
+
+agent モードで LLM が他の template モードスキルを呼び出せます：
+
+```yaml
+---
+name: diagnose
+mode: agent
+tools:
+  - bash
+  - read
+  - taskp_run    # スキル間連携を有効化
+---
+```
+
+制約:
+- template モードのスキルのみ呼び出し可能（agent のネストは不可）
+- 再帰呼び出しは検出・ブロック
+- 最大ネスト深度: 3
 
 ## カスタムシステムプロンプト
 

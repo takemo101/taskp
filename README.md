@@ -8,6 +8,7 @@ A CLI tool that runs skills (task procedures) defined in Markdown — collecting
 
 - **Skills defined in Markdown** — Human-readable, easy to write, and Git-friendly
 - **Two execution modes** — Template rendering (no LLM required) and AI agent execution
+- **Multi-action skills** — Group related operations (add/delete/list) into a single skill
 - **Multi-provider support** — Anthropic / OpenAI / Google / Ollama
 - **MCP server** — Usable from AI tools like Claude Code and pi
 
@@ -97,6 +98,61 @@ Change to `mode: agent` and the LLM will interpret and execute the skill's conte
 taskp run code-review --model anthropic/claude-sonnet-4-20250514
 ```
 
+### 5. Create a multi-action skill
+
+Group related operations into a single skill with `actions`:
+
+```markdown
+---
+name: task
+description: Manage tasks
+mode: template
+actions:
+  add:
+    description: Add a task
+    inputs:
+      - name: title
+        type: text
+        message: "Task title?"
+  list:
+    description: List tasks
+  delete:
+    description: Delete a task
+    mode: agent
+    tools: [bash]
+    inputs:
+      - name: id
+        type: text
+        message: "Task ID?"
+---
+
+# Task Management
+
+## action:add
+
+｀｀｀bash
+echo "Adding task: {{title}}"
+｀｀｀
+
+## action:list
+
+｀｀｀bash
+echo "Listing tasks..."
+｀｀｀
+
+## action:delete
+
+Find and delete task {{id}}, confirming with the user first.
+```
+
+```bash
+taskp run task:add                 # Run a specific action
+taskp run task:add --set title="Buy milk"
+taskp tui                          # Select actions interactively
+```
+
+Each action can have its own `mode`, `model`, `inputs`, `tools`, and `context` — mixing template and agent mode within a single skill.
+
 ## Commands
 
 ### `taskp run <skill>`
@@ -109,12 +165,12 @@ taskp run deploy --model ollama/qwen2.5-coder:32b
 taskp run deploy --dry-run
 taskp run deploy --set environment=production --set branch=main
 taskp run deploy --no-input
+taskp run task:add               # Run a specific action
 ```
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--model` | `-m` | LLM model to use |
-| `--provider` | `-p` | LLM provider |
+| `--model` | `-m` | LLM model (`provider/model` format supported) |
 | `--dry-run` | | Show execution plan without running |
 | `--force` | `-f` | Continue on error (template mode) |
 | `--verbose` | `-v` | Show detailed logs |
@@ -139,6 +195,7 @@ Generate a skill scaffold.
 taskp init my-task
 taskp init my-task --global
 taskp init my-task --mode agent
+taskp init my-task --actions add,delete,list
 ```
 
 ### `taskp show <skill>`
@@ -147,6 +204,7 @@ Show skill details.
 
 ```bash
 taskp show deploy
+taskp show task:add              # Show action details
 ```
 
 ### `taskp tui`
@@ -210,7 +268,7 @@ inputs:                 # Input definitions
   - name: target
     type: text
     message: "Target?"
-model: anthropic/claude-sonnet-4-20250514  # For agent mode (optional)
+model: anthropic/claude-sonnet-4-20250514  # For agent mode (provider/model format)
 tools:                  # Tools for agent mode (optional)
   - bash
   - read
@@ -220,7 +278,45 @@ context:                # Sources auto-included in context (optional)
     path: "src/{{target}}"
   - type: command
     run: "git diff --cached"
+actions:                # Multi-action definitions (optional)
+  build:
+    description: Build the project
+    inputs:
+      - name: target
+        type: text
+        message: "Build target?"
+  test:
+    description: Run tests
+    mode: agent
+    tools: [bash, read]
 ---
+```
+
+### Actions
+
+A skill can define multiple actions via the `actions` field. Each action can override `mode`, `model`, `inputs`, `tools`, `context`, and `timeout` — unspecified fields inherit from the skill level.
+
+When `actions` is defined, the skill-level `inputs` is ignored.
+
+Action bodies are defined in the Markdown body using `## action:<name>` sections:
+
+```markdown
+## action:build
+
+｀｀｀bash
+npm run build --target={{target}}
+｀｀｀
+
+## action:test
+
+Analyze test coverage and suggest improvements.
+```
+
+Run actions with colon syntax:
+
+```bash
+taskp run my-skill:build
+taskp run my-skill:test --model anthropic/claude-sonnet-4-20250514
 ```
 
 ### Input Types
@@ -237,6 +333,26 @@ context:                # Sources auto-included in context (optional)
 ### Variable Expansion
 
 Use `{{variable_name}}` in the body to expand input values.
+
+### Built-in Tool: `taskp_run`
+
+In agent mode, the LLM can invoke other template-mode skills using the `taskp_run` tool:
+
+```yaml
+---
+name: diagnose
+mode: agent
+tools:
+  - bash
+  - read
+  - taskp_run    # Enable cross-skill invocation
+---
+```
+
+Constraints:
+- Only template-mode skills can be called (no agent nesting)
+- Recursive calls are detected and blocked
+- Maximum nesting depth: 3
 
 ## Custom System Prompt
 
