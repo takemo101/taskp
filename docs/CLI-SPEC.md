@@ -138,6 +138,86 @@ interface InitOutput {
 }
 ```
 
+### taskp setup
+
+プロジェクトの初期設定を行う。`.taskp/` ディレクトリと設定ファイルのテンプレートを生成する。
+
+```bash
+taskp setup
+taskp setup --global
+```
+
+#### 生成されるファイル
+
+**プロジェクト（デフォルト）:**
+
+```
+.taskp/
+├── config.toml            ← 設定テンプレート（コメント付き）
+├── config.schema.json     ← エディタ補完用 JSON Schema
+└── skills/                ← スキル格納ディレクトリ
+.taplo.toml                ← Taplo（TOML LSP）設定（既存なら追記）
+```
+
+**グローバル（`--global`）:**
+
+```
+~/.taskp/
+├── config.toml            ← グローバル設定テンプレート
+└── skills/                ← グローバルスキル格納ディレクトリ
+```
+
+#### オプション
+
+| オプション | 短縮 | 型 | デフォルト | 説明 |
+|-----------|------|-----|----------|------|
+| `--global` | `-g` | `boolean` | `false` | グローバル設定を初期化 |
+| `--force` | `-f` | `boolean` | `false` | 既存ファイルを上書き |
+
+#### 動作
+
+1. `.taskp/` ディレクトリを作成
+2. `config.toml` のテンプレートを生成（セクションごとのコメント付き）
+3. `config.schema.json` を生成（プロジェクトのみ）
+4. `.taplo.toml` を生成または追記（プロジェクトのみ）
+5. `skills/` ディレクトリを作成
+6. 既存ファイルがある場合はスキップ（`--force` で上書き）
+
+#### 出力
+
+```typescript
+interface SetupOutput {
+  location: "project" | "global";
+  created: string[];                // 作成されたファイルパス一覧
+  skipped: string[];                // 既存のためスキップされたファイル一覧
+}
+```
+
+#### 生成される config.toml テンプレート
+
+```toml
+# taskp — 設定ファイル
+# 詳細: https://github.com/your-repo/taskp/docs/CONFIG-SPEC.md
+
+[ai]
+# default_provider = "anthropic"     # anthropic | openai | google | ollama | omlx | lmstudio
+# default_model = "claude-sonnet-4-20250514"
+
+# [ai.providers.anthropic]
+# api_key_env = "ANTHROPIC_API_KEY"
+
+# [ai.providers.ollama]
+# base_url = "http://localhost:11434/v1"
+# default_model = "qwen2.5-coder:32b"
+
+# [cli]
+# command_timeout_ms = 30000
+
+# [hooks]
+# on_success = []
+# on_failure = []
+```
+
 ### taskp show \<skill\>
 
 スキルの詳細を表示する。`skill:action` 形式でアクションの詳細も表示できる。
@@ -290,5 +370,5 @@ incur により、すべてのコマンドが MCP ツールとしても公開さ
 taskp serve
 
 # Claude Code / pi から利用
-# → taskp_run, taskp_list, taskp_init, taskp_show, taskp_setup がツールとして利用可能
+# → taskp_run, taskp_list, taskp_init, taskp_setup, taskp_show がツールとして利用可能
 ```

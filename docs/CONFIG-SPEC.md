@@ -11,6 +11,10 @@ taskp は TOML 形式の設定ファイルで AI/LLM プロバイダを構成す
 
 マージ順序: **グローバル → プロジェクト**（プロジェクト設定が優先）
 
+### 初期化
+
+`taskp setup` でテンプレート付きの設定ファイルを自動生成できる。詳細は [CLI 仕様](CLI-SPEC.md) の `taskp setup` セクションを参照。
+
 ## JSON Schema
 
 エディタ補完・バリデーション用の JSON Schema:
