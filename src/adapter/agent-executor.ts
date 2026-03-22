@@ -8,6 +8,7 @@ import type {
 	AgentExecutorPort,
 	AgentExecutorResult,
 } from "../usecase/port/agent-executor";
+import { classifyAgentError, toExecutionError } from "./agent-error-handler";
 import type { StreamWriter } from "./stream-writer";
 
 export function createAgentExecutor(writer: StreamWriter): AgentExecutorPort {
@@ -67,11 +68,11 @@ async function executeAgentLoop(
 
 		return ok(agentResult);
 	} catch (error) {
-		return err(
-			executionError(
-				`Agent execution failed: ${error instanceof Error ? error.message : String(error)}`,
-			),
-		);
+		const classified = classifyAgentError(error, input.model.provider);
+		if (classified.category === "fatal") {
+			throw error;
+		}
+		return err(toExecutionError(classified));
 	}
 }
 
