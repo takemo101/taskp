@@ -41,7 +41,32 @@ bun remove -g taskp
 
 ## Quick Start
 
-### 1. Create a skill
+### 1. Initialize the project
+
+```bash
+taskp setup
+```
+
+This creates the `.taskp/` directory with a commented-out `config.toml`. Uncomment the lines you need:
+
+```toml
+[ai]
+default_provider = "anthropic"
+default_model = "claude-sonnet-4-20250514"
+
+[ai.providers.anthropic]
+api_key_env = "ANTHROPIC_API_KEY"
+```
+
+A JSON Schema and `.taplo.toml` are also generated, enabling autocompletion in editors that support [Taplo](https://taplo.tamasfe.dev/).
+
+For global configuration (shared across projects):
+
+```bash
+taskp setup --global
+```
+
+### 2. Create a skill
 
 ```bash
 taskp init deploy
@@ -49,7 +74,7 @@ taskp init deploy
 
 This generates `.taskp/skills/deploy/SKILL.md`.
 
-### 2. Edit the skill
+### 3. Edit the skill
 
 ```markdown
 ---
@@ -81,7 +106,7 @@ npm run deploy:{{environment}}
 \`\`\`
 ```
 
-### 3. Run the skill
+### 4. Run the skill
 
 ```bash
 taskp run deploy
@@ -90,7 +115,7 @@ taskp run deploy
 # → Commands are executed in order
 ```
 
-### 4. Run in AI agent mode
+### 5. Run in AI agent mode
 
 Change to `mode: agent` and the LLM will interpret and execute the skill's content.
 
@@ -98,7 +123,7 @@ Change to `mode: agent` and the LLM will interpret and execute the skill's conte
 taskp run code-review --model anthropic/claude-sonnet-4-20250514
 ```
 
-### 5. Create a multi-action skill
+### 6. Create a multi-action skill
 
 Group related operations into a single skill with `actions`:
 
@@ -176,6 +201,21 @@ taskp run task:add               # Run a specific action
 | `--verbose` | `-v` | Show detailed logs |
 | `--no-input` | | Disable interactive prompts (use defaults) |
 | `--set` | `-s` | Set variables directly (`--set key=value`) |
+
+### `taskp setup`
+
+Initialize project configuration.
+
+```bash
+taskp setup
+taskp setup --global
+taskp setup --force
+```
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--global` | `-g` | Initialize global configuration (`~/.taskp/`) |
+| `--force` | `-f` | Overwrite existing files |
 
 ### `taskp list`
 

@@ -41,7 +41,32 @@ bun remove -g taskp
 
 ## クイックスタート
 
-### 1. スキルを作成する
+### 1. プロジェクトを初期化する
+
+```bash
+taskp setup
+```
+
+`.taskp/` ディレクトリとコメントアウトされた `config.toml` が生成されます。必要な行のコメントを外すだけで設定できます：
+
+```toml
+[ai]
+default_provider = "anthropic"
+default_model = "claude-sonnet-4-20250514"
+
+[ai.providers.anthropic]
+api_key_env = "ANTHROPIC_API_KEY"
+```
+
+JSON Schema と `.taplo.toml` も生成されるため、[Taplo](https://taplo.tamasfe.dev/) 対応エディタで補完が効きます。
+
+グローバル設定（プロジェクト横断）の場合：
+
+```bash
+taskp setup --global
+```
+
+### 2. スキルを作成する
 
 ```bash
 taskp init deploy
@@ -49,7 +74,7 @@ taskp init deploy
 
 `.taskp/skills/deploy/SKILL.md` が生成されます。
 
-### 2. スキルを編集する
+### 3. スキルを編集する
 
 ```markdown
 ---
@@ -81,7 +106,7 @@ npm run deploy:{{environment}}
 \`\`\`
 ```
 
-### 3. スキルを実行する
+### 4. スキルを実行する
 
 ```bash
 taskp run deploy
@@ -90,7 +115,7 @@ taskp run deploy
 # → コマンドが順番に実行される
 ```
 
-### 4. AI エージェントモードで実行する
+### 5. AI エージェントモードで実行する
 
 `mode: agent` に変更すれば、LLM がスキルの内容を解釈して実行します。
 
@@ -98,7 +123,7 @@ taskp run deploy
 taskp run code-review --model anthropic/claude-sonnet-4-20250514
 ```
 
-### 5. マルチアクションスキルを作成する
+### 6. マルチアクションスキルを作成する
 
 `actions` で関連する操作を1つのスキルにまとめられます：
 
@@ -176,6 +201,21 @@ taskp run task:add               # 特定のアクションを実行
 | `--verbose` | `-v` | 詳細ログを表示 |
 | `--no-input` | | 対話的質問を無効化（デフォルト値を使用） |
 | `--set` | `-s` | 変数を直接指定（`--set key=value`） |
+
+### `taskp setup`
+
+プロジェクトの設定を初期化します。
+
+```bash
+taskp setup
+taskp setup --global
+taskp setup --force
+```
+
+| オプション | 短縮 | 説明 |
+|-----------|------|------|
+| `--global` | `-g` | グローバル設定（`~/.taskp/`）を初期化 |
+| `--force` | `-f` | 既存ファイルを上書き |
 
 ### `taskp list`
 
