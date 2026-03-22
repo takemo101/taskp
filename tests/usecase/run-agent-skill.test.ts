@@ -341,6 +341,8 @@ describe("runAgentSkill", () => {
 					content:
 						"Global instructions.\n\n## action:review\n\nReview the code in {{target}}.\n\n## action:analyze\n\nAnalyze the codebase.\n",
 					extractCodeBlocks: () => [],
+					extractActionSection: () => undefined,
+					extractActionCodeBlocks: () => [],
 				},
 				location: "/tmp/test",
 				scope: "local",
@@ -467,6 +469,8 @@ describe("runAgentSkill", () => {
 				body: {
 					content: "No action sections here.",
 					extractCodeBlocks: () => [],
+					extractActionSection: () => undefined,
+					extractActionCodeBlocks: () => [],
 				},
 				location: "/tmp/test",
 				scope: "local",

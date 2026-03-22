@@ -131,6 +131,39 @@ agent モードで LLM に提供するツール。
 | `ask_user` | ユーザーに質問する | ❌ |
 | `taskp_run` | 別の taskp スキルを実行する（template モードのみ） | ❌ |
 
+### taskp_run ツール
+
+agent モードの LLM が別のスキル（またはアクション）を呼び出せる組み込みツール。
+
+```typescript
+const taskpRunParams = z.object({
+  skill: z.string(),   // "skill" or "skill:action"
+  set: z.record(z.string(), z.string()).optional(),
+});
+```
+
+#### 制約
+
+| 制約 | 理由 |
+|------|------|
+| template モードのスキルのみ呼び出し可能 | agent ネストによる無限ループ・コスト爆発を防止 |
+| `noInput: true` で実行 | LLM からの呼び出しは非対話。`set` で変数を渡す |
+| 再帰呼び出し禁止 | 呼び出しスタックで管理 |
+| 最大ネスト深度: 3 | 安全装置 |
+
+#### 有効化
+
+デフォルトでは無効。スキルの `tools` フィールドで明示的に有効化する:
+
+```yaml
+tools:
+  - bash
+  - read
+  - taskp_run
+```
+
+ツールの `description` には利用可能なスキル一覧が動的に注入される（agent モードスキルを除外）。
+
 ### ツールのスキーマ
 
 ```typescript

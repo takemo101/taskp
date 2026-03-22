@@ -58,11 +58,69 @@ npm run deploy:{{environment}}
 | フィールド | 型 | デフォルト | 説明 |
 |-----------|-----|----------|------|
 | `mode` | `"template" \| "agent"` | `"template"` | 実行モード |
-| `inputs` | `Input[]` | `[]` | 入力定義（質問リスト） |
+| `inputs` | `Input[]` | `[]` | 入力定義（質問リスト）。`actions` が定義されている場合は無視される |
 | `model` | `string` | 設定ファイルのデフォルト | 使用する LLM モデル。`provider/model` 形式でプロバイダも同時に指定可能 |
 | `timeout` | `number` | `30000` | template モードのコマンド実行タイムアウト（ミリ秒、最大: 3,600,000）。agent モードでは無視される |
 | `tools` | `string[]` | `["bash", "read", "write"]` | agent モードで使用するツール |
 | `context` | `ContextSource[]` | `[]` | 自動的にコンテキストに含めるソース |
+| `actions` | `Record<string, Action>` | - | アクション定義マップ。1つのスキルで複数のアクションを持つ場合に使用 |
+
+### Action 型
+
+`actions` フィールドで定義する各アクションの型。すべてのフィールドは省略可能で、省略時はスキルレベルの値を継承する（`inputs` を除く）。
+
+| フィールド | 型 | 継承元 | 説明 |
+|-----------|-----|--------|------|
+| `description` | `string` | **必須** | アクションの説明 |
+| `mode` | `"template" \| "agent"` | `skill.mode` → `"template"` | 実行モード |
+| `model` | `string` | `skill.model` → config default | LLM モデル |
+| `inputs` | `Input[]` | なし（デフォルト: `[]`） | 入力定義。アクション間で共有しない |
+| `context` | `ContextSource[]` | `skill.context` → `[]` | コンテキストソース |
+| `tools` | `string[]` | `skill.tools` → `["bash", "read", "write"]` | agent モード用ツール |
+| `timeout` | `number` | `skill.timeout` → コマンドランナーのデフォルト | template モードのタイムアウト（ms） |
+
+#### 継承ルール
+
+```
+action.mode    ?? skill.mode    ?? "template"
+action.model   ?? skill.model   ?? undefined
+action.context ?? skill.context ?? []
+action.tools   ?? skill.tools   ?? ["bash", "read", "write"]
+action.timeout ?? skill.timeout ?? undefined
+```
+
+`inputs` は継承しない。各アクションが独立した入力セットを持つため、スキルレベルの `inputs` からの暗黙の継承は混乱を招く。
+
+#### スキルレベルの `inputs` との排他
+
+`actions` が定義されている場合、スキルレベルの `inputs` は無視される（警告をログ出力）。
+
+### アクションセクション
+
+アクション付きスキルの本文には、各アクションに対応する `## action:<name>` セクションを記述する。
+
+```markdown
+## action:add
+
+新しいタスクを追加する。
+
+\`\`\`bash
+{{__skill_dir__}}/common.sh add "{{title}}" --priority {{priority}}
+\`\`\`
+
+## action:delete
+
+指定した ID のタスクを削除する。
+
+\`\`\`bash
+{{__skill_dir__}}/common.sh delete "{{id}}"
+\`\`\`
+```
+
+- **見出しレベル**: H2（`##`）固定
+- **書式**: `## action:<name>`（`action:` プレフィックス + フロントマターの actions キー名）
+- **セクション範囲**: 次の H2 見出しまで、またはファイル末尾まで
+- `## action:*` に属さない本文（冒頭の説明文など）は taskp では無視され、Agent 利用時のコンテキストとして機能する
 
 ### Input 型
 
@@ -361,4 +419,62 @@ tools:
 
 ## 改善提案
 - ファイル:行番号 — 提案内容
+```
+
+### アクション付きスキル: task
+
+```markdown
+---
+name: task
+description: タスクを管理する
+mode: template
+actions:
+  add:
+    description: タスクを追加する
+    inputs:
+      - name: title
+        type: text
+        message: "タスク名は？"
+      - name: priority
+        type: select
+        message: "優先度は？"
+        choices: [low, medium, high]
+        default: medium
+  delete:
+    description: タスクを削除する
+    inputs:
+      - name: id
+        type: text
+        message: "削除するタスクIDは？"
+  list:
+    description: タスク一覧を表示する
+---
+
+# タスク管理
+
+共通スクリプト `common.sh` でタスクのCRUD操作を行う。
+
+## action:add
+
+新しいタスクを追加する。
+
+\`\`\`bash
+{{__skill_dir__}}/common.sh add "{{title}}" --priority {{priority}}
+\`\`\`
+
+## action:delete
+
+指定した ID のタスクを削除する。
+
+\`\`\`bash
+{{__skill_dir__}}/common.sh delete "{{id}}"
+\`\`\`
+
+## action:list
+
+現在のタスク一覧を表示する。
+
+\`\`\`bash
+{{__skill_dir__}}/common.sh list
+\`\`\`
 ```
