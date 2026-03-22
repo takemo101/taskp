@@ -1,8 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createConfigLoader } from "../../src/adapter/config-loader";
+import { createProjectInitializer } from "../../src/adapter/project-initializer";
 import { createSkillLoader } from "../../src/adapter/skill-loader";
 import { type ReservedVars, renderTemplate } from "../../src/core/variable/template-renderer";
 
@@ -282,6 +283,91 @@ describe("Adapter Integration", () => {
 			if (result.ok) return;
 			expect(result.error.type).toBe("CONFIG_ERROR");
 			expect(result.error.message).toContain("Invalid config");
+		});
+	});
+
+	describe("ProjectInitializer", () => {
+		it("プロジェクト初期化で必要なファイルを生成する", async () => {
+			const initializer = createProjectInitializer({
+				baseDir: localRoot,
+				location: "project",
+			});
+
+			const result = await initializer.setup({ force: false });
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+
+			expect(existsSync(join(localRoot, ".taskp", "config.toml"))).toBe(true);
+			expect(existsSync(join(localRoot, ".taskp", "config.schema.json"))).toBe(true);
+			expect(existsSync(join(localRoot, ".taskp", "skills"))).toBe(true);
+			expect(existsSync(join(localRoot, ".taplo.toml"))).toBe(true);
+
+			const configContent = readFileSync(join(localRoot, ".taskp", "config.toml"), "utf-8");
+			expect(configContent).toContain("# default_provider");
+
+			const schemaContent = readFileSync(join(localRoot, ".taskp", "config.schema.json"), "utf-8");
+			const schema = JSON.parse(schemaContent);
+			expect(schema.properties).toHaveProperty("ai");
+		});
+
+		it("グローバル初期化ではスキーマと taplo を生成しない", async () => {
+			const initializer = createProjectInitializer({
+				baseDir: globalRoot,
+				location: "global",
+			});
+
+			const result = await initializer.setup({ force: false });
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+
+			expect(existsSync(join(globalRoot, ".taskp", "config.toml"))).toBe(true);
+			expect(existsSync(join(globalRoot, ".taskp", "skills"))).toBe(true);
+			expect(existsSync(join(globalRoot, ".taskp", "config.schema.json"))).toBe(false);
+			expect(existsSync(join(globalRoot, ".taplo.toml"))).toBe(false);
+		});
+
+		it("既存ファイルをスキップする（force なし）", async () => {
+			const configDir = join(localRoot, ".taskp");
+			mkdirSync(configDir, { recursive: true });
+			writeFileSync(join(configDir, "config.toml"), "existing content");
+
+			const initializer = createProjectInitializer({
+				baseDir: localRoot,
+				location: "project",
+			});
+
+			const result = await initializer.setup({ force: false });
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+
+			expect(result.value.skipped).toContain(".taskp/config.toml");
+
+			const content = readFileSync(join(configDir, "config.toml"), "utf-8");
+			expect(content).toBe("existing content");
+		});
+
+		it("force オプションで既存ファイルを上書きする", async () => {
+			const configDir = join(localRoot, ".taskp");
+			mkdirSync(configDir, { recursive: true });
+			writeFileSync(join(configDir, "config.toml"), "old content");
+
+			const initializer = createProjectInitializer({
+				baseDir: localRoot,
+				location: "project",
+			});
+
+			const result = await initializer.setup({ force: true });
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+
+			expect(result.value.created).toContain(".taskp/config.toml");
+
+			const content = readFileSync(join(configDir, "config.toml"), "utf-8");
+			expect(content).toContain("# default_provider");
 		});
 	});
 });
