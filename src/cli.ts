@@ -280,7 +280,6 @@ async function runAgentMode(
 	const aiConfig = configResult.value.ai ?? {};
 	const modelSpecResult = resolveModelSpec({
 		cliModel: c.options.model,
-		cliProvider: c.options.provider,
 		config: aiConfig,
 	});
 	if (!modelSpecResult.ok) {

@@ -98,7 +98,6 @@ async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConf
 	const aiConfig = configResult.value.ai ?? {};
 	const specResult = resolveModelSpec({
 		cliModel: options?.model,
-		cliProvider: options?.provider,
 		config: aiConfig,
 	});
 	if (!specResult.ok) return { model: null, modelSpec: null, hooksConfig, commandTimeoutMs };
