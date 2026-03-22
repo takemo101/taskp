@@ -45,6 +45,15 @@ export type RunSkillDeps = {
 	readonly hooksConfig?: HooksConfig;
 };
 
+function buildReservedVars(skill: Skill): ReservedVars {
+	return {
+		cwd: process.cwd(),
+		skillDir: dirname(skill.location),
+		date: new Date().toISOString().split("T")[0],
+		timestamp: new Date().toISOString(),
+	};
+}
+
 export async function runSkill(
 	input: RunSkillInput,
 	deps: RunSkillDeps,
@@ -102,12 +111,7 @@ async function runWithAction(
 	const progress = deps.progressWriter ?? createNoopProgressWriter();
 	progress.writeInputs(config.inputs, variables);
 
-	const reserved: ReservedVars = {
-		cwd: process.cwd(),
-		skillDir: dirname(skill.location),
-		date: new Date().toISOString().split("T")[0],
-		timestamp: new Date().toISOString(),
-	};
+	const reserved = buildReservedVars(skill);
 
 	const sectionContent = skill.body.extractActionSection(input.action);
 	if (!sectionContent) {
@@ -152,12 +156,7 @@ async function runWithoutAction(
 	const progress = deps.progressWriter ?? createNoopProgressWriter();
 	progress.writeInputs(skill.metadata.inputs, variables);
 
-	const reserved: ReservedVars = {
-		cwd: process.cwd(),
-		skillDir: dirname(skill.location),
-		date: new Date().toISOString().split("T")[0],
-		timestamp: new Date().toISOString(),
-	};
+	const reserved = buildReservedVars(skill);
 
 	const renderResult = renderTemplate(skill.body.content, variables, reserved);
 	if (!renderResult.ok) {
