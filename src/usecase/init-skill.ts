@@ -16,6 +16,7 @@ export type InitSkillInput = {
 	readonly name: string;
 	readonly global: boolean;
 	readonly mode: ExecutionMode;
+	readonly actions?: readonly string[];
 };
 
 type Deps = {
@@ -35,6 +36,7 @@ export async function initSkill(
 	const createResult = await deps.skillInitializer.create(input.name, {
 		mode: input.mode,
 		description: `${input.name} skill`,
+		actions: input.actions,
 	});
 
 	if (!createResult.ok) {

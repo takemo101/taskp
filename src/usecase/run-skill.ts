@@ -14,6 +14,7 @@ import type { SkillRepository } from "./port/skill-repository";
 
 export type RunSkillInput = {
 	readonly name: string;
+	readonly action?: string;
 	readonly presets: Readonly<Record<string, string>>;
 	readonly dryRun: boolean;
 	readonly force: boolean;

@@ -14,9 +14,11 @@ import { createSkillInitializer } from "./adapter/skill-initializer";
 import { createDefaultSkillLoader } from "./adapter/skill-loader";
 import { createStreamWriter } from "./adapter/stream-writer";
 import { createSystemPromptResolver } from "./adapter/system-prompt-resolver";
+import type { Action } from "./core/skill/action";
+import { resolveActionConfig } from "./core/skill/action";
 import type { ContextSource } from "./core/skill/context-source";
-import type { SkillScope } from "./core/skill/skill";
-import { type DomainError, domainErrorMessage, EXIT_CODE } from "./core/types/errors";
+import type { Skill, SkillScope } from "./core/skill/skill";
+import { type DomainError, domainErrorMessage, ErrorType, EXIT_CODE } from "./core/types/errors";
 import { type InitOutput, initSkill } from "./usecase/init-skill";
 import { createListSkillsUseCase } from "./usecase/list-skills";
 import { runAgentSkill } from "./usecase/run-agent-skill";
@@ -24,6 +26,29 @@ import type { RunOutput } from "./usecase/run-skill";
 import { runSkill } from "./usecase/run-skill";
 import type { ShowOutput } from "./usecase/show-skill";
 import { showSkill } from "./usecase/show-skill";
+
+type SkillRef = {
+	readonly name: string;
+	readonly action: string | undefined;
+};
+
+export function parseSkillRef(ref: string): SkillRef {
+	const parts = ref.split(":");
+	if (parts.length === 1) {
+		return { name: parts[0], action: undefined };
+	}
+	if (parts.length === 2) {
+		return { name: parts[0], action: parts[1] };
+	}
+	throw new InvalidSkillRefError(ref);
+}
+
+class InvalidSkillRefError extends Error {
+	constructor(ref: string) {
+		super(`Invalid skill reference "${ref}": expected "skill" or "skill:action"`);
+		this.name = "InvalidSkillRefError";
+	}
+}
 
 // --set key=value 形式の引数を Record に変換する。
 // "=" を含む値をサポートするため、最初の "=" のみで分割する
@@ -77,6 +102,31 @@ function formatError(error: DomainError): string {
 	return `Error: ${domainErrorMessage(error)}`;
 }
 
+function requireActionForActionsSkill(skill: Skill, actionName: string | undefined): void {
+	if (skill.metadata.actions && !actionName) {
+		const names = Object.keys(skill.metadata.actions).join(", ");
+		console.error(
+			`Error: Skill "${skill.metadata.name}" requires an action. Available actions: ${names}\nUse: taskp run ${skill.metadata.name}:<action> or use the TUI (taskp tui)`,
+		);
+		process.exit(EXIT_CODE[ErrorType.Config]);
+	}
+}
+
+function requireValidAction(skill: Skill, actionName: string | undefined): Action | undefined {
+	if (!actionName) return undefined;
+
+	const actions = skill.metadata.actions;
+	if (!actions || !(actionName in actions)) {
+		const available = actions ? Object.keys(actions).join(", ") : "none";
+		console.error(
+			`Error: Action "${actionName}" not found in skill "${skill.metadata.name}". Available actions: ${available}`,
+		);
+		process.exit(EXIT_CODE[ErrorType.SkillNotFound]);
+	}
+
+	return actions[actionName];
+}
+
 const cli = Cli.create("taskp", {
 	version: "0.1.4",
 	description:
@@ -85,7 +135,7 @@ const cli = Cli.create("taskp", {
 	.command("run", {
 		description: "Execute a skill",
 		args: z.object({
-			skill: z.string().describe("Skill name to execute"),
+			skill: z.string().describe("Skill name or skill:action to execute"),
 		}),
 		options: z.object({
 			model: z.string().optional().describe("LLM model to use"),
@@ -102,13 +152,21 @@ const cli = Cli.create("taskp", {
 			set: "s",
 		},
 		async run(c) {
+			let ref: SkillRef;
+			try {
+				ref = parseSkillRef(c.args.skill);
+			} catch {
+				console.error(
+					`Error: Invalid skill reference "${c.args.skill}": expected "skill" or "skill:action"`,
+				);
+				process.exit(EXIT_CODE[ErrorType.SkillNotFound]);
+			}
+
 			const presets = parsePresets(c.options.set ?? []);
 			const skillRepository = createDefaultSkillLoader(process.cwd());
 			const promptCollector = createPromptRunner();
 
-			// まずスキルを読み込んで mode を判定し、agent/template で処理を分岐する。
-			// agent モードは LLM 接続が必要なため、設定の読み込みやモデル解決が追加で発生する
-			const findResult = await skillRepository.findByName(c.args.skill);
+			const findResult = await skillRepository.findByName(ref.name);
 			if (!findResult.ok) {
 				console.error(formatError(findResult.error));
 				process.exit(EXIT_CODE[findResult.error.type]);
@@ -116,8 +174,21 @@ const cli = Cli.create("taskp", {
 
 			const skill = findResult.value;
 
-			if (skill.metadata.mode === "agent") {
-				await runAgentMode(c, presets, skillRepository, promptCollector);
+			requireActionForActionsSkill(skill, ref.action);
+			const action = requireValidAction(skill, ref.action);
+
+			// アクション指定時は resolveActionConfig で mode を決定
+			const effectiveMode = action
+				? resolveActionConfig(action, skill.metadata).mode
+				: skill.metadata.mode;
+
+			if (effectiveMode === "agent") {
+				await runAgentMode(
+					{ args: { skill: ref.name }, options: c.options },
+					presets,
+					skillRepository,
+					promptCollector,
+				);
 				return;
 			}
 
@@ -135,7 +206,8 @@ const cli = Cli.create("taskp", {
 
 			const result = await runSkill(
 				{
-					name: c.args.skill,
+					name: ref.name,
+					action: ref.action,
 					presets,
 					dryRun: c.options.dryRun ?? false,
 					force: c.options.force ?? false,
@@ -187,22 +259,27 @@ const cli = Cli.create("taskp", {
 		options: z.object({
 			global: z.boolean().optional().describe("Create in global directory"),
 			mode: z.enum(["template", "agent"]).optional().describe("Execution mode"),
+			actions: z.string().optional().describe("Comma-separated action names"),
 		}),
 		alias: {
 			global: "g",
 			mode: "m",
+			actions: "a",
 		},
 		async run(c) {
 			const isGlobal = c.options.global ?? false;
 			const baseDir = isGlobal ? homedir() : process.cwd();
 			const mode = c.options.mode ?? "template";
+			const actions = c.options.actions
+				? c.options.actions.split(",").map((a) => a.trim())
+				: undefined;
 
 			const skillRepository = createDefaultSkillLoader(process.cwd());
 			const skillInitializer = createSkillInitializer({ baseDir });
 
 			const result = await initSkill(
 				{ skillRepository, skillInitializer },
-				{ name: c.args.name, global: isGlobal, mode },
+				{ name: c.args.name, global: isGlobal, mode, actions },
 			);
 
 			if (!result.ok) {
@@ -216,11 +293,21 @@ const cli = Cli.create("taskp", {
 	.command("show", {
 		description: "Show skill details",
 		args: z.object({
-			skill: z.string().describe("Skill name to show"),
+			skill: z.string().describe("Skill name or skill:action to show"),
 		}),
 		async run(c) {
+			let ref: SkillRef;
+			try {
+				ref = parseSkillRef(c.args.skill);
+			} catch {
+				console.error(
+					`Error: Invalid skill reference "${c.args.skill}": expected "skill" or "skill:action"`,
+				);
+				process.exit(EXIT_CODE[ErrorType.SkillNotFound]);
+			}
+
 			const repository = createDefaultSkillLoader(process.cwd());
-			const result = await showSkill(c.args.skill, repository);
+			const result = await showSkill(ref.name, repository, ref.action);
 
 			if (!result.ok) {
 				console.error(formatError(result.error));
@@ -348,16 +435,31 @@ const ansi = {
 
 function printSkillTable(
 	skills: ReadonlyArray<{
-		metadata: { name: string; description: string };
+		metadata: {
+			name: string;
+			description: string;
+			actions?: Record<string, Action>;
+		};
 		location: string;
 		scope: SkillScope;
 	}>,
 ): void {
 	for (const skill of skills) {
 		const scopeLabel = ansi.dim(`(${skill.scope})`);
+		const actionsLabel = formatActionsLabel(skill.metadata.actions);
 		console.log(`${ansi.bold(ansi.cyan(skill.metadata.name))} ${scopeLabel}`);
 		console.log(`  ${skill.metadata.description}`);
+		if (actionsLabel) {
+			console.log(`  Actions: ${actionsLabel}`);
+		}
 	}
+}
+
+function formatActionsLabel(actions: Record<string, Action> | undefined): string | undefined {
+	if (!actions) return undefined;
+	const names = Object.keys(actions);
+	if (names.length === 0) return undefined;
+	return names.join(", ");
 }
 
 function formatShowOutput(output: ShowOutput): string {
@@ -367,6 +469,21 @@ function formatShowOutput(output: ShowOutput): string {
 		`Mode: ${output.mode}`,
 		`Location: ${output.location}`,
 	];
+
+	if (output.actions && output.actions.length > 0 && !output.actionDetail) {
+		lines.push("");
+		lines.push("Actions:");
+		for (const action of output.actions) {
+			lines.push(`  ${action.name}  ${action.description}`);
+		}
+	}
+
+	if (output.actionDetail) {
+		lines.push("");
+		lines.push(`Action: ${output.actionDetail.name}`);
+		lines.push(`  Description: ${output.actionDetail.description}`);
+		lines.push(`  Mode: ${output.actionDetail.mode}`);
+	}
 
 	if (output.inputs.length > 0) {
 		lines.push("");

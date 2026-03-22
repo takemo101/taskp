@@ -126,4 +126,61 @@ describe("showSkill", () => {
 		expect(result.value.inputs).toHaveLength(0);
 		expect(result.value.context).toHaveLength(0);
 	});
+
+	it("アクション付きスキルのアクション一覧を返す", async () => {
+		const skill = createSkill({
+			actions: {
+				add: { description: "タスクを追加" },
+				delete: { description: "タスクを削除" },
+			},
+		});
+		const repo = createRepository([skill]);
+
+		const result = await showSkill("deploy", repo);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.actions).toHaveLength(2);
+		expect(result.value.actions![0].name).toBe("add");
+		expect(result.value.actions![0].description).toBe("タスクを追加");
+		expect(result.value.actionDetail).toBeUndefined();
+	});
+
+	it("アクション指定時はアクション詳細を返す", async () => {
+		const skill = createSkill({
+			actions: {
+				add: {
+					description: "タスクを追加",
+					mode: "agent",
+					inputs: [{ name: "title", type: "text", message: "タスク名は？" }],
+				},
+			},
+		});
+		const repo = createRepository([skill]);
+
+		const result = await showSkill("deploy", repo, "add");
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.actionDetail).toBeDefined();
+		expect(result.value.actionDetail!.name).toBe("add");
+		expect(result.value.actionDetail!.mode).toBe("agent");
+		expect(result.value.inputs).toHaveLength(1);
+		expect(result.value.inputs[0].name).toBe("title");
+	});
+
+	it("存在しないアクション指定時はエラーを返す", async () => {
+		const skill = createSkill({
+			actions: {
+				add: { description: "タスクを追加" },
+			},
+		});
+		const repo = createRepository([skill]);
+
+		const result = await showSkill("deploy", repo, "unknown");
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("CONFIG_ERROR");
+	});
 });
