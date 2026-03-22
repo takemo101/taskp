@@ -143,7 +143,8 @@ function resolveProvider(
 	// LM Studio や vLLM など、OpenAI API 互換のローカルサーバーを
 	// 事前登録なしで利用可能にするため
 	if (providerConfig?.base_url !== undefined) {
-		return createLocalFactory()(model, providerConfig);
+		const useResponsesApi = providerConfig.api_type === "responses";
+		return createLocalFactory(undefined, { useResponsesApi })(model, providerConfig);
 	}
 
 	const knownNames = [...registry.keys()].join(", ");

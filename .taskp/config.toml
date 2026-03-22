@@ -1,7 +1,7 @@
 #:schema https://raw.githubusercontent.com/takemo101/taskp/main/.taskp/config.schema.json
 
 [ai]
-default_provider = "omlx"
+default_provider = "cli-proxy"
 
 [ai.providers.omlx]
 base_url = "http://127.0.0.1:8124/v1"
@@ -11,6 +11,11 @@ default_model = "Qwen3.5-4B-MLX-4bit"
 [ai.providers.ollama]
 base_url = "http://localhost:11434/v1"
 default_model = "qwen3.5:9b"
+
+[ai.providers.cli-proxy]
+base_url = "http://localhost:11434/v1"
+default_model = "qwen3.5:9b"
+use_responses_api = true
 
 [hooks]
 on_success = [

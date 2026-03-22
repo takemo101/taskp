@@ -39,6 +39,14 @@
                 "description": "Default model for this provider",
                 "type": "string",
                 "minLength": 1
+              },
+              "api_type": {
+                "description": "API type for custom OpenAI-compatible providers: 'chat' (Chat Completions API, default) or 'responses' (Responses API)",
+                "type": "string",
+                "enum": [
+                  "chat",
+                  "responses"
+                ]
               }
             },
             "additionalProperties": false

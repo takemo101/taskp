@@ -13,6 +13,12 @@ export const providerConfigSchema = z.object({
 	api_key_env: z.string().min(1).optional().describe("Environment variable name for API key"),
 	base_url: z.string().min(1).optional().describe("Custom endpoint URL"),
 	default_model: z.string().min(1).optional().describe("Default model for this provider"),
+	api_type: z
+		.enum(["chat", "responses"])
+		.optional()
+		.describe(
+			"API type for custom OpenAI-compatible providers: 'chat' (Chat Completions API, default) or 'responses' (Responses API)",
+		),
 });
 
 export const aiConfigSchema = z.object({

@@ -63,6 +63,7 @@ path = ".taskp/config.schema.json"
 | `api_key_env` | `string` | - | プロバイダ固有の環境変数名 | API キーの環境変数名 |
 | `base_url` | `string` | - | プロバイダ固有 | カスタムエンドポイント URL |
 | `default_model` | `string` | - | なし | プロバイダ別デフォルトモデル ※ |
+| `api_type` | `"chat" \| "responses"` | - | `"chat"` | カスタムプロバイダの API 形式。`chat` = Chat Completions API、`responses` = Responses API。組み込みプロバイダでは無視される |
 
 > ※ `default_model` はスキーマ上定義されているが、現在の実装（`resolveModelSpec`）では `ai.default_model` のみが参照される。プロバイダ別デフォルトモデルは将来対応予定。
 
@@ -142,6 +143,15 @@ default_model = "my-model"
 ```
 
 未登録のプロバイダ名でも `base_url` が設定されていれば OpenAI 互換プロトコルで接続する。
+
+デフォルトでは Chat Completions API を使用する。Responses API を使いたい場合は `api_type` を指定する:
+
+```toml
+[ai.providers.my-server]
+base_url = "http://192.168.1.100:8080/v1"
+default_model = "my-model"
+api_type = "responses"
+```
 
 ## `[cli]` — CLI 動作設定
 

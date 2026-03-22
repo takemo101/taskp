@@ -320,6 +320,39 @@ describe("createLanguageModel", () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.value.modelId).toBe("llama3");
+		// デフォルトは Chat Completions API（openai.chat）
+		expect(result.value.provider).toBe("openai.chat");
+	});
+
+	it("creates custom provider with api_type 'responses' using Responses API", () => {
+		const config: AiConfig = {
+			providers: {
+				"my-server": { base_url: "http://192.168.1.100:8080/v1", api_type: "responses" },
+			},
+		};
+
+		const result = createLanguageModel({ provider: "my-server", model: "gpt-4o" }, config);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.modelId).toBe("gpt-4o");
+		// Responses API は openai.responses
+		expect(result.value.provider).toBe("openai.responses");
+	});
+
+	it("creates custom provider with api_type 'chat' using Chat Completions API", () => {
+		const config: AiConfig = {
+			providers: {
+				"my-server": { base_url: "http://192.168.1.100:8080/v1", api_type: "chat" },
+			},
+		};
+
+		const result = createLanguageModel({ provider: "my-server", model: "llama3" }, config);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.modelId).toBe("llama3");
+		expect(result.value.provider).toBe("openai.chat");
 	});
 
 	it("returns error for unknown provider without base_url", () => {
