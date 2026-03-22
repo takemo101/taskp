@@ -1,5 +1,7 @@
 // Skill domain models
 
+export type { ActionSection } from "./action-section-parser";
+export { getActionSection, parseActionSections } from "./action-section-parser";
 export type { ContextSource } from "./context-source";
 export { parseContextSource } from "./context-source";
 export type { Skill, SkillScope } from "./skill";
