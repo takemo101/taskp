@@ -103,4 +103,88 @@ describe("taskp run (E2E)", () => {
 		expect(result.exitCode).toBe(2);
 		expect(result.stderr).toContain("not found");
 	});
+
+	const ACTION_SKILL = [
+		"---",
+		"name: task",
+		"description: Manage tasks",
+		"mode: template",
+		"actions:",
+		"  add:",
+		'    description: "Add a new task"',
+		"  delete:",
+		'    description: "Delete a task"',
+		"  list:",
+		'    description: "List tasks"',
+		"---",
+		"",
+		"# task",
+		"",
+		"## action: add",
+		"",
+		"```bash",
+		'echo "task added"',
+		"```",
+		"",
+		"## action: delete",
+		"",
+		"```bash",
+		'echo "task deleted"',
+		"```",
+		"",
+		"## action: list",
+		"",
+		"```bash",
+		'echo "task listed"',
+		"```",
+	].join("\n");
+
+	it("executes a skill action with task:add", async () => {
+		createSkillFile(projectDir, "task", ACTION_SKILL);
+
+		const result = await execaCommand(`bun run ${CLI_PATH} run task:add`, {
+			cwd: projectDir,
+			reject: false,
+		});
+
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout).toContain("task added");
+	});
+
+	it("exits with error for task:add:extra (too many colons)", async () => {
+		createSkillFile(projectDir, "task", ACTION_SKILL);
+
+		const result = await execaCommand(`bun run ${CLI_PATH} run task:add:extra`, {
+			cwd: projectDir,
+			reject: false,
+		});
+
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toContain("Invalid skill reference");
+	});
+
+	it("exits with error for task:unknown (nonexistent action)", async () => {
+		createSkillFile(projectDir, "task", ACTION_SKILL);
+
+		const result = await execaCommand(`bun run ${CLI_PATH} run task:unknown`, {
+			cwd: projectDir,
+			reject: false,
+		});
+
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toContain("not found");
+	});
+
+	it("exits with error when actions skill used without action", async () => {
+		createSkillFile(projectDir, "task", ACTION_SKILL);
+
+		const result = await execaCommand(`bun run ${CLI_PATH} run task`, {
+			cwd: projectDir,
+			reject: false,
+		});
+
+		expect(result.exitCode).toBe(4);
+		expect(result.stderr).toContain("requires an action");
+		expect(result.stderr).toContain("add, delete, list");
+	});
 });

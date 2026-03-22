@@ -80,4 +80,25 @@ describe("taskp init (E2E)", () => {
 		expect(result.stdout).toContain("path-test");
 		expect(result.stdout).toContain("SKILL.md");
 	});
+
+	it("creates a skill with --actions option", async () => {
+		const result = await execaCommand(
+			`bun run ${CLI_PATH} init my-task --actions add,delete,list`,
+			{ cwd: projectDir, reject: false },
+		);
+
+		expect(result.exitCode).toBe(0);
+
+		const skillPath = join(projectDir, ".taskp/skills/my-task/SKILL.md");
+		expect(existsSync(skillPath)).toBe(true);
+
+		const content = readFileSync(skillPath, "utf-8");
+		expect(content).toContain("actions:");
+		expect(content).toContain("add:");
+		expect(content).toContain("delete:");
+		expect(content).toContain("list:");
+		expect(content).toContain("## action: add");
+		expect(content).toContain("## action: delete");
+		expect(content).toContain("## action: list");
+	});
 });

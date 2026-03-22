@@ -94,4 +94,36 @@ describe("taskp list E2E", () => {
 
 		expect(skills).toHaveLength(0);
 	});
+
+	it("アクション付きスキルの actions フィールドが含まれる", async () => {
+		const dir = join(localRoot, ".taskp", "skills", "task");
+		mkdirSync(dir, { recursive: true });
+		writeFileSync(
+			join(dir, "SKILL.md"),
+			[
+				"---",
+				"name: task",
+				'description: "タスクを管理する"',
+				"mode: template",
+				"actions:",
+				"  add:",
+				'    description: "タスクを追加"',
+				"  delete:",
+				'    description: "タスクを削除"',
+				"  list:",
+				'    description: "タスク一覧"',
+				"---",
+				"",
+				"# task",
+			].join("\n"),
+		);
+
+		const repository = createSkillLoader({ localRoot, globalRoot });
+		const usecase = createListSkillsUseCase(repository);
+		const { skills } = await usecase.execute({});
+
+		expect(skills).toHaveLength(1);
+		expect(skills[0].metadata.actions).toBeDefined();
+		expect(Object.keys(skills[0].metadata.actions!)).toEqual(["add", "delete", "list"]);
+	});
 });
