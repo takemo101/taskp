@@ -49,6 +49,13 @@ const GLOBAL_CONFIG_TEMPLATE = `# taskp — グローバル設定ファイル
 # [ai.providers.ollama]
 # base_url = "http://localhost:11434/v1"
 # default_model = "qwen2.5-coder:32b"
+
+# [cli]
+# command_timeout_ms = 30000
+
+# [hooks]
+# on_success = []
+# on_failure = []
 `;
 
 const TAPLO_CONTENT = `[[rule]]
