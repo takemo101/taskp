@@ -5,9 +5,10 @@ export { createAgentLoop } from "./agent-loop.js";
 export type {
 	AnyTool,
 	BuildToolsOptions,
+	DescriptionOverrides,
 	TaskpRunDeps,
 	TaskpRunResult,
 	ToolName,
 } from "./agent-tools.js";
-export { buildTools, TOOL_NAMES } from "./agent-tools.js";
+export { buildTaskpRunDescription, buildTools, TOOL_NAMES } from "./agent-tools.js";
 export type { ExecutionMode } from "./execution-mode.js";
