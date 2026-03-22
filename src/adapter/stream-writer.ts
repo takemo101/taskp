@@ -1,3 +1,5 @@
+import { getPrimaryArgKey } from "../core/execution/agent-tools";
+
 export type StreamWriterOptions = {
 	readonly verbose: boolean;
 	readonly output: NodeJS.WritableStream;
@@ -22,7 +24,6 @@ export function createStreamWriter(options: StreamWriterOptions): StreamWriter {
 		},
 
 		writeToolResult(toolName: string, result: unknown): void {
-			// ツール結果は冗長になりがちなので、--verbose 時のみ表示
 			if (!options.verbose) return;
 			const text = typeof result === "string" ? result : JSON.stringify(result, null, 2);
 			options.output.write(`[result: ${toolName}]\n${text}\n`);
@@ -35,20 +36,8 @@ export function createStreamWriter(options: StreamWriterOptions): StreamWriter {
 	};
 }
 
-// ツールごとに最も重要な引数だけを表示して、ログの可読性を保つ
 function formatToolArgs(toolName: string, args: Record<string, unknown>): string {
-	switch (toolName) {
-		case "bash":
-			return String(args.command);
-		case "read":
-			return String(args.path);
-		case "write":
-			return String(args.path);
-		case "glob":
-			return String(args.pattern);
-		case "ask_user":
-			return String(args.question);
-		default:
-			return JSON.stringify(args);
-	}
+	const key = getPrimaryArgKey(toolName);
+	if (key) return String(args[key]);
+	return JSON.stringify(args);
 }
