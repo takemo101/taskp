@@ -14,11 +14,12 @@ describe("buildTools", () => {
 		expect(result.value.read.execute).toBeTypeOf("function");
 	});
 
-	it("すべてのツールを取得できる", () => {
-		const result = buildTools([...TOOL_NAMES]);
+	it("taskp_run 以外の静的ツールをすべて取得できる", () => {
+		const staticNames = TOOL_NAMES.filter((n) => n !== "taskp_run");
+		const result = buildTools(staticNames);
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
-		expect(Object.keys(result.value)).toHaveLength(5);
+		expect(Object.keys(result.value)).toHaveLength(staticNames.length);
 	});
 
 	it("空のツール名配列で空のオブジェクトを返す", () => {

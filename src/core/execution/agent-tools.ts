@@ -4,7 +4,11 @@ import type { JSONSchema7, Tool } from "ai";
 import { jsonSchema } from "ai";
 import { execa } from "execa";
 import { toJSONSchema, z } from "zod";
-import { type ExecutionError, executionError } from "../types/errors";
+import type { CommandExecutor } from "../../usecase/port/command-executor";
+import type { PromptCollector } from "../../usecase/port/prompt-collector";
+import type { SkillRepository } from "../../usecase/port/skill-repository";
+import { type RunOutput, runSkill } from "../../usecase/run-skill";
+import { domainErrorMessage, type ExecutionError, executionError } from "../types/errors";
 import { err, ok, type Result } from "../types/result";
 
 // Vercel AI SDK は JSONSchema7 形式のツール定義を要求するが、
@@ -14,7 +18,7 @@ function zodToJsonSchema<T extends z.ZodType>(schema: T) {
 	return jsonSchema<z.infer<T>>(toJSONSchema(schema) as JSONSchema7);
 }
 
-const TOOL_NAMES = ["bash", "read", "write", "glob", "ask_user"] as const;
+const TOOL_NAMES = ["bash", "read", "write", "glob", "ask_user", "taskp_run"] as const;
 type ToolName = (typeof TOOL_NAMES)[number];
 
 const bashParams = z.object({
@@ -39,6 +43,14 @@ const globParams = z.object({
 
 const askUserParams = z.object({
 	question: z.string().describe("The question to ask the user"),
+});
+
+const taskpRunParams = z.object({
+	skill: z.string().describe("Skill reference to run. Format: '<skill>' or '<skill>:<action>'."),
+	set: z
+		.record(z.string(), z.string())
+		.optional()
+		.describe("Variables to pass to the skill inputs (skips interactive prompts)."),
 });
 
 type BashInput = z.infer<typeof bashParams>;
@@ -119,7 +131,8 @@ const askUserTool: Tool<AskUserInput, string> = {
 // 1つの Record にまとめるには型パラメータを消去する必要がある
 type AnyTool = Tool<Record<string, unknown>, unknown>;
 
-const allTools: Record<ToolName, AnyTool> = {
+// taskp_run 以外の静的ツール
+const staticTools: Record<string, AnyTool> = {
 	bash: bashTool as AnyTool,
 	read: readTool as AnyTool,
 	write: writeTool as AnyTool,
@@ -127,12 +140,130 @@ const allTools: Record<ToolName, AnyTool> = {
 	ask_user: askUserTool as AnyTool,
 };
 
+const MAX_NESTING_DEPTH = 3;
+
+type TaskpRunInput = z.infer<typeof taskpRunParams>;
+
+type TaskpRunResult = {
+	readonly status: "success" | "failed";
+	readonly output: string;
+	readonly error?: string;
+};
+
+type TaskpRunDeps = {
+	readonly skillRepository: SkillRepository;
+	readonly commandExecutor: CommandExecutor;
+	readonly promptCollector: PromptCollector;
+	readonly callStack?: readonly string[];
+};
+
+function parseSkillRef(ref: string): {
+	readonly name: string;
+	readonly action: string | undefined;
+} {
+	const colonIndex = ref.indexOf(":");
+	if (colonIndex === -1) {
+		return { name: ref, action: undefined };
+	}
+	return { name: ref.slice(0, colonIndex), action: ref.slice(colonIndex + 1) };
+}
+
+function buildTaskpRunOutput(runOutput: RunOutput): string {
+	const parts: string[] = [runOutput.rendered];
+	for (const cmd of runOutput.commands) {
+		if (cmd.result.stdout) parts.push(cmd.result.stdout);
+		if (cmd.result.stderr) parts.push(cmd.result.stderr);
+	}
+	return parts.join("\n");
+}
+
+function createTaskpRunTool(deps: TaskpRunDeps): AnyTool {
+	const callStack = deps.callStack ?? [];
+
+	const tool: Tool<TaskpRunInput, TaskpRunResult> = {
+		description:
+			"Run another taskp skill (template mode only). Use to invoke predefined skills with variable inputs.",
+		inputSchema: zodToJsonSchema(taskpRunParams),
+		execute: async ({ skill, set }) => {
+			const ref = parseSkillRef(skill);
+			const skillId = ref.action ? `${ref.name}:${ref.action}` : ref.name;
+
+			if (callStack.includes(skillId)) {
+				return { status: "failed", output: "", error: `Recursive call detected: ${skillId}` };
+			}
+
+			if (callStack.length >= MAX_NESTING_DEPTH) {
+				return {
+					status: "failed",
+					output: "",
+					error: `Maximum nesting depth (${MAX_NESTING_DEPTH}) exceeded`,
+				};
+			}
+
+			const findResult = await deps.skillRepository.findByName(ref.name);
+			if (!findResult.ok) {
+				return { status: "failed", output: "", error: `Skill not found: ${ref.name}` };
+			}
+
+			const foundSkill = findResult.value;
+
+			const effectiveMode = ref.action
+				? (foundSkill.metadata.actions?.[ref.action]?.mode ?? foundSkill.metadata.mode)
+				: foundSkill.metadata.mode;
+
+			if (effectiveMode === "agent") {
+				return {
+					status: "failed",
+					output: "",
+					error: `Cannot call agent mode skill: ${skillId}. Only template mode skills are allowed.`,
+				};
+			}
+
+			const result = await runSkill(
+				{
+					name: ref.name,
+					action: ref.action,
+					presets: (set ?? {}) as Readonly<Record<string, string>>,
+					dryRun: false,
+					force: false,
+					noInput: true,
+				},
+				{
+					skillRepository: deps.skillRepository,
+					commandExecutor: deps.commandExecutor,
+					promptCollector: deps.promptCollector,
+				},
+			);
+
+			if (!result.ok) {
+				return { status: "failed", output: "", error: domainErrorMessage(result.error) };
+			}
+
+			return { status: "success", output: buildTaskpRunOutput(result.value) };
+		},
+	};
+
+	return tool as AnyTool;
+}
+
+export type BuildToolsOptions = {
+	readonly taskpRunDeps?: TaskpRunDeps;
+};
+
 export function buildTools(
 	toolNames: readonly string[],
+	options?: BuildToolsOptions,
 ): Result<Record<string, AnyTool>, ExecutionError> {
 	const tools: Record<string, AnyTool> = {};
 	for (const name of toolNames) {
-		const t = allTools[name as ToolName];
+		if (name === "taskp_run") {
+			if (!options?.taskpRunDeps) {
+				return err(executionError("taskp_run requires taskpRunDeps in BuildToolsOptions"));
+			}
+			tools[name] = createTaskpRunTool(options.taskpRunDeps);
+			continue;
+		}
+		const t = staticTools[name];
 		if (t === undefined) {
 			return err(executionError(`Unknown tool: ${name}`));
 		}
@@ -143,8 +274,11 @@ export function buildTools(
 
 /** ツール名からその description を返す。未知のツール名は undefined を返す。 */
 export function getToolDescription(name: string): string | undefined {
-	return allTools[name as ToolName]?.description;
+	if (name === "taskp_run") {
+		return "Run another taskp skill (template mode only). Use to invoke predefined skills with variable inputs.";
+	}
+	return staticTools[name]?.description;
 }
 
-export type { AnyTool, ToolName };
+export type { AnyTool, TaskpRunDeps, TaskpRunResult, ToolName };
 export { TOOL_NAMES };
