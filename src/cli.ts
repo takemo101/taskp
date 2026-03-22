@@ -19,6 +19,7 @@ import type { Action } from "./core/skill/action";
 import { resolveActionConfig } from "./core/skill/action";
 import type { ContextSource } from "./core/skill/context-source";
 import type { Skill, SkillScope } from "./core/skill/skill";
+import { parseSkillRef } from "./core/skill/skill-ref";
 import { type DomainError, domainErrorMessage, ErrorType, EXIT_CODE } from "./core/types/errors";
 import { type InitOutput, initSkill } from "./usecase/init-skill";
 import { createListSkillsUseCase } from "./usecase/list-skills";
@@ -29,29 +30,6 @@ import type { SetupOutput } from "./usecase/setup-project";
 import { setupProject } from "./usecase/setup-project";
 import type { ShowOutput } from "./usecase/show-skill";
 import { showSkill } from "./usecase/show-skill";
-
-type SkillRef = {
-	readonly name: string;
-	readonly action: string | undefined;
-};
-
-export function parseSkillRef(ref: string): SkillRef {
-	const parts = ref.split(":");
-	if (parts.length === 1) {
-		return { name: parts[0], action: undefined };
-	}
-	if (parts.length === 2) {
-		return { name: parts[0], action: parts[1] };
-	}
-	throw new InvalidSkillRefError(ref);
-}
-
-class InvalidSkillRefError extends Error {
-	constructor(ref: string) {
-		super(`Invalid skill reference "${ref}": expected "skill" or "skill:action"`);
-		this.name = "InvalidSkillRefError";
-	}
-}
 
 // --set key=value 形式の引数を Record に変換する。
 // "=" を含む値をサポートするため、最初の "=" のみで分割する
@@ -178,15 +156,12 @@ const cli = Cli.create("taskp", {
 			set: "s",
 		},
 		async run(c) {
-			let ref: SkillRef;
-			try {
-				ref = parseSkillRef(c.args.skill);
-			} catch {
-				console.error(
-					`Error: Invalid skill reference "${c.args.skill}": expected "skill" or "skill:action"`,
-				);
-				process.exit(EXIT_CODE[ErrorType.SkillNotFound]);
+			const refResult = parseSkillRef(c.args.skill);
+			if (!refResult.ok) {
+				console.error(`Error: ${refResult.error.message}`);
+				process.exit(EXIT_CODE[ErrorType.Parse]);
 			}
+			const ref = refResult.value;
 
 			const presets = parsePresets(c.options.set ?? []);
 			const skillRepository = createDefaultSkillLoader(process.cwd());
@@ -322,15 +297,12 @@ const cli = Cli.create("taskp", {
 			skill: z.string().describe("Skill name or skill:action to show"),
 		}),
 		async run(c) {
-			let ref: SkillRef;
-			try {
-				ref = parseSkillRef(c.args.skill);
-			} catch {
-				console.error(
-					`Error: Invalid skill reference "${c.args.skill}": expected "skill" or "skill:action"`,
-				);
-				process.exit(EXIT_CODE[ErrorType.SkillNotFound]);
+			const refResult = parseSkillRef(c.args.skill);
+			if (!refResult.ok) {
+				console.error(`Error: ${refResult.error.message}`);
+				process.exit(EXIT_CODE[ErrorType.Parse]);
 			}
+			const ref = refResult.value;
 
 			const repository = createDefaultSkillLoader(process.cwd());
 			const result = await showSkill(ref.name, repository, ref.action);

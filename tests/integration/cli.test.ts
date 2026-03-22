@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execaCommand } from "execa";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { parseSkillRef } from "../../src/cli";
+import { parseSkillRef } from "../../src/core/skill/skill-ref";
 
 const CLI_PATH = join(import.meta.dirname, "../../src/cli.ts");
 
@@ -13,15 +13,21 @@ function run(args: string, cwd: string) {
 
 describe("parseSkillRef", () => {
 	it("parses skill name without action", () => {
-		expect(parseSkillRef("task")).toEqual({ name: "task", action: undefined });
+		const result = parseSkillRef("task");
+		expect(result.ok).toBe(true);
+		expect(result.ok && result.value).toEqual({ name: "task", action: undefined });
 	});
 
 	it("parses skill:action format", () => {
-		expect(parseSkillRef("task:add")).toEqual({ name: "task", action: "add" });
+		const result = parseSkillRef("task:add");
+		expect(result.ok).toBe(true);
+		expect(result.ok && result.value).toEqual({ name: "task", action: "add" });
 	});
 
-	it("throws on skill:action:extra format", () => {
-		expect(() => parseSkillRef("task:add:extra")).toThrow("Invalid skill reference");
+	it("returns error on skill:action:extra format", () => {
+		const result = parseSkillRef("task:add:extra");
+		expect(result.ok).toBe(false);
+		expect(!result.ok && result.error.message).toContain("Invalid skill reference");
 	});
 });
 
