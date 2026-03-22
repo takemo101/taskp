@@ -176,39 +176,35 @@ async function askPassword(skillInput: SkillInput): Promise<Result<string, Execu
 	}
 }
 
-function buildValidator(
-	skillInput: SkillInput,
-): Result<((value: string) => string | true) | undefined, ExecutionError> {
-	if (!skillInput.validate) return ok(undefined);
+function buildValidatorFn<T>(
+	pattern: string | undefined,
+	format: (value: T) => string | undefined,
+): Result<((value: T) => string | true) | undefined, ExecutionError> {
+	if (!pattern) return ok(undefined);
 
-	const regexResult = compileRegex(skillInput.validate);
+	const regexResult = compileRegex(pattern);
 	if (!regexResult.ok) return regexResult;
 
 	const regex = regexResult.value;
-	return ok((value: string) => {
-		if (!regex.test(value)) {
-			return `Input must match pattern: ${skillInput.validate}`;
-		}
-		return true;
+	return ok((value: T) => {
+		const formatted = format(value);
+		if (formatted === undefined) return true;
+		return regex.test(formatted) ? true : `Input must match pattern: ${pattern}`;
 	});
+}
+
+function buildValidator(
+	skillInput: SkillInput,
+): Result<((value: string) => string | true) | undefined, ExecutionError> {
+	return buildValidatorFn(skillInput.validate, (value: string) => value);
 }
 
 function buildNumberValidator(
 	skillInput: SkillInput,
 ): Result<((value: number | undefined) => string | true) | undefined, ExecutionError> {
-	if (!skillInput.validate) return ok(undefined);
-
-	const regexResult = compileRegex(skillInput.validate);
-	if (!regexResult.ok) return regexResult;
-
-	const regex = regexResult.value;
-	return ok((value: number | undefined) => {
-		if (value === undefined) return true;
-		if (!regex.test(String(value))) {
-			return `Input must match pattern: ${skillInput.validate}`;
-		}
-		return true;
-	});
+	return buildValidatorFn(skillInput.validate, (value: number | undefined) =>
+		value === undefined ? undefined : String(value),
+	);
 }
 
 function compileRegex(pattern: string): Result<RegExp, ExecutionError> {
