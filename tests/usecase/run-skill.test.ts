@@ -416,4 +416,179 @@ echo "step 2 {{env}}"
 			expect(hookExecutor.execute).not.toHaveBeenCalled();
 		});
 	});
+
+	describe("action support", () => {
+		const ACTION_SKILL_MD = `---
+name: task
+description: Task manager
+mode: template
+actions:
+  add:
+    description: Add a task
+    inputs:
+      - name: title
+        type: text
+        message: "Task title?"
+  list:
+    description: List tasks
+---
+
+## action: add
+
+Add task: {{title}}
+
+\`\`\`bash
+echo "adding {{title}}"
+\`\`\`
+
+## action: list
+
+\`\`\`bash
+echo "listing tasks"
+\`\`\`
+`;
+
+		function createActionSkill(): Skill {
+			return {
+				metadata: {
+					name: "task",
+					description: "Task manager",
+					mode: "template",
+					inputs: [],
+					model: undefined,
+					tools: ["bash", "read", "write"],
+					context: [],
+					actions: {
+						add: {
+							description: "Add a task",
+							inputs: [{ name: "title", type: "text", message: "Task title?" }],
+						},
+						list: {
+							description: "List tasks",
+						},
+					},
+				},
+				body: createSkillBody(ACTION_SKILL_MD),
+				location: "/skills/task",
+				scope: "global",
+			};
+		}
+
+		it("executes only the specified action's code blocks", async () => {
+			const executedCommands: string[] = [];
+			const deps = createDeps({
+				skillRepository: stubRepository(createActionSkill()),
+				promptCollector: stubCollector({}),
+				commandExecutor: {
+					execute: async (command: string) => {
+						executedCommands.push(command);
+						return ok({ stdout: `ok: ${command}`, stderr: "", exitCode: 0 });
+					},
+				},
+			});
+
+			const result = await runSkill(createInput({ name: "task", action: "list" }), deps);
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.commands).toHaveLength(1);
+			expect(result.value.commands[0].command).toContain("listing tasks");
+			expect(executedCommands).not.toContain(expect.stringContaining("adding"));
+		});
+
+		it("collects action-specific inputs", async () => {
+			let collectedInputNames: string[] = [];
+			const deps = createDeps({
+				skillRepository: stubRepository(createActionSkill()),
+				promptCollector: {
+					collect: async (inputs, _presets) => {
+						collectedInputNames = inputs.map((i) => i.name);
+						return ok({ title: "my task" });
+					},
+				},
+			});
+
+			const result = await runSkill(createInput({ name: "task", action: "add" }), deps);
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(collectedInputNames).toEqual(["title"]);
+			expect(result.value.commands[0].command).toContain("adding my task");
+		});
+
+		it("returns error for non-existent action", async () => {
+			const deps = createDeps({
+				skillRepository: stubRepository(createActionSkill()),
+				promptCollector: stubCollector({}),
+			});
+
+			const result = await runSkill(createInput({ name: "task", action: "nonexistent" }), deps);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("EXECUTION_ERROR");
+			if (result.error.type !== "EXECUTION_ERROR") return;
+			expect(result.error.message).toContain("nonexistent");
+		});
+
+		it("returns error when action is not specified for skill with actions", async () => {
+			const deps = createDeps({
+				skillRepository: stubRepository(createActionSkill()),
+				promptCollector: stubCollector({}),
+			});
+
+			const result = await runSkill(createInput({ name: "task" }), deps);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("EXECUTION_ERROR");
+			if (result.error.type !== "EXECUTION_ERROR") return;
+			expect(result.error.message).toContain("actions defined");
+		});
+
+		it("supports --set presets for action variables", async () => {
+			const deps = createDeps({
+				skillRepository: stubRepository(createActionSkill()),
+				promptCollector: {
+					collect: async (_inputs, presets) => ok({ title: "default", ...presets }),
+				},
+			});
+
+			const result = await runSkill(
+				createInput({ name: "task", action: "add", presets: { title: "preset task" } }),
+				deps,
+			);
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.commands[0].command).toContain("adding preset task");
+		});
+
+		it("returns rendered content without executing in --dry-run mode for action", async () => {
+			const deps = createDeps({
+				skillRepository: stubRepository(createActionSkill()),
+				promptCollector: stubCollector({ title: "dry run task" }),
+			});
+
+			const result = await runSkill(
+				createInput({ name: "task", action: "add", dryRun: true }),
+				deps,
+			);
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.dryRun).toBe(true);
+			expect(result.value.commands).toHaveLength(0);
+			expect(result.value.rendered).toContain("adding dry run task");
+		});
+
+		it("does not break existing non-action skills", async () => {
+			const result = await runSkill(createInput(), createDeps());
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.skillName).toBe("deploy");
+			expect(result.value.commands).toHaveLength(1);
+		});
+	});
 });
