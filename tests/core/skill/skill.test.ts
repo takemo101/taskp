@@ -84,6 +84,16 @@ describe("parseSkill", () => {
 			expect(result.value.scope).toBe("global");
 		});
 
+		it("with-actions フィクスチャをパースできる", () => {
+			const raw = readFixture("with-actions");
+			const result = parseSkill(raw, "/project/.taskp/skills/manage/SKILL.md");
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+
+			expect(result.value.metadata.actions).toBeDefined();
+			expect(result.value.body.extractActionCodeBlocks("add", "bash")).toHaveLength(1);
+		});
+
 		it("invalid-frontmatter フィクスチャでエラーになる", () => {
 			const raw = readFixture("invalid-frontmatter");
 			const result = parseSkill(raw, "/path/to/SKILL.md");
@@ -100,6 +110,133 @@ describe("parseSkill", () => {
 			if (!result.ok) return;
 
 			expect(result.value.metadata.context).toHaveLength(4);
+		});
+	});
+
+	describe("アクションバリデーション", () => {
+		it("actions キーに対応するセクションがない場合エラーになる", () => {
+			const raw = [
+				"---",
+				"name: manage",
+				'description: "管理スキル"',
+				"actions:",
+				"  add:",
+				'    description: "追加"',
+				"  delete:",
+				'    description: "削除"',
+				"---",
+				"",
+				"## action:add",
+				"",
+				"```bash",
+				"echo add",
+				"```",
+			].join("\n");
+
+			const result = parseSkill(raw, "/path/to/SKILL.md");
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+
+			expect(result.error.type).toBe("PARSE_ERROR");
+			expect(result.error.message).toContain("delete");
+			expect(result.error.message).toContain("no corresponding");
+		});
+
+		it("セクションがあるが actions に定義がない場合エラーになる", () => {
+			const raw = [
+				"---",
+				"name: manage",
+				'description: "管理スキル"',
+				"actions:",
+				"  add:",
+				'    description: "追加"',
+				"---",
+				"",
+				"## action:add",
+				"",
+				"```bash",
+				"echo add",
+				"```",
+				"",
+				"## action:delete",
+				"",
+				"```bash",
+				"echo delete",
+				"```",
+			].join("\n");
+
+			const result = parseSkill(raw, "/path/to/SKILL.md");
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+
+			expect(result.error.type).toBe("PARSE_ERROR");
+			expect(result.error.message).toContain("delete");
+			expect(result.error.message).toContain("not defined in actions");
+		});
+
+		it("template モードのアクションにコードブロックがない場合エラーになる", () => {
+			const raw = [
+				"---",
+				"name: manage",
+				'description: "管理スキル"',
+				"mode: template",
+				"actions:",
+				"  add:",
+				'    description: "追加"',
+				"---",
+				"",
+				"## action:add",
+				"",
+				"No code blocks here.",
+			].join("\n");
+
+			const result = parseSkill(raw, "/path/to/SKILL.md");
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+
+			expect(result.error.type).toBe("PARSE_ERROR");
+			expect(result.error.message).toContain("requires at least one code block");
+		});
+
+		it("agent モードのアクションはコードブロックなしでもパースできる", () => {
+			const raw = [
+				"---",
+				"name: manage",
+				'description: "管理スキル"',
+				"mode: agent",
+				"actions:",
+				"  review:",
+				'    description: "レビュー"',
+				"---",
+				"",
+				"## action:review",
+				"",
+				"Please review the code.",
+			].join("\n");
+
+			const result = parseSkill(raw, "/path/to/SKILL.md");
+			expect(result.ok).toBe(true);
+		});
+
+		it("アクション個別に agent モードを指定した場合コードブロック不要", () => {
+			const raw = [
+				"---",
+				"name: manage",
+				'description: "管理スキル"',
+				"mode: template",
+				"actions:",
+				"  review:",
+				'    description: "レビュー"',
+				"    mode: agent",
+				"---",
+				"",
+				"## action:review",
+				"",
+				"Please review the code.",
+			].join("\n");
+
+			const result = parseSkill(raw, "/path/to/SKILL.md");
+			expect(result.ok).toBe(true);
 		});
 	});
 });

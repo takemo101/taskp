@@ -15,7 +15,12 @@ function createSkill(name: string, scope: SkillScope): Skill {
 			tools: ["bash", "read", "write"],
 			context: [],
 		},
-		body: { content: `# ${name}`, extractCodeBlocks: () => [] },
+		body: {
+			content: `# ${name}`,
+			extractCodeBlocks: () => [],
+			extractActionSection: () => undefined,
+			extractActionCodeBlocks: () => [],
+		},
 		location:
 			scope === "local" ? `/project/.taskp/skills/${name}/SKILL.md` : `/global/${name}/SKILL.md`,
 		scope,

@@ -1,6 +1,8 @@
 import matter from "gray-matter";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
+import type { ActionSection } from "./action-section-parser";
+import { getActionSection, parseActionSections } from "./action-section-parser";
 
 export interface CodeBlock {
 	readonly lang: string;
@@ -10,6 +12,8 @@ export interface CodeBlock {
 export interface SkillBody {
 	readonly content: string;
 	readonly extractCodeBlocks: (lang?: string) => readonly CodeBlock[];
+	readonly extractActionSection: (name: string) => string | undefined;
+	readonly extractActionCodeBlocks: (name: string, lang?: string) => readonly CodeBlock[];
 }
 
 export function createSkillBody(rawMarkdown: string): SkillBody {
@@ -17,9 +21,29 @@ export function createSkillBody(rawMarkdown: string): SkillBody {
 	// （メタデータは SkillMetadata 側で管理するため分離）
 	const { content } = matter(rawMarkdown);
 
+	// アクションセクションは content から一度だけパースしてキャッシュする
+	let cachedSections: readonly ActionSection[] | null = null;
+	const getSections = (): readonly ActionSection[] => {
+		if (cachedSections === null) {
+			const result = parseActionSections(rawMarkdown);
+			if (!result.ok) return [];
+			cachedSections = result.value;
+		}
+		return cachedSections;
+	};
+
 	return {
 		content,
 		extractCodeBlocks: (lang = "bash") => extractCodeBlocks(content, lang),
+		extractActionSection: (name: string) => {
+			const section = getActionSection(getSections(), name);
+			return section?.content;
+		},
+		extractActionCodeBlocks: (name: string, lang = "bash") => {
+			const section = getActionSection(getSections(), name);
+			if (!section) return [];
+			return extractCodeBlocks(section.content, lang);
+		},
 	};
 }
 

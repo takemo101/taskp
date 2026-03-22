@@ -3,6 +3,37 @@ import { createSkillBody } from "../../../src/core/skill/skill-body";
 
 const withFrontmatter = (body: string) => `---\nname: test\ndescription: test skill\n---\n${body}`;
 
+const withActionSections = () =>
+	withFrontmatter(
+		[
+			"",
+			"# Overview",
+			"",
+			"General description.",
+			"",
+			"## action:add",
+			"",
+			"Add something.",
+			"",
+			"```bash",
+			"echo add",
+			"```",
+			"",
+			"## action:delete",
+			"",
+			"Delete something.",
+			"",
+			"```bash",
+			"echo delete",
+			"```",
+			"",
+			"```python",
+			"print('delete')",
+			"```",
+			"",
+		].join("\n"),
+	);
+
 describe("createSkillBody", () => {
 	it("フロントマターを除去した本文を保持する", () => {
 		const raw = withFrontmatter("\n# Title\n\nSome content\n");
@@ -88,5 +119,46 @@ describe("extractCodeBlocks", () => {
 		const blocks = body.extractCodeBlocks("python");
 
 		expect(blocks).toEqual([{ lang: "python", code: "print('hi')" }]);
+	});
+});
+
+describe("extractActionSection", () => {
+	it("指定アクション名のセクション内容を返す", () => {
+		const body = createSkillBody(withActionSections());
+		const content = body.extractActionSection("add");
+
+		expect(content).toBeDefined();
+		expect(content).toContain("Add something.");
+		expect(content).toContain("echo add");
+	});
+
+	it("存在しないアクション名は undefined を返す", () => {
+		const body = createSkillBody(withActionSections());
+		const content = body.extractActionSection("nonexistent");
+
+		expect(content).toBeUndefined();
+	});
+});
+
+describe("extractActionCodeBlocks", () => {
+	it("指定アクションの bash コードブロックを返す", () => {
+		const body = createSkillBody(withActionSections());
+		const blocks = body.extractActionCodeBlocks("add");
+
+		expect(blocks).toEqual([{ lang: "bash", code: "echo add" }]);
+	});
+
+	it("lang 引数で任意の言語を指定して抽出できる", () => {
+		const body = createSkillBody(withActionSections());
+		const blocks = body.extractActionCodeBlocks("delete", "python");
+
+		expect(blocks).toEqual([{ lang: "python", code: "print('delete')" }]);
+	});
+
+	it("存在しないアクション名は空配列を返す", () => {
+		const body = createSkillBody(withActionSections());
+		const blocks = body.extractActionCodeBlocks("nonexistent");
+
+		expect(blocks).toEqual([]);
 	});
 });
