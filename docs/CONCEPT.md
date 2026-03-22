@@ -61,6 +61,20 @@ taskp init my-task
 # → ./.taskp/skills/my-task/SKILL.md が生成される
 ```
 
+### UC-5: プロジェクト初期化
+
+```bash
+taskp setup
+# → .taskp/config.toml（設定テンプレート）
+# → .taskp/config.schema.json（エディタ補完用）
+# → .taskp/skills/（スキル格納ディレクトリ）
+# → .taplo.toml（TOML LSP 設定）
+
+taskp setup --global
+# → ~/.taskp/config.toml（グローバル設定テンプレート）
+# → ~/.taskp/skills/（グローバルスキル格納ディレクトリ）
+```
+
 ## 設計方針
 
 ### 1. スキルはマークダウン
