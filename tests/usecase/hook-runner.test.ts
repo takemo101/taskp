@@ -124,4 +124,41 @@ describe("runHooks", () => {
 
 		expect(executor.calls[0].context).toEqual(context);
 	});
+
+	it("passes actionName in context when action is specified", async () => {
+		const executor = createMockExecutor();
+		const context: HookContext = {
+			skillName: "task",
+			actionName: "add",
+			mode: "template",
+			status: "success",
+			durationMs: 100,
+		};
+
+		await runHooks({
+			hookExecutor: executor,
+			hooksConfig: { on_success: ["echo ok"] },
+			context,
+		});
+
+		expect(executor.calls[0].context.actionName).toBe("add");
+	});
+
+	it("omits actionName in context for single skill execution", async () => {
+		const executor = createMockExecutor();
+		const context: HookContext = {
+			skillName: "deploy",
+			mode: "template",
+			status: "success",
+			durationMs: 100,
+		};
+
+		await runHooks({
+			hookExecutor: executor,
+			hooksConfig: { on_success: ["echo ok"] },
+			context,
+		});
+
+		expect(executor.calls[0].context.actionName).toBeUndefined();
+	});
 });

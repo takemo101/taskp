@@ -74,11 +74,54 @@ describe("HookExecutor", () => {
 		const env = executor.executedCommands[0].options?.env;
 		expect(env).toMatchObject({
 			TASKP_SKILL_NAME: "deploy",
+			TASKP_ACTION_NAME: "",
+			TASKP_SKILL_REF: "deploy",
 			TASKP_MODE: "template",
 			TASKP_STATUS: "success",
 			TASKP_DURATION_MS: "1234",
 			TASKP_ERROR: "",
 		});
+	});
+
+	it("injects TASKP_ACTION_NAME when actionName is present", async () => {
+		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
+		const hookExecutor = createHookExecutor(executor);
+		const contextWithAction: HookContext = {
+			...successContext,
+			actionName: "add",
+		};
+
+		await hookExecutor.execute(["echo test"], contextWithAction);
+
+		const env = executor.executedCommands[0].options?.env;
+		expect(env?.TASKP_ACTION_NAME).toBe("add");
+	});
+
+	it("injects TASKP_SKILL_REF as skillName:actionName when actionName is present", async () => {
+		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
+		const hookExecutor = createHookExecutor(executor);
+		const contextWithAction: HookContext = {
+			skillName: "task",
+			actionName: "add",
+			mode: "template",
+			status: "success",
+			durationMs: 100,
+		};
+
+		await hookExecutor.execute(["echo test"], contextWithAction);
+
+		const env = executor.executedCommands[0].options?.env;
+		expect(env?.TASKP_SKILL_REF).toBe("task:add");
+	});
+
+	it("injects TASKP_SKILL_REF as skillName only when no actionName", async () => {
+		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
+		const hookExecutor = createHookExecutor(executor);
+
+		await hookExecutor.execute(["echo test"], successContext);
+
+		const env = executor.executedCommands[0].options?.env;
+		expect(env?.TASKP_SKILL_REF).toBe("deploy");
 	});
 
 	it("injects TASKP_ERROR on failure context", async () => {

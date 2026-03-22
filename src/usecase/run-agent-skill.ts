@@ -139,6 +139,7 @@ export async function runAgentSkill(
 			hooksConfig: deps.hooksConfig,
 			context: {
 				skillName: skill.metadata.name,
+				actionName: input.action,
 				mode: "agent",
 				status: "failed",
 				durationMs,
@@ -153,6 +154,7 @@ export async function runAgentSkill(
 		hooksConfig: deps.hooksConfig,
 		context: {
 			skillName: skill.metadata.name,
+			actionName: input.action,
 			mode: "agent",
 			status: "success",
 			durationMs,
