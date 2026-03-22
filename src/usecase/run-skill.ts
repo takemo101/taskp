@@ -1,6 +1,5 @@
 import { dirname } from "node:path";
 import { resolveActionConfig } from "../core/skill/action";
-import { getActionSection, parseActionSections } from "../core/skill/action-section-parser";
 import type { Skill } from "../core/skill/skill";
 import type { CodeBlock } from "../core/skill/skill-body";
 import { type DomainError, domainErrorMessage, executionError } from "../core/types/errors";
@@ -110,23 +109,18 @@ async function runWithAction(
 		timestamp: new Date().toISOString(),
 	};
 
-	const sectionsResult = parseActionSections(skill.body.content);
-	if (!sectionsResult.ok) {
-		return sectionsResult;
-	}
-
-	const section = getActionSection(sectionsResult.value, input.action);
-	if (!section) {
+	const sectionContent = skill.body.extractActionSection(input.action);
+	if (!sectionContent) {
 		return err(executionError(`Action section "action:${input.action}" not found in skill body.`));
 	}
 
-	const renderResult = renderTemplate(section.content, variables, reserved);
+	const renderResult = renderTemplate(sectionContent, variables, reserved);
 	if (!renderResult.ok) {
 		return renderResult;
 	}
 
 	const rendered = renderResult.value;
-	const codeBlocks = section.codeBlocks;
+	const codeBlocks = skill.body.extractActionCodeBlocks(input.action, "bash");
 
 	if (input.dryRun) {
 		return ok({

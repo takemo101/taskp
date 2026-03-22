@@ -3,8 +3,6 @@ import type { ParseError } from "../types/errors";
 import { parseError } from "../types/errors";
 import type { Result } from "../types/result";
 import { err, ok } from "../types/result";
-import type { Action } from "./action";
-import type { ActionSection } from "./action-section-parser";
 import { parseActionSections } from "./action-section-parser";
 import type { SkillBody } from "./skill-body";
 import { createSkillBody } from "./skill-body";
@@ -62,13 +60,13 @@ export function parseSkill(
 }
 
 function validateActionSections(raw: string, metadata: SkillMetadata): Result<void, ParseError> {
-	const actions = metadata.actions as Record<string, Action>;
-	const sectionsResult = parseActionSections(raw);
-	if (!sectionsResult.ok) return err(parseError("Failed to parse action sections"));
-	const sections: readonly ActionSection[] = sectionsResult.value;
+	const actions = metadata.actions;
+	if (!actions) return ok(undefined);
+
+	const sections = parseActionSections(raw);
 
 	const actionKeys = new Set(Object.keys(actions));
-	const sectionNames = new Set(sections.map((section: ActionSection) => section.name));
+	const sectionNames = new Set(sections.map((section) => section.name));
 
 	for (const key of actionKeys) {
 		if (!sectionNames.has(key)) {
@@ -90,10 +88,10 @@ function validateActionSections(raw: string, metadata: SkillMetadata): Result<vo
 		}
 	}
 
-	for (const [key, action] of Object.entries(actions) as [string, Action][]) {
+	for (const [key, action] of Object.entries(actions)) {
 		const effectiveMode = action.mode ?? metadata.mode ?? "template";
 		if (effectiveMode === "template") {
-			const section = sections.find((s: ActionSection) => s.name === key);
+			const section = sections.find((s) => s.name === key);
 			if (section && section.codeBlocks.length === 0) {
 				return err(
 					parseError(

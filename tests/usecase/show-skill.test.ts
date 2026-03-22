@@ -146,8 +146,8 @@ describe("showSkill", () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.value.actions).toHaveLength(2);
-		expect(result.value.actions![0].name).toBe("add");
-		expect(result.value.actions![0].description).toBe("タスクを追加");
+		expect(result.value.actions?.[0].name).toBe("add");
+		expect(result.value.actions?.[0].description).toBe("タスクを追加");
 		expect(result.value.actionDetail).toBeUndefined();
 	});
 
@@ -168,8 +168,8 @@ describe("showSkill", () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.value.actionDetail).toBeDefined();
-		expect(result.value.actionDetail!.name).toBe("add");
-		expect(result.value.actionDetail!.mode).toBe("agent");
+		expect(result.value.actionDetail?.name).toBe("add");
+		expect(result.value.actionDetail?.mode).toBe("agent");
 		expect(result.value.inputs).toHaveLength(1);
 		expect(result.value.inputs[0].name).toBe("title");
 	});

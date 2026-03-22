@@ -3,8 +3,6 @@ import type { Heading, Root, RootContent } from "mdast";
 import remarkParse from "remark-parse";
 import remarkStringify from "remark-stringify";
 import { unified } from "unified";
-import type { Result } from "../types/result";
-import { ok } from "../types/result";
 import type { CodeBlock } from "./skill-body";
 
 const ACTION_PREFIX = "action:";
@@ -15,7 +13,7 @@ export type ActionSection = {
 	readonly codeBlocks: readonly CodeBlock[];
 };
 
-export function parseActionSections(markdown: string): Result<readonly ActionSection[], never> {
+export function parseActionSections(markdown: string): readonly ActionSection[] {
 	const { content } = matter(markdown);
 	const tree = unified().use(remarkParse).parse(content);
 
@@ -53,7 +51,7 @@ export function parseActionSections(markdown: string): Result<readonly ActionSec
 		sections.push(buildSection(currentName, currentNodes));
 	}
 
-	return ok(sections);
+	return sections;
 }
 
 export function getActionSection(

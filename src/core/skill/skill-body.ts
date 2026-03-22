@@ -25,9 +25,7 @@ export function createSkillBody(rawMarkdown: string): SkillBody {
 	let cachedSections: readonly ActionSection[] | null = null;
 	const getSections = (): readonly ActionSection[] => {
 		if (cachedSections === null) {
-			const result = parseActionSections(rawMarkdown);
-			if (!result.ok) return [];
-			cachedSections = result.value;
+			cachedSections = parseActionSections(rawMarkdown);
 		}
 		return cachedSections;
 	};

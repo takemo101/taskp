@@ -142,6 +142,6 @@ describe("taskp list E2E", () => {
 
 		expect(skills).toHaveLength(1);
 		expect(skills[0].metadata.actions).toBeDefined();
-		expect(Object.keys(skills[0].metadata.actions!)).toEqual(["add", "delete", "list"]);
+		expect(Object.keys(skills[0].metadata.actions ?? {})).toEqual(["add", "delete", "list"]);
 	});
 });

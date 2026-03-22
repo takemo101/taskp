@@ -25,12 +25,10 @@ describe("parseActionSections", () => {
 		].join("\n");
 
 		const result = parseActionSections(markdown);
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
 
-		expect(result.value).toHaveLength(2);
-		expect(result.value[0].name).toBe("add");
-		expect(result.value[1].name).toBe("delete");
+		expect(result).toHaveLength(2);
+		expect(result[0].name).toBe("add");
+		expect(result[1].name).toBe("delete");
 	});
 
 	it("セクション範囲は次の H2 見出しまで", () => {
@@ -45,23 +43,19 @@ describe("parseActionSections", () => {
 		].join("\n");
 
 		const result = parseActionSections(markdown);
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
 
-		expect(result.value[0].content).toContain("最初のセクション");
-		expect(result.value[0].content).not.toContain("次のセクション");
+		expect(result[0].content).toContain("最初のセクション");
+		expect(result[0].content).not.toContain("次のセクション");
 	});
 
 	it("セクション範囲はファイル末尾まで", () => {
 		const markdown = ["## action:only", "", "唯一のセクション", "", "追加テキスト"].join("\n");
 
 		const result = parseActionSections(markdown);
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
 
-		expect(result.value).toHaveLength(1);
-		expect(result.value[0].content).toContain("唯一のセクション");
-		expect(result.value[0].content).toContain("追加テキスト");
+		expect(result).toHaveLength(1);
+		expect(result[0].content).toContain("唯一のセクション");
+		expect(result[0].content).toContain("追加テキスト");
 	});
 
 	it("セクション外のテキスト（冒頭の説明文）は除外される", () => {
@@ -76,12 +70,10 @@ describe("parseActionSections", () => {
 		].join("\n");
 
 		const result = parseActionSections(markdown);
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
 
-		expect(result.value).toHaveLength(1);
-		expect(result.value[0].name).toBe("deploy");
-		expect(result.value[0].content).not.toContain("冒頭の説明文");
+		expect(result).toHaveLength(1);
+		expect(result[0].name).toBe("deploy");
+		expect(result[0].content).not.toContain("冒頭の説明文");
 	});
 
 	it("コードブロックがアクション単位で抽出される", () => {
@@ -104,15 +96,13 @@ describe("parseActionSections", () => {
 		].join("\n");
 
 		const result = parseActionSections(markdown);
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
 
-		expect(result.value[0].codeBlocks).toHaveLength(2);
-		expect(result.value[0].codeBlocks[0].code).toBe("npm run build");
-		expect(result.value[0].codeBlocks[1].code).toBe("npm run test");
+		expect(result[0].codeBlocks).toHaveLength(2);
+		expect(result[0].codeBlocks[0].code).toBe("npm run build");
+		expect(result[0].codeBlocks[1].code).toBe("npm run test");
 
-		expect(result.value[1].codeBlocks).toHaveLength(1);
-		expect(result.value[1].codeBlocks[0].code).toBe("npm run deploy");
+		expect(result[1].codeBlocks).toHaveLength(1);
+		expect(result[1].codeBlocks[0].code).toBe("npm run deploy");
 	});
 
 	it("action: プレフィックスのない H2 は無視される", () => {
@@ -131,25 +121,21 @@ describe("parseActionSections", () => {
 		].join("\n");
 
 		const result = parseActionSections(markdown);
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
 
-		expect(result.value).toHaveLength(1);
-		expect(result.value[0].name).toBe("run");
-		expect(result.value[0].content).not.toContain("注意テキスト");
+		expect(result).toHaveLength(1);
+		expect(result[0].name).toBe("run");
+		expect(result[0].content).not.toContain("注意テキスト");
 	});
 
 	it("空のアクションセクション", () => {
 		const markdown = ["## action:empty", "", "## action:next", "", "次のセクション"].join("\n");
 
 		const result = parseActionSections(markdown);
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
 
-		expect(result.value).toHaveLength(2);
-		expect(result.value[0].name).toBe("empty");
-		expect(result.value[0].codeBlocks).toHaveLength(0);
-		expect(result.value[1].name).toBe("next");
+		expect(result).toHaveLength(2);
+		expect(result[0].name).toBe("empty");
+		expect(result[0].codeBlocks).toHaveLength(0);
+		expect(result[1].name).toBe("next");
 	});
 
 	it("bash 以外のコードブロックは codeBlocks に含まれない", () => {
@@ -166,11 +152,9 @@ describe("parseActionSections", () => {
 		].join("\n");
 
 		const result = parseActionSections(markdown);
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
 
-		expect(result.value[0].codeBlocks).toHaveLength(1);
-		expect(result.value[0].codeBlocks[0].code).toBe("echo hello");
+		expect(result[0].codeBlocks).toHaveLength(1);
+		expect(result[0].codeBlocks[0].code).toBe("echo hello");
 	});
 
 	it("frontmatter がある場合も正しくパースできる", () => {
@@ -186,11 +170,9 @@ describe("parseActionSections", () => {
 		].join("\n");
 
 		const result = parseActionSections(markdown);
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
 
-		expect(result.value).toHaveLength(1);
-		expect(result.value[0].name).toBe("run");
+		expect(result).toHaveLength(1);
+		expect(result[0].name).toBe("run");
 	});
 });
 
@@ -200,11 +182,9 @@ describe("getActionSection", () => {
 			"\n",
 		);
 
-		const result = parseActionSections(markdown);
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
+		const sections = parseActionSections(markdown);
 
-		const section = getActionSection(result.value, "delete");
+		const section = getActionSection(sections, "delete");
 		expect(section).toBeDefined();
 		expect(section?.name).toBe("delete");
 	});
@@ -212,10 +192,8 @@ describe("getActionSection", () => {
 	it("存在しない名前の場合は undefined を返す", () => {
 		const markdown = "## action:add\n\n追加手順";
 
-		const result = parseActionSections(markdown);
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
+		const sections = parseActionSections(markdown);
 
-		expect(getActionSection(result.value, "nonexistent")).toBeUndefined();
+		expect(getActionSection(sections, "nonexistent")).toBeUndefined();
 	});
 });
