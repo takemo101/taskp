@@ -1,6 +1,6 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { createCliRenderer } from "@opentui/core";
-import { createLanguageModel, resolveModelSpec } from "../adapter/ai-provider";
+import { createLanguageModel, type ModelSpec, resolveModelSpec } from "../adapter/ai-provider";
 import { createCommandRunner } from "../adapter/command-runner";
 import { createDefaultConfigLoader } from "../adapter/config-loader";
 import { createHookExecutor } from "../adapter/hook-executor";
@@ -43,7 +43,8 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 			return;
 		}
 
-		const { model, hooksConfig, commandTimeoutMs } = await resolveModelAndConfig(options);
+		const { model, modelSpec, hooksConfig, commandTimeoutMs } =
+			await resolveModelAndConfig(options);
 
 		const commandExecutor = createCommandRunner({ defaultTimeoutMs: commandTimeoutMs });
 		const hookExecutor = createHookExecutor(commandExecutor);
@@ -62,7 +63,11 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 			const variables = await showInputForm(renderer, skill);
 			if (!variables) continue;
 
-			const action = await showExecution(renderer, skill, variables, model, executionDeps);
+			const action = await showExecution(
+				renderer,
+				{ skill, variables, model, modelSpec },
+				executionDeps,
+			);
 			if (action === "exit") break;
 		}
 	} finally {
@@ -72,6 +77,7 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 
 type ModelAndConfig = {
 	readonly model: LanguageModelV3 | null;
+	readonly modelSpec: ModelSpec | null;
 	readonly hooksConfig: HooksConfig | undefined;
 	readonly commandTimeoutMs: number | undefined;
 };
@@ -81,7 +87,8 @@ type ModelAndConfig = {
 async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConfig> {
 	const configLoader = createDefaultConfigLoader(process.cwd());
 	const configResult = await configLoader.load();
-	if (!configResult.ok) return { model: null, hooksConfig: undefined, commandTimeoutMs: undefined };
+	if (!configResult.ok)
+		return { model: null, modelSpec: null, hooksConfig: undefined, commandTimeoutMs: undefined };
 
 	const hooksConfig = configResult.value.hooks;
 	const commandTimeoutMs = configResult.value.cli?.command_timeout_ms;
@@ -92,10 +99,10 @@ async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConf
 		cliProvider: options?.provider,
 		config: aiConfig,
 	});
-	if (!specResult.ok) return { model: null, hooksConfig, commandTimeoutMs };
+	if (!specResult.ok) return { model: null, modelSpec: null, hooksConfig, commandTimeoutMs };
 
 	const modelResult = createLanguageModel(specResult.value, aiConfig);
-	if (!modelResult.ok) return { model: null, hooksConfig, commandTimeoutMs };
+	if (!modelResult.ok) return { model: null, modelSpec: null, hooksConfig, commandTimeoutMs };
 
-	return { model: modelResult.value, hooksConfig, commandTimeoutMs };
+	return { model: modelResult.value, modelSpec: specResult.value, hooksConfig, commandTimeoutMs };
 }

@@ -8,6 +8,7 @@ import {
 	SyntaxStyle,
 	TextRenderable,
 } from "@opentui/core";
+import type { ModelSpec } from "../../adapter/ai-provider";
 import type { Skill } from "../../core/skill/skill";
 import { KeyHelp } from "../components/key-help";
 import { SPINNER_FRAMES, SPINNER_INTERVAL_MS } from "../components/spinner";
@@ -24,22 +25,30 @@ export { createPresetPromptCollector, createSingleSkillRepository } from "./exec
 
 const CONTAINER_ID = "exec-container";
 
+export type ExecutionParams = {
+	readonly skill: Skill;
+	readonly variables: Readonly<Record<string, string>>;
+	readonly model: LanguageModelV3 | null;
+	readonly modelSpec: ModelSpec | null;
+};
+
 export async function showExecution(
 	renderer: CliRenderer,
-	skill: Skill,
-	variables: Readonly<Record<string, string>>,
-	model: LanguageModelV3 | null,
+	params: ExecutionParams,
 	deps: ExecutionDeps,
 ): Promise<"back" | "exit"> {
+	const { skill, variables, model, modelSpec } = params;
 	return new Promise((resolve) => {
 		clearScreen(renderer);
+
+		const modelLabel = modelSpec ? ` ─── ${modelSpec.provider}/${modelSpec.model}` : "";
 
 		const container = new BoxRenderable(renderer, {
 			id: CONTAINER_ID,
 			width: "100%",
 			height: "100%",
 			borderStyle: "rounded",
-			title: `${skill.metadata.name} [Running]`,
+			title: `${skill.metadata.name} [Running]${modelLabel}`,
 			padding: 1,
 			flexDirection: "column",
 			justifyContent: "flex-start",
@@ -129,7 +138,7 @@ export async function showExecution(
 				stopSpinner();
 				const seconds = (elapsedMs / 1000).toFixed(1);
 				summaryText.content = `Done in ${seconds}s (${steps} steps)`;
-				container.title = `${skill.metadata.name} [Done]`;
+				container.title = `${skill.metadata.name} [Done]${modelLabel}`;
 				helpBox.visible = true;
 			},
 		};
