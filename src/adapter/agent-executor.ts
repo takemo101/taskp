@@ -31,7 +31,7 @@ async function executeAgentLoop(
 		const result = streamText({
 			model: input.model,
 			system: input.systemPrompt,
-			prompt: input.context,
+			prompt: input.prompt,
 			tools,
 			stopWhen: stepCountIs(input.maxSteps),
 			experimental_repairToolCall: repairToolCall,

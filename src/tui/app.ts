@@ -5,6 +5,7 @@ import { createCommandRunner } from "../adapter/command-runner";
 import { createDefaultConfigLoader } from "../adapter/config-loader";
 import { createHookExecutor } from "../adapter/hook-executor";
 import { createDefaultSkillLoader } from "../adapter/skill-loader";
+import { createSystemPromptResolver } from "../adapter/system-prompt-resolver";
 import type { HooksConfig } from "../usecase/hook-runner";
 import { copyToClipboard } from "./clipboard";
 import {
@@ -54,6 +55,7 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 			hooksConfig,
 			skillRepositoryFactory: createSingleSkillRepository,
 			promptCollectorFactory: createPresetPromptCollector,
+			systemPromptResolver: createSystemPromptResolver(process.cwd()),
 		};
 
 		while (true) {

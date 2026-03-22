@@ -13,6 +13,7 @@ import { createPromptRunner } from "./adapter/prompt-runner";
 import { createSkillInitializer } from "./adapter/skill-initializer";
 import { createDefaultSkillLoader } from "./adapter/skill-loader";
 import { createStreamWriter } from "./adapter/stream-writer";
+import { createSystemPromptResolver } from "./adapter/system-prompt-resolver";
 import type { ContextSource } from "./core/skill/context-source";
 import type { SkillScope } from "./core/skill/skill";
 import { type DomainError, domainErrorMessage, EXIT_CODE } from "./core/types/errors";
@@ -321,6 +322,7 @@ async function runAgentMode(
 			promptCollector,
 			contextCollector,
 			agentExecutor,
+			systemPromptResolver: createSystemPromptResolver(process.cwd()),
 			progressWriter: createCliProgressWriter(process.stdout),
 			hookExecutor,
 			hooksConfig,

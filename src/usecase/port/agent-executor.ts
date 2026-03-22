@@ -5,7 +5,7 @@ import type { Result } from "../../core/types/result";
 export type AgentExecutorInput = {
 	readonly model: LanguageModelV3;
 	readonly systemPrompt: string;
-	readonly context: string;
+	readonly prompt: string;
 	readonly toolNames: readonly string[];
 	readonly maxSteps: number;
 };
