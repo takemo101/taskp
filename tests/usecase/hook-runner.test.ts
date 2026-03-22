@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ErrorType } from "../../src/core/types/errors";
 import { runHooks } from "../../src/usecase/hook-runner";
 import type { HookContext, HookExecutorPort } from "../../src/usecase/port/hook-executor";
 
@@ -18,19 +19,20 @@ function createMockExecutor(): HookExecutorPort & {
 describe("runHooks", () => {
 	it("calls on_success commands when status is success", async () => {
 		const executor = createMockExecutor();
-		await runHooks({
+		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["echo ok"], on_failure: ["echo fail"] },
 			context: { skillName: "deploy", mode: "template", status: "success", durationMs: 100 },
 		});
 
+		expect(result.ok).toBe(true);
 		expect(executor.execute).toHaveBeenCalledOnce();
 		expect(executor.calls[0].commands).toEqual(["echo ok"]);
 	});
 
 	it("calls on_failure commands when status is failed", async () => {
 		const executor = createMockExecutor();
-		await runHooks({
+		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["echo ok"], on_failure: ["echo fail"] },
 			context: {
@@ -42,68 +44,75 @@ describe("runHooks", () => {
 			},
 		});
 
+		expect(result.ok).toBe(true);
 		expect(executor.execute).toHaveBeenCalledOnce();
 		expect(executor.calls[0].commands).toEqual(["echo fail"]);
 	});
 
 	it("does not call executor when commands array is empty", async () => {
 		const executor = createMockExecutor();
-		await runHooks({
+		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_success: [], on_failure: [] },
 			context: { skillName: "deploy", mode: "template", status: "success", durationMs: 100 },
 		});
 
+		expect(result.ok).toBe(true);
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
 	it("does not call executor when commands are undefined", async () => {
 		const executor = createMockExecutor();
-		await runHooks({
+		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: {},
 			context: { skillName: "deploy", mode: "agent", status: "success", durationMs: 100 },
 		});
 
+		expect(result.ok).toBe(true);
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("does nothing when hookExecutor is undefined", async () => {
-		await runHooks({
+	it("returns ok when hookExecutor is undefined", async () => {
+		const result = await runHooks({
 			hookExecutor: undefined,
 			hooksConfig: { on_success: ["echo ok"] },
 			context: { skillName: "deploy", mode: "template", status: "success", durationMs: 100 },
 		});
-		// no throw = pass
+
+		expect(result.ok).toBe(true);
 	});
 
-	it("does nothing when hooksConfig is undefined", async () => {
+	it("returns ok when hooksConfig is undefined", async () => {
 		const executor = createMockExecutor();
-		await runHooks({
+		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: undefined,
 			context: { skillName: "deploy", mode: "template", status: "success", durationMs: 100 },
 		});
 
+		expect(result.ok).toBe(true);
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("catches and logs executor exceptions without rethrowing", async () => {
+	it("returns err with ExecutionError when executor throws", async () => {
 		const throwingExecutor: HookExecutorPort = {
 			execute: vi.fn(async () => {
 				throw new Error("network error");
 			}),
 		};
-		const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-		await runHooks({
+		const result = await runHooks({
 			hookExecutor: throwingExecutor,
 			hooksConfig: { on_success: ["echo ok"] },
 			context: { skillName: "deploy", mode: "template", status: "success", durationMs: 100 },
 		});
 
-		expect(errorSpy).toHaveBeenCalledWith("[taskp] hook error: network error");
-		vi.restoreAllMocks();
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.type).toBe(ErrorType.Execution);
+			expect(result.error.message).toBe("Hook failed: network error");
+		}
 	});
 
 	it("passes context to executor", async () => {
@@ -116,12 +125,13 @@ describe("runHooks", () => {
 			error: "timeout",
 		};
 
-		await runHooks({
+		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_failure: ["notify"] },
 			context,
 		});
 
+		expect(result.ok).toBe(true);
 		expect(executor.calls[0].context).toEqual(context);
 	});
 
@@ -135,12 +145,13 @@ describe("runHooks", () => {
 			durationMs: 100,
 		};
 
-		await runHooks({
+		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["echo ok"] },
 			context,
 		});
 
+		expect(result.ok).toBe(true);
 		expect(executor.calls[0].context.actionName).toBe("add");
 	});
 
@@ -154,12 +165,13 @@ describe("runHooks", () => {
 			callerSkill: "diagnose",
 		};
 
-		await runHooks({
+		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["echo ok"] },
 			context,
 		});
 
+		expect(result.ok).toBe(true);
 		expect(executor.calls[0].context.callerSkill).toBe("diagnose");
 	});
 
@@ -172,12 +184,13 @@ describe("runHooks", () => {
 			durationMs: 100,
 		};
 
-		await runHooks({
+		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["echo ok"] },
 			context,
 		});
 
+		expect(result.ok).toBe(true);
 		expect(executor.calls[0].context.callerSkill).toBeUndefined();
 	});
 
@@ -190,12 +203,13 @@ describe("runHooks", () => {
 			durationMs: 100,
 		};
 
-		await runHooks({
+		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["echo ok"] },
 			context,
 		});
 
+		expect(result.ok).toBe(true);
 		expect(executor.calls[0].context.actionName).toBeUndefined();
 	});
 });
