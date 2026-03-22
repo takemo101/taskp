@@ -238,6 +238,21 @@ context:                # Sources auto-included in context (optional)
 
 Use `{{variable_name}}` in the body to expand input values.
 
+## Custom System Prompt
+
+You can customize the system prompt used in agent mode by placing a `SYSTEM.md` file.
+
+| Location | Scope |
+|----------|-------|
+| `.taskp/SYSTEM.md` | Project-local (takes priority) |
+| `~/.taskp/SYSTEM.md` | Global |
+
+When `SYSTEM.md` exists, its content replaces the default system prompt. The available tools list and environment information are automatically appended.
+
+When no `SYSTEM.md` is found (or the file is empty), the built-in default system prompt is used.
+
+For details, see [Skill Spec — Custom System Prompt](docs/SKILL-SPEC.md#カスタムシステムプロンプトsystemmd).
+
 ## Configuration
 
 Configuration is written in TOML format. Project settings take priority over global settings.
