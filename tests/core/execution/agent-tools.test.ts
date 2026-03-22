@@ -3,10 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+	MAX_NESTING_DEPTH,
 	buildTaskpRunDescription,
 	buildTools,
 	getPrimaryArgKey,
+	resolveSkillMode,
 	TOOL_NAMES,
+	validateTaskpRunCall,
 } from "../../../src/core/execution/agent-tools";
 import type { Skill } from "../../../src/core/skill/skill";
 
@@ -309,5 +312,71 @@ describe("getPrimaryArgKey", () => {
 	it("returns undefined for unknown tools", () => {
 		expect(getPrimaryArgKey("custom")).toBeUndefined();
 		expect(getPrimaryArgKey("")).toBeUndefined();
+	});
+});
+
+describe("validateTaskpRunCall", () => {
+	it("再帰呼び出しを検出してエラーを返す", () => {
+		const result = validateTaskpRunCall("deploy", ["deploy"]);
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error).toBe("Recursive call detected: deploy");
+	});
+
+	it("アクション付きスキルIDの再帰を検出する", () => {
+		const result = validateTaskpRunCall("task:add", ["task:add"]);
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error).toBe("Recursive call detected: task:add");
+	});
+
+	it("最大ネスト深度を超えた場合エラーを返す", () => {
+		const callStack = Array.from({ length: MAX_NESTING_DEPTH }, (_, i) => `skill-${i}`);
+		const result = validateTaskpRunCall("new-skill", callStack);
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error).toContain("Maximum nesting depth");
+	});
+
+	it("有効な呼び出しで ok を返す", () => {
+		const result = validateTaskpRunCall("deploy", ["test"]);
+		expect(result.ok).toBe(true);
+	});
+
+	it("空のコールスタックで ok を返す", () => {
+		const result = validateTaskpRunCall("deploy", []);
+		expect(result.ok).toBe(true);
+	});
+});
+
+describe("resolveSkillMode", () => {
+	it("アクション未指定でスキルのモードを返す", () => {
+		const skill = createSkillFixture({ name: "s", description: "d", mode: "template" });
+		expect(resolveSkillMode(skill)).toBe("template");
+	});
+
+	it("アクション指定でアクションのモードを返す", () => {
+		const skill = createSkillFixture({
+			name: "s",
+			description: "d",
+			mode: "template",
+			actions: { run: { description: "run", mode: "agent" } },
+		});
+		expect(resolveSkillMode(skill, "run")).toBe("agent");
+	});
+
+	it("アクションにモード未定義の場合スキルのモードにフォールバックする", () => {
+		const skill = createSkillFixture({
+			name: "s",
+			description: "d",
+			mode: "agent",
+			actions: { run: { description: "run" } },
+		});
+		expect(resolveSkillMode(skill, "run")).toBe("agent");
+	});
+
+	it("存在しないアクション名でスキルのモードを返す", () => {
+		const skill = createSkillFixture({ name: "s", description: "d", mode: "template" });
+		expect(resolveSkillMode(skill, "nonexistent")).toBe("template");
 	});
 });

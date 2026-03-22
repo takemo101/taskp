@@ -175,76 +175,84 @@ function buildTaskpRunOutput(runOutput: RunOutput): string {
 	return parts.join("\n");
 }
 
+function validateTaskpRunCall(skillId: string, callStack: readonly string[]): Result<void, string> {
+	if (callStack.includes(skillId)) {
+		return err(`Recursive call detected: ${skillId}`);
+	}
+	if (callStack.length >= MAX_NESTING_DEPTH) {
+		return err(`Maximum nesting depth (${MAX_NESTING_DEPTH}) exceeded`);
+	}
+	return ok(undefined);
+}
+
+function resolveSkillMode(skill: Skill, actionName?: string): "template" | "agent" {
+	if (!actionName) return skill.metadata.mode;
+	return skill.metadata.actions?.[actionName]?.mode ?? skill.metadata.mode;
+}
+
+function failedResult(error: string): TaskpRunResult {
+	return { status: "failed", output: "", error };
+}
+
+async function executeTaskpRun(
+	deps: TaskpRunDeps,
+	callStack: readonly string[],
+	skill: string,
+	set?: Readonly<Record<string, string>>,
+): Promise<TaskpRunResult> {
+	const refResult = parseSkillRef(skill);
+	if (!refResult.ok) return failedResult(refResult.error.message);
+
+	const ref = refResult.value;
+	const skillId = ref.action ? `${ref.name}:${ref.action}` : ref.name;
+
+	const validation = validateTaskpRunCall(skillId, callStack);
+	if (!validation.ok) return failedResult(validation.error);
+
+	const findResult = await deps.skillRepository.findByName(ref.name);
+	if (!findResult.ok) return failedResult(`Skill not found: ${ref.name}`);
+
+	const foundSkill = findResult.value;
+	const effectiveMode = resolveSkillMode(foundSkill, ref.action);
+
+	if (effectiveMode === "agent") {
+		return failedResult(
+			`Cannot call agent mode skill: ${skillId}. Only template mode skills are allowed.`,
+		);
+	}
+
+	const result = await runSkill(
+		{
+			name: ref.name,
+			action: ref.action,
+			presets: (set ?? {}) as Readonly<Record<string, string>>,
+			dryRun: false,
+			force: false,
+			noInput: true,
+			callerSkill: deps.callerSkillName,
+		},
+		{
+			skillRepository: deps.skillRepository,
+			commandExecutor: deps.commandExecutor,
+			promptCollector: deps.promptCollector,
+			hookExecutor: deps.hookExecutor,
+			hooksConfig: deps.hooksConfig,
+		},
+	);
+
+	if (!result.ok) return failedResult(domainErrorMessage(result.error));
+
+	return { status: "success", output: buildTaskpRunOutput(result.value) };
+}
+
 function createTaskpRunTool(deps: TaskpRunDeps, description: string): AnyTool {
 	const callStack = deps.callStack ?? [];
 
 	const tool: Tool<TaskpRunInput, TaskpRunResult> = {
 		description,
 		inputSchema: zodToJsonSchema(taskpRunParams),
-		execute: async ({ skill, set }) => {
-			const refResult = parseSkillRef(skill);
-			if (!refResult.ok) {
-				return { status: "failed" as const, output: "", error: refResult.error.message };
-			}
-			const ref = refResult.value;
-			const skillId = ref.action ? `${ref.name}:${ref.action}` : ref.name;
-
-			if (callStack.includes(skillId)) {
-				return { status: "failed", output: "", error: `Recursive call detected: ${skillId}` };
-			}
-
-			if (callStack.length >= MAX_NESTING_DEPTH) {
-				return {
-					status: "failed",
-					output: "",
-					error: `Maximum nesting depth (${MAX_NESTING_DEPTH}) exceeded`,
-				};
-			}
-
-			const findResult = await deps.skillRepository.findByName(ref.name);
-			if (!findResult.ok) {
-				return { status: "failed", output: "", error: `Skill not found: ${ref.name}` };
-			}
-
-			const foundSkill = findResult.value;
-
-			const effectiveMode = ref.action
-				? (foundSkill.metadata.actions?.[ref.action]?.mode ?? foundSkill.metadata.mode)
-				: foundSkill.metadata.mode;
-
-			if (effectiveMode === "agent") {
-				return {
-					status: "failed",
-					output: "",
-					error: `Cannot call agent mode skill: ${skillId}. Only template mode skills are allowed.`,
-				};
-			}
-
-			const result = await runSkill(
-				{
-					name: ref.name,
-					action: ref.action,
-					presets: (set ?? {}) as Readonly<Record<string, string>>,
-					dryRun: false,
-					force: false,
-					noInput: true,
-					callerSkill: deps.callerSkillName,
-				},
-				{
-					skillRepository: deps.skillRepository,
-					commandExecutor: deps.commandExecutor,
-					promptCollector: deps.promptCollector,
-					hookExecutor: deps.hookExecutor,
-					hooksConfig: deps.hooksConfig,
-				},
-			);
-
-			if (!result.ok) {
-				return { status: "failed", output: "", error: domainErrorMessage(result.error) };
-			}
-
-			return { status: "success", output: buildTaskpRunOutput(result.value) };
-		},
+		execute: async ({ skill, set }) =>
+			executeTaskpRun(deps, callStack, skill, set as Readonly<Record<string, string>>),
 	};
 
 	return tool as AnyTool;
@@ -371,4 +379,4 @@ export function getPrimaryArgKey(toolName: string): string | undefined {
 }
 
 export type { AnyTool, TaskpRunDeps, TaskpRunResult, ToolName };
-export { TOOL_NAMES };
+export { MAX_NESTING_DEPTH, TOOL_NAMES, resolveSkillMode, validateTaskpRunCall };
