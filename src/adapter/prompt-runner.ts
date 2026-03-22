@@ -29,29 +29,28 @@ export function createPromptRunner(): PromptCollector {
 			const results: Record<string, string> = {};
 
 			for (const skillInput of inputs) {
-				// --set key=value で事前指定された値はプロンプトをスキップする
-				if (skillInput.name in presets) {
-					results[skillInput.name] = presets[skillInput.name];
-					continue;
-				}
-
-				// --no-input: 対話プロンプトをスキップし、デフォルト値を自動適用する
-				if (options?.noInput) {
-					const resolveResult = resolveNonInteractive(skillInput);
-					if (!resolveResult.ok) return resolveResult;
-					results[skillInput.name] = resolveResult.value;
-					continue;
-				}
-
-				const promptFn = promptByType[skillInput.type];
-				const promptResult = await promptFn(skillInput);
-				if (!promptResult.ok) return promptResult;
-				results[skillInput.name] = promptResult.value;
+				const value = await resolveInput(skillInput, presets, options);
+				if (!value.ok) return value;
+				results[skillInput.name] = value.value;
 			}
 
 			return ok(results);
 		},
 	};
+}
+
+async function resolveInput(
+	skillInput: SkillInput,
+	presets: Readonly<Record<string, string>>,
+	options?: PromptCollectOptions,
+): Promise<Result<string, ExecutionError>> {
+	if (skillInput.name in presets) {
+		return ok(presets[skillInput.name]);
+	}
+	if (options?.noInput) {
+		return resolveNonInteractive(skillInput);
+	}
+	return promptByType[skillInput.type](skillInput);
 }
 
 function resolveNonInteractive(skillInput: SkillInput): Result<string, ExecutionError> {
