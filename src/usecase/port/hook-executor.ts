@@ -5,6 +5,7 @@ export type HookContext = {
 	readonly status: "success" | "failed";
 	readonly durationMs: number;
 	readonly error?: string;
+	readonly callerSkill?: string;
 };
 
 export type HookResult = {
