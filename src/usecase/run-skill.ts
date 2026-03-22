@@ -1,8 +1,11 @@
 import { dirname } from "node:path";
+import { resolveActionConfig } from "../core/skill/action";
+import { getActionSection, parseActionSections } from "../core/skill/action-section-parser";
+import type { Skill } from "../core/skill/skill";
 import type { CodeBlock } from "../core/skill/skill-body";
-import { type DomainError, domainErrorMessage } from "../core/types/errors";
+import { type DomainError, domainErrorMessage, executionError } from "../core/types/errors";
 import type { Result } from "../core/types/result";
-import { ok } from "../core/types/result";
+import { err, ok } from "../core/types/result";
 import type { ReservedVars } from "../core/variable/template-renderer";
 import { renderTemplate } from "../core/variable/template-renderer";
 import { type HooksConfig, runHooks } from "./hook-runner";
@@ -14,6 +17,7 @@ import type { SkillRepository } from "./port/skill-repository";
 
 export type RunSkillInput = {
 	readonly name: string;
+	readonly action?: string;
 	readonly presets: Readonly<Record<string, string>>;
 	readonly dryRun: boolean;
 	readonly force: boolean;
@@ -51,7 +55,97 @@ export async function runSkill(
 	}
 
 	const skill = findResult.value;
+	const hasActions = skill.metadata.actions !== undefined;
 
+	if (hasActions && !input.action) {
+		return err(
+			executionError(
+				`Skill "${skill.metadata.name}" has actions defined. Specify an action to run.`,
+			),
+		);
+	}
+
+	if (input.action) {
+		return runWithAction({ ...input, action: input.action }, skill, deps);
+	}
+
+	return runWithoutAction(input, skill, deps);
+}
+
+async function runWithAction(
+	input: RunSkillInput & { readonly action: string },
+	skill: Skill,
+	deps: RunSkillDeps,
+): Promise<Result<RunOutput, DomainError>> {
+	const actions = skill.metadata.actions;
+	if (!actions) {
+		return err(executionError(`Skill "${skill.metadata.name}" does not define actions.`));
+	}
+
+	const action = actions[input.action];
+	if (!action) {
+		return err(
+			executionError(`Action "${input.action}" not found in skill "${skill.metadata.name}".`),
+		);
+	}
+
+	const config = resolveActionConfig(action, skill.metadata);
+
+	const collectResult = await deps.promptCollector.collect(config.inputs, input.presets, {
+		noInput: input.noInput,
+	});
+	if (!collectResult.ok) {
+		return collectResult;
+	}
+	const variables = collectResult.value;
+
+	const progress = deps.progressWriter ?? createNoopProgressWriter();
+	progress.writeInputs(config.inputs, variables);
+
+	const reserved: ReservedVars = {
+		cwd: process.cwd(),
+		skillDir: dirname(skill.location),
+		date: new Date().toISOString().split("T")[0],
+		timestamp: new Date().toISOString(),
+	};
+
+	const sectionsResult = parseActionSections(skill.body.content);
+	if (!sectionsResult.ok) {
+		return sectionsResult;
+	}
+
+	const section = getActionSection(sectionsResult.value, input.action);
+	if (!section) {
+		return err(executionError(`Action section "action:${input.action}" not found in skill body.`));
+	}
+
+	const renderResult = renderTemplate(section.content, variables, reserved);
+	if (!renderResult.ok) {
+		return renderResult;
+	}
+
+	const rendered = renderResult.value;
+	const codeBlocks = section.codeBlocks;
+
+	if (input.dryRun) {
+		return ok({
+			skillName: skill.metadata.name,
+			rendered,
+			commands: [],
+			dryRun: true,
+		});
+	}
+
+	const timeout = config.timeout;
+
+	return executeAndReport(skill, codeBlocks, variables, reserved, input, deps, rendered, timeout);
+}
+
+async function runWithoutAction(
+	input: RunSkillInput,
+	skill: Skill,
+	deps: RunSkillDeps,
+): Promise<Result<RunOutput, DomainError>> {
 	const collectResult = await deps.promptCollector.collect(skill.metadata.inputs, input.presets, {
 		noInput: input.noInput,
 	});
@@ -87,16 +181,36 @@ export async function runSkill(
 		});
 	}
 
+	return executeAndReport(
+		skill,
+		codeBlocks,
+		variables,
+		reserved,
+		input,
+		deps,
+		rendered,
+		skill.metadata.timeout,
+	);
+}
+
+async function executeAndReport(
+	skill: Skill,
+	codeBlocks: readonly CodeBlock[],
+	variables: Record<string, string>,
+	reserved: ReservedVars,
+	input: RunSkillInput,
+	deps: RunSkillDeps,
+	rendered: string,
+	timeout: number | undefined,
+): Promise<Result<RunOutput, DomainError>> {
 	const startTime = Date.now();
 
-	// template モードではマークダウン内の bash コードブロックを順に実行する。
-	// force=true なら1つ失敗しても残りを続行する（CI パイプライン的な使い方に対応）
 	const commandResults = await executeCommands(
 		codeBlocks,
 		variables,
 		reserved,
 		deps.commandExecutor,
-		{ force: input.force, timeout: skill.metadata.timeout },
+		{ force: input.force, timeout },
 	);
 
 	const durationMs = Date.now() - startTime;
