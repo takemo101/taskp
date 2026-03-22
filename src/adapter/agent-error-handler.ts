@@ -1,5 +1,6 @@
 import { APICallError } from "@ai-sdk/provider";
 import { type ExecutionError, executionError } from "../core/types/errors";
+import { ErrorMessages } from "./error-messages";
 
 export type AgentErrorCategory =
 	| "rate_limit"
@@ -26,13 +27,13 @@ export function classifyAgentError(error: unknown, provider: string): Classified
 		if (provider === "ollama") {
 			return {
 				category: "ollama_not_running",
-				message: "Ollama is not running. Start it with:\n\n  ollama serve\n",
+				message: ErrorMessages.OLLAMA_NOT_RUNNING,
 				retryable: false,
 			};
 		}
 		return {
 			category: "network",
-			message: "Network error: unable to reach the API server. Check your internet connection.",
+			message: ErrorMessages.NETWORK_ERROR,
 			retryable: true,
 		};
 	}
@@ -58,7 +59,7 @@ function classifyApiCallError(error: APICallError, provider: string): Classified
 	if (status === 429) {
 		return {
 			category: "rate_limit",
-			message: "Rate limited by the API. Retrying with exponential backoff...",
+			message: ErrorMessages.RATE_LIMITED,
 			retryable: true,
 		};
 	}
@@ -67,7 +68,7 @@ function classifyApiCallError(error: APICallError, provider: string): Classified
 		const model = extractOllamaModelFromError(error);
 		return {
 			category: "ollama_model_missing",
-			message: `Model not found. Download it with:\n\n  ollama pull ${model}\n`,
+			message: ErrorMessages.ollamaModelMissing(model),
 			retryable: false,
 		};
 	}
@@ -75,7 +76,7 @@ function classifyApiCallError(error: APICallError, provider: string): Classified
 	if (status !== undefined && status >= 500) {
 		return {
 			category: "network",
-			message: `Server error (${status}). Retrying...`,
+			message: ErrorMessages.serverError(status),
 			retryable: true,
 		};
 	}
@@ -131,9 +132,9 @@ const API_KEY_ENV_VARS: Record<string, string> = {
 function buildApiKeyMessage(provider: string): string {
 	const envVar = API_KEY_ENV_VARS[provider];
 	if (envVar === undefined) {
-		return `API key is invalid or missing for provider "${provider}".`;
+		return ErrorMessages.apiKeyMissingGeneric(provider);
 	}
-	return `API key is invalid or missing. Set the ${envVar} environment variable:\n\n  export ${envVar}=your-api-key\n`;
+	return ErrorMessages.apiKeyMissingWithEnv(envVar);
 }
 
 function extractOllamaModelFromError(error: APICallError): string {
