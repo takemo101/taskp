@@ -184,7 +184,7 @@ const cli = Cli.create("taskp", {
 
 			if (effectiveMode === "agent") {
 				await runAgentMode(
-					{ args: { skill: ref.name }, options: c.options },
+					{ args: { skill: ref.name, action: ref.action }, options: c.options },
 					presets,
 					skillRepository,
 					promptCollector,
@@ -338,7 +338,7 @@ const cli = Cli.create("taskp", {
 	});
 
 type RunCommandContext = {
-	readonly args: { readonly skill: string };
+	readonly args: { readonly skill: string; readonly action?: string };
 	readonly options: {
 		readonly model?: string;
 		readonly verbose?: boolean;
@@ -394,6 +394,7 @@ async function runAgentMode(
 	const result = await runAgentSkill(
 		{
 			name: c.args.skill,
+			action: c.args.action,
 			presets,
 			model: languageModelResult.value,
 			noInput: c.options.skipPrompt,
