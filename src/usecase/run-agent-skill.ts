@@ -1,9 +1,12 @@
 import { dirname } from "node:path";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
+import { getActionSection, parseActionSections, resolveActionConfig } from "../core/skill";
 import type { ContextSource } from "../core/skill/context-source";
-import { type DomainError, domainErrorMessage } from "../core/types/errors";
+import type { Skill } from "../core/skill/skill";
+import type { SkillInput } from "../core/skill/skill-input";
+import { type DomainError, domainErrorMessage, executionError } from "../core/types/errors";
 import type { Result } from "../core/types/result";
-import { ok } from "../core/types/result";
+import { err, ok } from "../core/types/result";
 import type { ReservedVars } from "../core/variable/template-renderer";
 import { renderTemplate } from "../core/variable/template-renderer";
 import { type HooksConfig, runHooks } from "./hook-runner";
@@ -19,6 +22,7 @@ const MAX_STEPS = 50;
 
 export type RunAgentSkillInput = {
 	readonly name: string;
+	readonly action?: string;
 	readonly presets: Readonly<Record<string, string>>;
 	readonly model: LanguageModelV3;
 	readonly noInput?: boolean;
@@ -50,7 +54,15 @@ export async function runAgentSkill(
 	}
 
 	const skill = findResult.value;
-	const collectResult = await deps.promptCollector.collect(skill.metadata.inputs, input.presets, {
+
+	const actionConfig = input.action ? resolveActionForAgent(skill, input.action) : undefined;
+	if (actionConfig !== undefined && !actionConfig.ok) {
+		return actionConfig;
+	}
+	const resolved = actionConfig?.value;
+
+	const inputs: readonly SkillInput[] = resolved?.inputs ?? skill.metadata.inputs;
+	const collectResult = await deps.promptCollector.collect(inputs, input.presets, {
 		noInput: input.noInput,
 	});
 	if (!collectResult.ok) {
@@ -59,7 +71,7 @@ export async function runAgentSkill(
 	const variables = collectResult.value;
 	const progress = deps.progressWriter ?? createNoopProgressWriter();
 
-	progress.writeInputs(skill.metadata.inputs, variables);
+	progress.writeInputs(inputs, variables);
 
 	const reserved: ReservedVars = {
 		cwd: process.cwd(),
@@ -68,16 +80,19 @@ export async function runAgentSkill(
 		timestamp: new Date().toISOString(),
 	};
 
-	const renderResult = renderTemplate(skill.body.content, variables, reserved);
+	const rawContent = resolved?.sectionContent ?? skill.body.content;
+	const renderResult = renderTemplate(rawContent, variables, reserved);
 	if (!renderResult.ok) {
 		return renderResult;
 	}
 
 	const skillPrompt = renderResult.value;
 
+	const toolNames: readonly string[] = resolved?.tools ?? skill.metadata.tools;
+
 	// system prompt: SystemPromptResolver が SYSTEM.md の探索とフォールバックを一元管理
 	const systemPrompt = await deps.systemPromptResolver.resolve({
-		toolNames: skill.metadata.tools,
+		toolNames,
 		cwd: process.cwd(),
 		date: reserved.date,
 	});
@@ -86,12 +101,14 @@ export async function runAgentSkill(
 	// system = 「どう振る舞うか」、prompt = 「何をするか」の分離
 	const promptParts: string[] = [skillPrompt];
 
-	if (skill.metadata.context.length > 0) {
-		progress.writeContextSources(skill.metadata.context);
+	const contextSources: readonly ContextSource[] = resolved?.context ?? skill.metadata.context;
+
+	if (contextSources.length > 0) {
+		progress.writeContextSources(contextSources);
 
 		// context ソース内の変数（{{__skill_dir__}} 等）を展開してからコレクタに渡す
 		// （SKILL-SPEC.md「展開タイミング」ステップ3: context のパス内の変数を展開）
-		const resolvedSources = resolveContextSources(skill.metadata.context, variables, reserved);
+		const resolvedSources = resolveContextSources(contextSources, variables, reserved);
 		if (!resolvedSources.ok) {
 			return resolvedSources;
 		}
@@ -110,7 +127,7 @@ export async function runAgentSkill(
 		model: input.model,
 		systemPrompt,
 		prompt,
-		toolNames: skill.metadata.tools,
+		toolNames,
 		maxSteps: MAX_STEPS,
 	});
 
@@ -145,6 +162,48 @@ export async function runAgentSkill(
 	return ok({
 		skillName: skill.metadata.name,
 		result: executeResult.value,
+	});
+}
+
+type ResolvedAction = {
+	readonly inputs: readonly SkillInput[];
+	readonly tools: readonly string[];
+	readonly context: readonly ContextSource[];
+	readonly sectionContent: string;
+};
+
+function resolveActionForAgent(
+	skill: Skill,
+	actionName: string,
+): Result<ResolvedAction, DomainError> {
+	const actions = skill.metadata.actions;
+	if (!actions?.[actionName]) {
+		return err(
+			executionError(`Action "${actionName}" is not defined in skill "${skill.metadata.name}"`),
+		);
+	}
+
+	const config = resolveActionConfig(actions[actionName], skill.metadata);
+
+	const sectionsResult = parseActionSections(skill.body.content);
+	if (!sectionsResult.ok) {
+		return sectionsResult;
+	}
+
+	const section = getActionSection(sectionsResult.value, actionName);
+	if (!section) {
+		return err(
+			executionError(
+				`Action section "## action:${actionName}" not found in skill "${skill.metadata.name}"`,
+			),
+		);
+	}
+
+	return ok({
+		inputs: config.inputs,
+		tools: config.tools,
+		context: config.context,
+		sectionContent: section.content,
 	});
 }
 

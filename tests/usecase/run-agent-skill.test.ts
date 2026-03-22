@@ -314,6 +314,198 @@ describe("runAgentSkill", () => {
 		});
 	});
 
+	describe("action support", () => {
+		function createActionSkill(): Skill {
+			return {
+				metadata: {
+					name: "multi-action",
+					description: "A skill with actions",
+					mode: "agent",
+					inputs: [{ name: "global_var", type: "text", message: "Global input" }],
+					model: undefined,
+					tools: ["bash", "read"],
+					context: [{ type: "file", path: "global.md" }],
+					actions: {
+						review: {
+							description: "Code review",
+							inputs: [{ name: "target", type: "text", message: "Review target" }],
+							tools: ["bash", "read", "write"],
+							context: [{ type: "file", path: "review-rules.md" }],
+						},
+						analyze: {
+							description: "Analyze code",
+						},
+					},
+				},
+				body: {
+					content:
+						"Global instructions.\n\n## action:review\n\nReview the code in {{target}}.\n\n## action:analyze\n\nAnalyze the codebase.\n",
+					extractCodeBlocks: () => [],
+				},
+				location: "/tmp/test",
+				scope: "local",
+			};
+		}
+
+		it("uses action section content as prompt", async () => {
+			const skill = createActionSkill();
+			const deps = createMockDeps(skill);
+
+			await runAgentSkill(
+				{ name: "multi-action", action: "analyze", presets: {}, model: mockModel },
+				deps,
+			);
+
+			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
+				.calls[0][0];
+			expect(executorCall.prompt).toContain("Analyze the codebase.");
+			expect(executorCall.prompt).not.toContain("Global instructions.");
+		});
+
+		it("uses action-specific tools", async () => {
+			const skill = createActionSkill();
+			const deps = createMockDeps(skill);
+			(deps.promptCollector.collect as ReturnType<typeof vi.fn>).mockResolvedValue(
+				ok({ target: "src/" }),
+			);
+
+			await runAgentSkill(
+				{ name: "multi-action", action: "review", presets: { target: "src/" }, model: mockModel },
+				deps,
+			);
+
+			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
+				.calls[0][0];
+			expect(executorCall.toolNames).toEqual(["bash", "read", "write"]);
+		});
+
+		it("uses action-specific inputs", async () => {
+			const skill = createActionSkill();
+			const deps = createMockDeps(skill);
+			(deps.promptCollector.collect as ReturnType<typeof vi.fn>).mockResolvedValue(
+				ok({ target: "src/" }),
+			);
+
+			await runAgentSkill(
+				{ name: "multi-action", action: "review", presets: { target: "src/" }, model: mockModel },
+				deps,
+			);
+
+			expect(deps.promptCollector.collect).toHaveBeenCalledWith(
+				[{ name: "target", type: "text", message: "Review target" }],
+				{ target: "src/" },
+				{ noInput: undefined },
+			);
+		});
+
+		it("uses action-specific context sources", async () => {
+			const skill = createActionSkill();
+			const deps = createMockDeps(skill);
+			(deps.promptCollector.collect as ReturnType<typeof vi.fn>).mockResolvedValue(
+				ok({ target: "src/" }),
+			);
+
+			await runAgentSkill(
+				{ name: "multi-action", action: "review", presets: { target: "src/" }, model: mockModel },
+				deps,
+			);
+
+			expect(deps.contextCollector.collect).toHaveBeenCalledWith(
+				[{ type: "file", path: "review-rules.md" }],
+				process.cwd(),
+			);
+		});
+
+		it("falls back to skill-level tools/context when action omits them", async () => {
+			const skill = createActionSkill();
+			const deps = createMockDeps(skill);
+
+			await runAgentSkill(
+				{ name: "multi-action", action: "analyze", presets: {}, model: mockModel },
+				deps,
+			);
+
+			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
+				.calls[0][0];
+			// analyze action has no tools override, falls back to skill-level
+			expect(executorCall.toolNames).toEqual(["bash", "read"]);
+			// analyze action has no context override, falls back to skill-level
+			expect(deps.contextCollector.collect).toHaveBeenCalledWith(
+				[{ type: "file", path: "global.md" }],
+				process.cwd(),
+			);
+		});
+
+		it("returns error for undefined action", async () => {
+			const skill = createActionSkill();
+			const deps = createMockDeps(skill);
+
+			const result = await runAgentSkill(
+				{ name: "multi-action", action: "nonexistent", presets: {}, model: mockModel },
+				deps,
+			);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("EXECUTION_ERROR");
+		});
+
+		it("returns error when action section is missing in body", async () => {
+			const skill: Skill = {
+				metadata: {
+					name: "bad-skill",
+					description: "Missing section",
+					mode: "agent",
+					inputs: [],
+					model: undefined,
+					tools: ["bash"],
+					context: [],
+					actions: {
+						deploy: { description: "Deploy" },
+					},
+				},
+				body: {
+					content: "No action sections here.",
+					extractCodeBlocks: () => [],
+				},
+				location: "/tmp/test",
+				scope: "local",
+			};
+			const deps = createMockDeps(skill);
+
+			const result = await runAgentSkill(
+				{ name: "bad-skill", action: "deploy", presets: {}, model: mockModel },
+				deps,
+			);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("EXECUTION_ERROR");
+		});
+
+		it("renders variables in action section content", async () => {
+			const skill = createActionSkill();
+			const deps = createMockDeps(skill);
+			(deps.promptCollector.collect as ReturnType<typeof vi.fn>).mockResolvedValue(
+				ok({ target: "src/main.ts" }),
+			);
+
+			await runAgentSkill(
+				{
+					name: "multi-action",
+					action: "review",
+					presets: { target: "src/main.ts" },
+					model: mockModel,
+				},
+				deps,
+			);
+
+			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
+				.calls[0][0];
+			expect(executorCall.prompt).toContain("Review the code in src/main.ts.");
+		});
+	});
+
 	it("resolves model priority: CLI model takes precedence", async () => {
 		const skill = createAgentSkill();
 		const deps = createMockDeps(skill);
