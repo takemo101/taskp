@@ -128,7 +128,7 @@ function requireValidAction(skill: Skill, actionName: string | undefined): Actio
 }
 
 const cli = Cli.create("taskp", {
-	version: "0.1.4",
+	version: "0.1.6",
 	description:
 		"Markdown-defined skill runner with interactive argument collection and LLM execution",
 })
