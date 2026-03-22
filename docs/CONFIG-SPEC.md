@@ -73,16 +73,17 @@ path = ".taskp/config.schema.json"
 1. --model CLI オプション            (最優先)
 2. スキルの model フィールド
 3. ai.default_model                 (config.toml)
-4. エラー
+4. エラー（明示的な設定を要求）
 ```
 
-プロバイダ解決:
+プロバイダはモデル文字列から解決する（`provider/model` 形式）:
 
 ```
-1. "provider/model" 形式で指定      → provider 部分を使用
-2. モデル名のみ指定                 → ai.default_provider を適用
-3. 未指定                           → エラー
+"anthropic/claude-sonnet-4-20250514"  → provider: anthropic
+"claude-sonnet-4-20250514"            → provider: ai.default_provider
 ```
+
+詳細は [AI 連携仕様](AI-SPEC.md) の「モデル文字列のパース」を参照。
 
 ## 設定例
 

@@ -14,7 +14,7 @@ taskp <command> [args] [options]
 
 ```bash
 taskp run deploy
-taskp run deploy --model ollama
+taskp run deploy --model ollama/qwen2.5-coder:32b
 taskp run deploy --dry-run
 taskp run deploy --env production --branch main   # 質問をスキップ
 ```
@@ -29,8 +29,7 @@ taskp run deploy --env production --branch main   # 質問をスキップ
 
 | オプション | 短縮 | 型 | デフォルト | 説明 |
 |-----------|------|-----|----------|------|
-| `--model` | `-m` | `string` | 設定ファイルのデフォルト | 使用する LLM モデル |
-| `--provider` | `-p` | `string` | 設定ファイルのデフォルト | LLM プロバイダ |
+| `--model` | `-m` | `string` | 設定ファイルのデフォルト | 使用する LLM モデル。`provider/model` 形式でプロバイダも同時に指定可能 |
 | `--dry-run` | | `boolean` | `false` | 実行計画を表示するが実行しない |
 | `--force` | `-f` | `boolean` | `false` | エラー時も続行する（template モード） |
 | `--verbose` | `-v` | `boolean` | `false` | 詳細ログを表示 |
