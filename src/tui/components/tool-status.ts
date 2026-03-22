@@ -18,6 +18,7 @@ export class ToolStatusDisplay {
 			id,
 			content: "",
 			fg: "#888888",
+			visible: false,
 		});
 	}
 
