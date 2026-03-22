@@ -60,7 +60,6 @@ class FormController {
 	retreatFocus(): void {
 		if (this.focusIndex <= 0) return;
 		this.focusIndex--;
-		delete this.values[this.elements[this.focusIndex].input.name];
 		this.applyFocus();
 	}
 
@@ -75,9 +74,10 @@ class FormController {
 	applyFocus(): void {
 		for (let i = 0; i < this.elements.length; i++) {
 			const el = this.elements[i];
-			if (el.input.name in this.values) continue;
 			if (i === this.focusIndex) {
 				el.label.content = t`${green("?")} ${el.input.message}`;
+			} else if (el.input.name in this.values) {
+				continue;
 			} else {
 				el.label.content = t`${dim("○")} ${el.input.message}`;
 			}
