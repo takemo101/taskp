@@ -31,7 +31,12 @@ function makeSkill(name: string): Skill {
 			tools: [],
 			context: [],
 		},
-		body: { content: "", extractCodeBlocks: () => [] },
+		body: {
+			content: "",
+			extractCodeBlocks: () => [],
+			extractActionSection: () => undefined,
+			extractActionCodeBlocks: () => [],
+		},
 		location: `.taskp/skills/${name}/SKILL.md`,
 		scope: "local",
 	};

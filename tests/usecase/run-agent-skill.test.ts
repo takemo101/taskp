@@ -27,6 +27,8 @@ function createAgentSkill(overrides?: Partial<Skill["metadata"]>): Skill {
 		body: {
 			content: "You are a helpful assistant.",
 			extractCodeBlocks: () => [],
+			extractActionSection: () => undefined,
+			extractActionCodeBlocks: () => [],
 		},
 		location: "/tmp/test",
 		scope: "local",
