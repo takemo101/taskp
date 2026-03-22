@@ -1,7 +1,7 @@
 import { dirname } from "node:path";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { buildTaskpRunDescription } from "../core/execution/agent-tools";
-import { getActionSection, parseActionSections, resolveActionConfig } from "../core/skill";
+import { resolveActionConfig } from "../core/skill";
 import type { ContextSource } from "../core/skill/context-source";
 import type { Skill } from "../core/skill/skill";
 import type { SkillInput } from "../core/skill/skill-input";
@@ -195,13 +195,8 @@ function resolveActionForAgent(
 
 	const config = resolveActionConfig(actions[actionName], skill.metadata);
 
-	const sectionsResult = parseActionSections(skill.body.content);
-	if (!sectionsResult.ok) {
-		return sectionsResult;
-	}
-
-	const section = getActionSection(sectionsResult.value, actionName);
-	if (!section) {
+	const sectionContent = skill.body.extractActionSection(actionName);
+	if (!sectionContent) {
 		return err(
 			executionError(
 				`Action section "## action:${actionName}" not found in skill "${skill.metadata.name}"`,
@@ -213,7 +208,7 @@ function resolveActionForAgent(
 		inputs: config.inputs,
 		tools: config.tools,
 		context: config.context,
-		sectionContent: section.content,
+		sectionContent,
 	});
 }
 

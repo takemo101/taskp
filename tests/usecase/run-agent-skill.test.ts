@@ -341,7 +341,13 @@ describe("runAgentSkill", () => {
 					content:
 						"Global instructions.\n\n## action:review\n\nReview the code in {{target}}.\n\n## action:analyze\n\nAnalyze the codebase.\n",
 					extractCodeBlocks: () => [],
-					extractActionSection: () => undefined,
+					extractActionSection: (name: string) => {
+						const sections: Record<string, string> = {
+							review: "## action:review\n\nReview the code in {{target}}.",
+							analyze: "## action:analyze\n\nAnalyze the codebase.",
+						};
+						return sections[name];
+					},
 					extractActionCodeBlocks: () => [],
 				},
 				location: "/tmp/test",
