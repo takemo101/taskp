@@ -23,9 +23,9 @@ actions:
         required: false
       - name: priority
         type: select
-        message: "優先度は？"
-        choices: ["1:通常", "2:中", "3:高"]
-        default: "1:通常"
+        message: "優先度は？（1=通常, 2=中, 3=高）"
+        choices: ["1", "2", "3"]
+        default: "1"
   add-note:
     description: ノートを追加する（AIが内容を簡潔にまとめる）
     mode: agent
@@ -73,8 +73,8 @@ actions:
         message: "対象のIDは？"
       - name: priority
         type: select
-        message: "優先度は？"
-        choices: ["1:通常", "2:中", "3:高"]
+        message: "優先度は？（1=通常, 2=中, 3=高）"
+        choices: ["1", "2", "3"]
   move:
     description: アイテムを別ボードへ移動する
     inputs:
@@ -167,7 +167,7 @@ tb -a
 
 1. ユーザー入力（複数行の場合あり）を読んで、**日本語で1行のタスク説明**にまとめる
 2. 元の意図を損なわず、具体的で行動可能な表現にする
-3. 優先度は `{{priority}}` の先頭の数字（1, 2, 3）を使う
+3. 優先度は `{{priority}}`（1, 2, 3）をそのまま使う
 4. コマンド実行後に `tb` で最新状態を表示する
 
 ### ユーザー入力
