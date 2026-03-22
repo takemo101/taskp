@@ -43,6 +43,10 @@ export function parseSkill(
 	const metadata = metadataResult.value;
 
 	if (metadata.actions) {
+		if (metadata.inputs.length > 0) {
+			console.warn('[taskp] Skill-level "inputs" is ignored when "actions" is defined');
+		}
+
 		const validationResult = validateActionSections(raw, metadata);
 		if (!validationResult.ok) {
 			return validationResult;

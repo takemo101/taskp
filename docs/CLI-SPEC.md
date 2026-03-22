@@ -10,20 +10,33 @@ taskp <command> [args] [options]
 
 ### taskp run \<skill\>
 
-スキルを実行する。
+スキルを実行する。`skill:action` 形式でアクションを直接指定できる。
 
 ```bash
 taskp run deploy
 taskp run deploy --model ollama/qwen2.5-coder:32b
 taskp run deploy --dry-run
-taskp run deploy --env production --branch main   # 質問をスキップ
+taskp run deploy --set environment=production --set branch=main
+
+# アクション付きスキル
+taskp run task:add                                  # アクション直接指定
+taskp run task:add --set title="買い物する"          # 変数を直接指定
 ```
 
 #### 引数
 
 | 引数 | 型 | 必須 | 説明 |
 |------|-----|:---:|------|
-| `skill` | `string` | ✅ | 実行するスキル名 |
+| `skill` | `string` | ✅ | スキル名、または `skill:action` 形式 |
+
+#### skill 引数のパース
+
+```
+<skill>          → スキルを実行。actions ありならエラー（TUI で選択）
+<skill>:<action> → 指定アクションを直接実行
+```
+
+コロンは1つのみ許可。`task:add:extra` はエラー（終了コード: 2）。
 
 #### オプション
 
@@ -82,22 +95,13 @@ taskp list --local
 
 ```
 Name          Description                    Location
+task          タスクを管理する                ./.taskp/skills/task
+  Actions: add, delete, list
 deploy        アプリをデプロイする             ./.taskp/skills/deploy
 code-review   コードレビューを実行する         ~/.taskp/skills/code-review
-init-db       データベースを初期化する         ~/.taskp/skills/init-db
 ```
 
-```typescript
-interface ListOutput {
-  skills: Array<{
-    name: string;
-    description: string;
-    location: string;              // ファイルパス
-    scope: "local" | "global";
-    mode: "template" | "agent";
-  }>;
-}
-```
+アクション付きスキルは `Actions` 行にアクション一覧を表示する。
 
 ### taskp init \<name\>
 
@@ -107,6 +111,7 @@ interface ListOutput {
 taskp init my-task
 taskp init my-task --global
 taskp init my-task --mode agent
+taskp init my-task --actions add,delete,list     # アクション付きスキル
 ```
 
 #### 引数
@@ -117,10 +122,11 @@ taskp init my-task --mode agent
 
 #### オプション
 
-| オプション | 型 | デフォルト | 説明 |
-|-----------|-----|----------|------|
+| オプション | 短縮 | 型 | デフォルト | 説明 |
+|-----------|------|-----|----------|------|
 | `--global` | `-g` | `boolean` | `false` | グローバルに作成 |
 | `--mode` | `-m` | `string` | `"template"` | 実行モード |
+| `--actions` | `-a` | `string` | - | カンマ区切りのアクション名。指定するとアクション付きスキルの雛形を生成 |
 
 #### 出力
 
@@ -134,13 +140,15 @@ interface InitOutput {
 
 ### taskp show \<skill\>
 
-スキルの詳細を表示する。
+スキルの詳細を表示する。`skill:action` 形式でアクションの詳細も表示できる。
 
 ```bash
 taskp show deploy
+taskp show task              # アクション一覧を表示
+taskp show task:add          # アクションの詳細を表示
 ```
 
-#### 出力
+#### 出力（通常スキル）
 
 ```
 Skill: deploy
@@ -154,24 +162,32 @@ Inputs:
   confirm      confirm  本当にデプロイしますか？
 ```
 
-```typescript
-interface ShowOutput {
-  name: string;
-  description: string;
-  mode: "template" | "agent";
-  location: string;
-  inputs: Array<{
-    name: string;
-    type: string;
-    message: string;
-    default?: string;
-    choices?: string[];
-  }>;
-  context: Array<{
-    type: string;
-    source: string;
-  }>;
-}
+#### 出力（アクション付きスキル）
+
+```
+Skill: task
+Description: タスクを管理する
+Mode: template
+Location: ./.taskp/skills/task/SKILL.md
+
+Actions:
+  add       タスクを追加する
+  delete    タスクを削除する
+  list      タスク一覧を表示する
+```
+
+#### 出力（アクション詳細）
+
+```
+Skill: task
+Action: add
+Description: タスクを追加する
+Mode: template
+Location: ./.taskp/skills/task/SKILL.md
+
+Inputs:
+  title      text     タスク名は？
+  priority   select   優先度は？          [low, medium, high] (default: medium)
 ```
 
 ## 終了コード

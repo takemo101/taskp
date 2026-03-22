@@ -80,19 +80,21 @@ taskp のアクション実行と通常の Agent Skills としての利用（pi 
 | `inputs` | `Input[]` | なし（デフォルト: `[]`） | 入力定義。アクション間で共有しない |
 | `context` | `ContextSource[]` | `skill.context` → `[]` | コンテキストソース |
 | `tools` | `string[]` | `skill.tools` → `["bash", "read", "write"]` | agent モード用ツール |
-| `timeout` | `number` | `skill.timeout` → `30000` | template モードのタイムアウト（ms） |
+| `timeout` | `number` | `skill.timeout` → コマンドランナーのデフォルト | template モードのタイムアウト（ms） |
 
 ### 継承ルール
 
 ```
 action.mode    ?? skill.mode    ?? "template"
-action.model   ?? skill.model   ?? config default
+action.model   ?? skill.model   ?? undefined
 action.context ?? skill.context ?? []
 action.tools   ?? skill.tools   ?? ["bash", "read", "write"]
-action.timeout ?? skill.timeout ?? 30000
+action.timeout ?? skill.timeout ?? undefined
 ```
 
 `inputs` は継承しない。各アクションが独立した入力セットを持つため、スキルレベルの `inputs` からの暗黙の継承は混乱を招く。
+
+> **Note**: `timeout` が未指定の場合、コマンドランナーのデフォルト値（30000ms）が適用される。
 
 ### スキルレベルの `inputs` との排他
 
@@ -326,20 +328,11 @@ code-review     コードレビューする        -
 `Actions` カラムは `actions` が存在する場合のみ表示。全スキルがアクションなしなら従来と同じ出力。
 
 ```typescript
-interface ListOutput {
-  skills: Array<{
-    name: string;
-    description: string;
-    location: string;
-    scope: "local" | "global";
-    mode: "template" | "agent";
-    actions?: Array<{               // 新規
-      name: string;
-      description: string;
-      mode: "template" | "agent";
-    }>;
-  }>;
-}
+// 実装では Skill[] を直接使用。Skill.metadata.actions にアクション定義を含む。
+type ListOutput = {
+  readonly skills: readonly Skill[];
+  readonly failures: readonly SkillLoadFailure[];
+};
 ```
 
 ### show コマンド
@@ -377,29 +370,27 @@ Inputs:
 ```
 
 ```typescript
-interface ShowOutput {
-  name: string;
-  description: string;
-  mode: "template" | "agent";
-  location: string;
-  action?: string;                    // 新規: アクション名（task:add 指定時）
-  inputs: Array<{
-    name: string;
-    type: string;
-    message: string;
-    default?: string;
-    choices?: string[];
-  }>;
-  context: Array<{
-    type: string;
-    source: string;
-  }>;
-  actions?: Array<{                   // 新規: アクション一覧（スキル指定時）
-    name: string;
-    description: string;
-    mode: "template" | "agent";
-  }>;
-}
+type ActionSummary = {
+  readonly name: string;
+  readonly description: string;
+};
+
+type ActionDetail = {
+  readonly name: string;
+  readonly description: string;
+  readonly mode: SkillMode;
+};
+
+type ShowOutput = {
+  readonly name: string;
+  readonly description: string;
+  readonly mode: SkillMode;
+  readonly location: string;
+  readonly inputs: readonly SkillInput[];
+  readonly context: readonly ContextSource[];
+  readonly actions?: readonly ActionSummary[];
+  readonly actionDetail?: ActionDetail;
+};
 ```
 
 ### init コマンド
@@ -544,11 +535,11 @@ Agent 互換性を高めるために:
 
 | 条件 | エラーメッセージ |
 |------|----------------|
-| `actions` 内のキーに対応する `## action:<name>` が本文にない | `Action "<name>" is defined in frontmatter but has no corresponding "## action:<name>" section in body` |
-| 本文に `## action:<name>` があるが `actions` に定義がない | `Section "## action:<name>" found in body but "<name>" is not defined in frontmatter actions` |
-| template モードのアクションセクションにコードブロックがない | `Action "<name>" (template mode) has no code blocks in its section` |
-| `actions` のキーにコロンが含まれる | `Action name "<name>" must not contain ":"` |
-| `actions` が空オブジェクト | `"actions" must have at least one action` |
+| `actions` 内のキーに対応する `## action:<name>` が本文にない | `Action "<name>" is defined in metadata but has no corresponding ## action:<name> section in body` |
+| 本文に `## action:<name>` があるが `actions` に定義がない | `Section ## action:<name> exists in body but "<name>" is not defined in actions metadata` |
+| template モードのアクションセクションにコードブロックがない | `Template action "<name>" requires at least one code block in ## action:<name> section` |
+| `actions` のキーにコロンが含まれる | `action name must not contain ':'` |
+| `actions` が空オブジェクト | `actions must not be empty` |
 
 ### 警告（実行は継続）
 
@@ -560,8 +551,8 @@ Agent 互換性を高めるために:
 
 | 条件 | 終了コード | エラーメッセージ |
 |------|:----------:|----------------|
-| `taskp run task:unknown`（存在しないアクション） | 2 | `Action "unknown" not found in skill "task". Available: add, delete, list` |
-| `taskp run task:add:extra`（コロン複数） | 2 | `Invalid skill reference "task:add:extra". Expected format: <skill> or <skill>:<action>` |
+| `taskp run task:unknown`（存在しないアクション） | 2 | `Error: Action "unknown" not found in skill "task". Available actions: add, delete, list` |
+| `taskp run task:add:extra`（コロン複数） | 2 | `Error: Invalid skill reference "task:add:extra": expected "skill" or "skill:action"` |
 
 ## 後方互換性
 
@@ -589,9 +580,9 @@ Agent 互換性を高めるために:
 
 | ファイル | 変更内容 |
 |---------|---------|
-| `src/domain/skill.ts` | `Action` 型, `SkillFrontmatter` に `actions` 追加 |
-| `src/adapter/skill-loader.ts` | `actionSchema` 追加, `actions` のパース・バリデーション・継承解決 |
-| `src/adapter/skill-parser.ts` | `## action:<name>` セクションのパースロジック追加 |
+| `src/core/skill/skill.ts` | `Skill` 型, アクションセクションのバリデーション |
+| `src/core/skill/skill-metadata.ts` | `skillMetadataSchema` に `actions` フィールド追加、バリデーション |
+| `src/adapter/skill-loader.ts` | スキルファイルの読み込み |
 | `src/usecase/run-skill.ts` | アクション選択フロー、セクション抽出、変数スコープ制御 |
 | `src/usecase/run-agent-skill.ts` | agent モードのアクションセクション抽出 |
 | `src/cli.ts` | skill 引数の `<skill>:<action>` パース、`--actions` オプション（init） |
@@ -602,8 +593,8 @@ Agent 互換性を高めるために:
 
 | ファイル | 役割 |
 |---------|------|
-| `src/domain/action.ts` | `Action` 型定義、`resolveActionConfig`（継承解決）純粋関数 |
-| `src/adapter/action-section-parser.ts` | 本文から `## action:<name>` セクションを抽出するパーサー |
+| `src/core/skill/action.ts` | `Action` 型定義、`actionSchema`、`resolveActionConfig`（継承解決）純粋関数 |
+| `src/core/skill/action-section-parser.ts` | 本文から `## action:<name>` セクションを抽出するパーサー |
 
 ## テスト方針
 
