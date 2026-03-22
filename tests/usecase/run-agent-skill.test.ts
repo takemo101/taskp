@@ -7,6 +7,7 @@ import type { ContextCollectorPort } from "../../src/usecase/port/context-collec
 import type { HookContext, HookExecutorPort } from "../../src/usecase/port/hook-executor";
 import type { PromptCollector } from "../../src/usecase/port/prompt-collector";
 import type { SkillRepository } from "../../src/usecase/port/skill-repository";
+import type { SystemPromptResolver } from "../../src/usecase/port/system-prompt-resolver";
 import { runAgentSkill } from "../../src/usecase/run-agent-skill";
 
 const mockModel = {} as LanguageModelV3;
@@ -52,7 +53,17 @@ function createMockDeps(skill: Skill) {
 		execute: vi.fn().mockResolvedValue(ok({ output: "agent output", steps: 3, elapsedMs: 1500 })),
 	};
 
-	return { skillRepository, promptCollector, contextCollector, agentExecutor };
+	const systemPromptResolver: SystemPromptResolver = {
+		resolve: vi.fn().mockResolvedValue("You are a task execution agent for taskp."),
+	};
+
+	return {
+		skillRepository,
+		promptCollector,
+		contextCollector,
+		agentExecutor,
+		systemPromptResolver,
+	};
 }
 
 describe("runAgentSkill", () => {
@@ -77,14 +88,14 @@ describe("runAgentSkill", () => {
 
 		await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
 
-		expect(deps.agentExecutor.execute).toHaveBeenCalledWith(
-			expect.objectContaining({
-				model: mockModel,
-				systemPrompt: "You are a helpful assistant.",
-				toolNames: ["bash", "read"],
-				maxSteps: 50,
-			}),
-		);
+		const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
+		expect(executorCall.model).toBe(mockModel);
+		// systemPrompt は taskp の基盤プロンプト（ツール使用ルール等）が入る
+		expect(executorCall.systemPrompt).toContain("task execution agent");
+		// prompt に SKILL.md 本文が含まれる
+		expect(executorCall.prompt).toContain("You are a helpful assistant.");
+		expect(executorCall.toolNames).toEqual(["bash", "read"]);
+		expect(executorCall.maxSteps).toBe(50);
 	});
 
 	it("collects context from skill context sources", async () => {
@@ -101,10 +112,10 @@ describe("runAgentSkill", () => {
 			process.cwd(),
 		);
 
-		// Context should include both system prompt and collected context
+		// prompt に SKILL.md 本文と context ソース出力の両方が含まれる
 		const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
-		expect(executorCall.context).toContain("You are a helpful assistant.");
-		expect(executorCall.context).toContain("collected context");
+		expect(executorCall.prompt).toContain("You are a helpful assistant.");
+		expect(executorCall.prompt).toContain("collected context");
 	});
 
 	it("skips context collection when no context sources defined", async () => {

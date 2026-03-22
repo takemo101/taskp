@@ -13,6 +13,7 @@ import type { HookExecutorPort } from "./port/hook-executor";
 import { createNoopProgressWriter, type ProgressWriter } from "./port/progress-writer";
 import type { PromptCollector } from "./port/prompt-collector";
 import type { SkillRepository } from "./port/skill-repository";
+import type { SystemPromptResolver } from "./port/system-prompt-resolver";
 
 const MAX_STEPS = 50;
 
@@ -33,6 +34,7 @@ export type RunAgentSkillDeps = {
 	readonly promptCollector: PromptCollector;
 	readonly contextCollector: ContextCollectorPort;
 	readonly agentExecutor: AgentExecutorPort;
+	readonly systemPromptResolver: SystemPromptResolver;
 	readonly progressWriter?: ProgressWriter;
 	readonly hookExecutor?: HookExecutorPort;
 	readonly hooksConfig?: HooksConfig;
@@ -71,11 +73,18 @@ export async function runAgentSkill(
 		return renderResult;
 	}
 
-	const systemPrompt = renderResult.value;
+	const skillPrompt = renderResult.value;
 
-	// systemPrompt（スキル本文をレンダリングしたもの）を context の先頭に含め、
-	// 追加の context ソース（ファイル・コマンド出力等）をその後に結合する
-	const contextParts: string[] = [systemPrompt];
+	// system prompt: SystemPromptResolver が SYSTEM.md の探索とフォールバックを一元管理
+	const systemPrompt = await deps.systemPromptResolver.resolve({
+		toolNames: skill.metadata.tools,
+		cwd: process.cwd(),
+		date: reserved.date,
+	});
+
+	// prompt: SKILL.md 本文（タスク指示）+ context ソース出力（データ）を結合
+	// system = 「どう振る舞うか」、prompt = 「何をするか」の分離
+	const promptParts: string[] = [skillPrompt];
 
 	if (skill.metadata.context.length > 0) {
 		progress.writeContextSources(skill.metadata.context);
@@ -90,17 +99,17 @@ export async function runAgentSkill(
 		if (!contextResult.ok) {
 			return contextResult;
 		}
-		contextParts.push(contextResult.value);
+		promptParts.push(contextResult.value);
 	}
 
-	const context = contextParts.join("\n\n");
+	const prompt = promptParts.join("\n\n");
 
 	const startTime = Date.now();
 
 	const executeResult = await deps.agentExecutor.execute({
 		model: input.model,
 		systemPrompt,
-		context,
+		prompt,
 		toolNames: skill.metadata.tools,
 		maxSteps: MAX_STEPS,
 	});

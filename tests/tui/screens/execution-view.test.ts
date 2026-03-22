@@ -74,6 +74,9 @@ function createMockDeps(): ExecutionDeps {
 		hookExecutor: { execute: vi.fn() },
 		skillRepositoryFactory: createSingleSkillRepository,
 		promptCollectorFactory: createPresetPromptCollector,
+		systemPromptResolver: {
+			resolve: vi.fn().mockResolvedValue("You are a task execution agent for taskp."),
+		},
 	};
 }
 

@@ -141,5 +141,10 @@ export function buildTools(
 	return ok(tools);
 }
 
+/** ツール名からその description を返す。未知のツール名は undefined を返す。 */
+export function getToolDescription(name: string): string | undefined {
+	return allTools[name as ToolName]?.description;
+}
+
 export type { AnyTool, ToolName };
 export { TOOL_NAMES };

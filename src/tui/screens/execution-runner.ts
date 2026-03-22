@@ -10,6 +10,7 @@ import type { CommandExecutor } from "../../usecase/port/command-executor";
 import type { HookExecutorPort } from "../../usecase/port/hook-executor";
 import type { PromptCollector } from "../../usecase/port/prompt-collector";
 import type { SkillRepository } from "../../usecase/port/skill-repository";
+import type { SystemPromptResolver } from "../../usecase/port/system-prompt-resolver";
 import { runAgentSkill } from "../../usecase/run-agent-skill";
 import { runSkill } from "../../usecase/run-skill";
 import {
@@ -29,6 +30,7 @@ export type ExecutionDeps = {
 	readonly hooksConfig?: HooksConfig;
 	readonly skillRepositoryFactory: SkillRepositoryFactory;
 	readonly promptCollectorFactory: PromptCollectorFactory;
+	readonly systemPromptResolver: SystemPromptResolver;
 };
 
 export async function runExecution(
@@ -99,6 +101,7 @@ async function executeAgentMode(
 			progressWriter,
 			hookExecutor: deps.hookExecutor,
 			hooksConfig: deps.hooksConfig,
+			systemPromptResolver: deps.systemPromptResolver,
 		},
 	);
 
