@@ -103,39 +103,11 @@ describe("resolveModelSpec", () => {
 		expect(result.error.message).toContain("No model specified");
 	});
 
-	it("cliProvider overrides config default_provider", () => {
-		const result = resolveModelSpec({
-			cliModel: "some-model",
-			cliProvider: "ollama",
-			config: { default_provider: "anthropic" },
-		});
-
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
-		expect(result.value).toEqual({ provider: "ollama", model: "some-model" });
-	});
-
-	it("uses provider-specific default_model when cliProvider is specified", () => {
-		const result = resolveModelSpec({
-			cliProvider: "ollama",
-			config: {
-				default_model: "global-model",
-				providers: {
-					ollama: { default_model: "qwen3.5:9b" },
-				},
-			},
-		});
-
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
-		expect(result.value).toEqual({ provider: "ollama", model: "qwen3.5:9b" });
-	});
-
 	it("cliModel takes priority over provider-specific default_model", () => {
 		const result = resolveModelSpec({
 			cliModel: "my-model",
-			cliProvider: "ollama",
 			config: {
+				default_provider: "ollama",
 				providers: {
 					ollama: { default_model: "qwen3.5:9b" },
 				},
@@ -165,8 +137,8 @@ describe("resolveModelSpec", () => {
 
 	it("falls back to top-level default_model when provider has no default_model", () => {
 		const result = resolveModelSpec({
-			cliProvider: "ollama",
 			config: {
+				default_provider: "ollama",
 				default_model: "global-model",
 				providers: {
 					ollama: { base_url: "http://localhost:11434/v1" },

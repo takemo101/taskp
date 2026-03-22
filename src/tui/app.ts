@@ -19,7 +19,6 @@ import { showSkillSelector } from "./screens/skill-selector";
 
 export type TuiOptions = {
 	readonly model?: string;
-	readonly provider?: string;
 };
 
 export async function startTui(options?: TuiOptions): Promise<void> {
@@ -98,7 +97,6 @@ async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConf
 	const aiConfig = configResult.value.ai ?? {};
 	const specResult = resolveModelSpec({
 		cliModel: options?.model,
-		cliProvider: options?.provider,
 		config: aiConfig,
 	});
 	if (!specResult.ok) return { model: null, modelSpec: null, hooksConfig, commandTimeoutMs };

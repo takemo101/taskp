@@ -17,7 +17,6 @@ export type ModelSpec = {
 
 export type ModelSource = {
 	readonly cliModel?: string;
-	readonly cliProvider?: string;
 	readonly skillModel?: string;
 	readonly config: AiConfig;
 };
@@ -185,8 +184,8 @@ export function resolveModelSpec(source: ModelSource): Result<ModelSpec, ConfigE
 		return resolveWithProvider(explicitSpec, source);
 	}
 
-	// 2. provider を解決（CLI --provider > config default_provider）
-	const resolvedProvider = source.cliProvider ?? source.config.default_provider;
+	// 2. config の default_provider を使用
+	const resolvedProvider = source.config.default_provider;
 
 	// 3. 解決された provider の default_model > トップレベル default_model
 	const providerDefaultModel = resolvedProvider
@@ -215,7 +214,7 @@ function resolveWithProvider(rawSpec: string, source: ModelSource): Result<Model
 		return ok({ provider, model });
 	}
 
-	const resolvedProvider = source.cliProvider ?? source.config.default_provider;
+	const resolvedProvider = source.config.default_provider;
 	if (resolvedProvider === undefined) {
 		return err(
 			configError(
