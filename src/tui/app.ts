@@ -19,7 +19,6 @@ import { showSkillSelector } from "./screens/skill-selector";
 
 export type TuiOptions = {
 	readonly model?: string;
-	readonly provider?: string;
 };
 
 export async function startTui(options?: TuiOptions): Promise<void> {

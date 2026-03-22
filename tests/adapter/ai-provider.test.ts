@@ -103,6 +103,22 @@ describe("resolveModelSpec", () => {
 		expect(result.error.message).toContain("No model specified");
 	});
 
+	it("cliModel takes priority over provider-specific default_model", () => {
+		const result = resolveModelSpec({
+			cliModel: "my-model",
+			config: {
+				default_provider: "ollama",
+				providers: {
+					ollama: { default_model: "qwen3.5:9b" },
+				},
+			},
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toEqual({ provider: "ollama", model: "my-model" });
+	});
+
 	it("uses provider-specific default_model for config default_provider", () => {
 		const result = resolveModelSpec({
 			config: {
