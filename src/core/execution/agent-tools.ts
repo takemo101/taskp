@@ -352,5 +352,23 @@ function appendSkillWithActions(lines: string[], skill: Skill): void {
 	lines.push(...actionLines);
 }
 
+/**
+ * ツールごとの「最も重要な引数キー」。
+ * 表示層がツール名で switch-case する代わりに、このマップを参照する。
+ */
+const PRIMARY_ARG_KEYS: Readonly<Record<ToolName, string | undefined>> = {
+	bash: "command",
+	read: "path",
+	write: "path",
+	glob: "pattern",
+	ask_user: "question",
+	taskp_run: "skill",
+};
+
+/** ツール名に対応する primaryArgKey を返す。未知のツール名は undefined。 */
+export function getPrimaryArgKey(toolName: string): string | undefined {
+	return PRIMARY_ARG_KEYS[toolName as ToolName];
+}
+
 export type { AnyTool, TaskpRunDeps, TaskpRunResult, ToolName };
 export { TOOL_NAMES };

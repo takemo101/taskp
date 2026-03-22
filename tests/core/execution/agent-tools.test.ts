@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
 	buildTaskpRunDescription,
 	buildTools,
+	getPrimaryArgKey,
 	TOOL_NAMES,
 } from "../../../src/core/execution/agent-tools";
 import type { Skill } from "../../../src/core/skill/skill";
@@ -292,5 +293,21 @@ describe("buildTaskpRunDescription", () => {
 		const result = buildTaskpRunDescription(skills);
 
 		expect(result).not.toContain("agent-only");
+	});
+});
+
+describe("getPrimaryArgKey", () => {
+	it("returns the primary arg key for known tools", () => {
+		expect(getPrimaryArgKey("bash")).toBe("command");
+		expect(getPrimaryArgKey("read")).toBe("path");
+		expect(getPrimaryArgKey("write")).toBe("path");
+		expect(getPrimaryArgKey("glob")).toBe("pattern");
+		expect(getPrimaryArgKey("ask_user")).toBe("question");
+		expect(getPrimaryArgKey("taskp_run")).toBe("skill");
+	});
+
+	it("returns undefined for unknown tools", () => {
+		expect(getPrimaryArgKey("custom")).toBeUndefined();
+		expect(getPrimaryArgKey("")).toBeUndefined();
 	});
 });
