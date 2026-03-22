@@ -221,6 +221,7 @@ async function executeAndReport(
 			hooksConfig: deps.hooksConfig,
 			context: {
 				skillName: skill.metadata.name,
+				actionName: input.action,
 				mode: "template",
 				status: "failed",
 				durationMs,
@@ -235,6 +236,7 @@ async function executeAndReport(
 		hooksConfig: deps.hooksConfig,
 		context: {
 			skillName: skill.metadata.name,
+			actionName: input.action,
 			mode: "template",
 			status: "success",
 			durationMs,

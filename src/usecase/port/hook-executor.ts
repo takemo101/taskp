@@ -1,5 +1,6 @@
 export type HookContext = {
 	readonly skillName: string;
+	readonly actionName?: string;
 	readonly mode: "template" | "agent";
 	readonly status: "success" | "failed";
 	readonly durationMs: number;
