@@ -25,7 +25,7 @@ async function executeAgentLoop(
 	if (!toolsResult.ok) {
 		return toolsResult;
 	}
-	const tools = toolsResult.value as ToolSet;
+	const tools = toolsResult.value;
 
 	try {
 		const result = streamText({
