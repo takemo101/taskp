@@ -59,7 +59,7 @@ npm run deploy:{{environment}}
 |-----------|-----|----------|------|
 | `mode` | `"template" \| "agent"` | `"template"` | 実行モード |
 | `inputs` | `Input[]` | `[]` | 入力定義（質問リスト） |
-| `model` | `string` | 設定ファイルのデフォルト | 使用する LLM モデル |
+| `model` | `string` | 設定ファイルのデフォルト | 使用する LLM モデル。`provider/model` 形式でプロバイダも同時に指定可能 |
 | `timeout` | `number` | `30000` | template モードのコマンド実行タイムアウト（ミリ秒、最大: 3,600,000）。agent モードでは無視される |
 | `tools` | `string[]` | `["bash", "read", "write"]` | agent モードで使用するツール |
 | `context` | `ContextSource[]` | `[]` | 自動的にコンテキストに含めるソース |
@@ -323,7 +323,7 @@ npm run deploy:{{environment}}
 name: code-review
 description: コードレビューを実行する
 mode: agent
-model: claude-sonnet-4-20250514
+model: anthropic/claude-sonnet-4-20250514
 inputs:
   - name: target
     type: text
