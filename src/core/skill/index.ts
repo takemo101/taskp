@@ -2,6 +2,8 @@
 
 export type { Action, ResolvedActionConfig } from "./action";
 export { resolveActionConfig } from "./action";
+export type { ActionSection } from "./action-section-parser";
+export { getActionSection, parseActionSections } from "./action-section-parser";
 export type { ContextSource } from "./context-source";
 export { parseContextSource } from "./context-source";
 export type { Skill, SkillScope } from "./skill";
