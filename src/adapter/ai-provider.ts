@@ -184,12 +184,9 @@ export function resolveModelSpec(source: ModelSource): Result<ModelSpec, ConfigE
 		return resolveWithProvider(explicitSpec, source);
 	}
 
-	// 2. config の default_provider を使用
-	const resolvedProvider = source.config.default_provider;
-
-	// 3. 解決された provider の default_model > トップレベル default_model
-	const providerDefaultModel = resolvedProvider
-		? source.config.providers?.[resolvedProvider]?.default_model
+	// 2. default_provider の default_model > トップレベル default_model
+	const providerDefaultModel = source.config.default_provider
+		? source.config.providers?.[source.config.default_provider]?.default_model
 		: undefined;
 	const rawSpec = providerDefaultModel ?? source.config.default_model;
 
@@ -214,8 +211,7 @@ function resolveWithProvider(rawSpec: string, source: ModelSource): Result<Model
 		return ok({ provider, model });
 	}
 
-	const resolvedProvider = source.config.default_provider;
-	if (resolvedProvider === undefined) {
+	if (source.config.default_provider === undefined) {
 		return err(
 			configError(
 				`Model "${rawSpec}" has no provider prefix. Set default_provider in config or use "provider/model" format.`,
@@ -223,7 +219,7 @@ function resolveWithProvider(rawSpec: string, source: ModelSource): Result<Model
 		);
 	}
 
-	return ok({ provider: resolvedProvider, model });
+	return ok({ provider: source.config.default_provider, model });
 }
 
 export function createLanguageModel(
