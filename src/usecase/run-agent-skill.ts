@@ -1,5 +1,6 @@
 import { dirname } from "node:path";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
+import { buildTaskpRunDescription } from "../core/execution/agent-tools";
 import { getActionSection, parseActionSections, resolveActionConfig } from "../core/skill";
 import type { ContextSource } from "../core/skill/context-source";
 import type { Skill } from "../core/skill/skill";
@@ -123,12 +124,19 @@ export async function runAgentSkill(
 
 	const startTime = Date.now();
 
+	const descriptionOverrides = await buildDescriptionOverrides(
+		toolNames,
+		deps.skillRepository,
+		skill.metadata.name,
+	);
+
 	const executeResult = await deps.agentExecutor.execute({
 		model: input.model,
 		systemPrompt,
 		prompt,
 		toolNames,
 		maxSteps: MAX_STEPS,
+		buildToolsOptions: descriptionOverrides ? { descriptionOverrides } : undefined,
 	});
 
 	const durationMs = Date.now() - startTime;
@@ -230,6 +238,19 @@ function resolveContextSources(
 	}
 
 	return ok(resolved);
+}
+
+async function buildDescriptionOverrides(
+	toolNames: readonly string[],
+	skillRepository: SkillRepository,
+	currentSkillName: string,
+): Promise<Record<string, string> | undefined> {
+	if (!toolNames.includes("taskp_run")) return undefined;
+
+	const { skills } = await skillRepository.listAll();
+	return {
+		taskp_run: buildTaskpRunDescription(skills, currentSkillName),
+	};
 }
 
 function getContextSourceValue(source: ContextSource): string {

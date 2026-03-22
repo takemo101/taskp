@@ -8,6 +8,9 @@ import type { CommandExecutor } from "../../usecase/port/command-executor";
 import type { PromptCollector } from "../../usecase/port/prompt-collector";
 import type { SkillRepository } from "../../usecase/port/skill-repository";
 import { type RunOutput, runSkill } from "../../usecase/run-skill";
+import type { Action } from "../skill/action";
+import { resolveActionConfig } from "../skill/action";
+import type { Skill } from "../skill/skill";
 import { domainErrorMessage, type ExecutionError, executionError } from "../types/errors";
 import { err, ok, type Result } from "../types/result";
 
@@ -177,12 +180,11 @@ function buildTaskpRunOutput(runOutput: RunOutput): string {
 	return parts.join("\n");
 }
 
-function createTaskpRunTool(deps: TaskpRunDeps): AnyTool {
+function createTaskpRunTool(deps: TaskpRunDeps, description: string): AnyTool {
 	const callStack = deps.callStack ?? [];
 
 	const tool: Tool<TaskpRunInput, TaskpRunResult> = {
-		description:
-			"Run another taskp skill (template mode only). Use to invoke predefined skills with variable inputs.",
+		description,
 		inputSchema: zodToJsonSchema(taskpRunParams),
 		execute: async ({ skill, set }) => {
 			const ref = parseSkillRef(skill);
@@ -246,8 +248,11 @@ function createTaskpRunTool(deps: TaskpRunDeps): AnyTool {
 	return tool as AnyTool;
 }
 
+export type DescriptionOverrides = Readonly<Record<string, string>>;
+
 export type BuildToolsOptions = {
 	readonly taskpRunDeps?: TaskpRunDeps;
+	readonly descriptionOverrides?: DescriptionOverrides;
 };
 
 export function buildTools(
@@ -260,24 +265,89 @@ export function buildTools(
 			if (!options?.taskpRunDeps) {
 				return err(executionError("taskp_run requires taskpRunDeps in BuildToolsOptions"));
 			}
-			tools[name] = createTaskpRunTool(options.taskpRunDeps);
+			const description = options.descriptionOverrides?.taskp_run ?? TASKP_RUN_DEFAULT_DESCRIPTION;
+			tools[name] = createTaskpRunTool(options.taskpRunDeps, description);
 			continue;
 		}
 		const t = staticTools[name];
 		if (t === undefined) {
 			return err(executionError(`Unknown tool: ${name}`));
 		}
-		tools[name] = t;
+		const override = options?.descriptionOverrides?.[name];
+		tools[name] = override ? { ...t, description: override } : t;
 	}
 	return ok(tools);
 }
 
+const TASKP_RUN_DEFAULT_DESCRIPTION =
+	"Run another taskp skill (template mode only). Use to invoke predefined skills with variable inputs.";
+
 /** ツール名からその description を返す。未知のツール名は undefined を返す。 */
 export function getToolDescription(name: string): string | undefined {
 	if (name === "taskp_run") {
-		return "Run another taskp skill (template mode only). Use to invoke predefined skills with variable inputs.";
+		return TASKP_RUN_DEFAULT_DESCRIPTION;
 	}
 	return staticTools[name]?.description;
+}
+
+const TASKP_RUN_BASE_DESCRIPTION =
+	"Run another taskp skill or action. Only template-mode skills can be invoked.";
+
+/**
+ * スキル一覧から taskp_run ツールの description を動的構築する。
+ * agent モードのスキル/アクションは除外し、template モードのみ表示する。
+ */
+export function buildTaskpRunDescription(
+	skills: readonly Skill[],
+	currentSkillName?: string,
+): string {
+	const lines = collectSkillLines(skills, currentSkillName);
+
+	if (lines.length === 0) {
+		return TASKP_RUN_BASE_DESCRIPTION;
+	}
+
+	return `${TASKP_RUN_BASE_DESCRIPTION}\n\nAvailable skills:\n${lines.join("\n")}`;
+}
+
+function collectSkillLines(skills: readonly Skill[], currentSkillName?: string): readonly string[] {
+	const lines: string[] = [];
+
+	for (const skill of skills) {
+		if (skill.metadata.name === currentSkillName) continue;
+
+		const hasActions = skill.metadata.actions && Object.keys(skill.metadata.actions).length > 0;
+
+		if (hasActions) {
+			appendSkillWithActions(lines, skill);
+		} else {
+			appendSimpleSkill(lines, skill);
+		}
+	}
+
+	return lines;
+}
+
+function appendSimpleSkill(lines: string[], skill: Skill): void {
+	if (skill.metadata.mode === "agent") return;
+	lines.push(`- ${skill.metadata.name}: ${skill.metadata.description}`);
+}
+
+function appendSkillWithActions(lines: string[], skill: Skill): void {
+	const actions = skill.metadata.actions as Record<string, Action>;
+	const actionLines: string[] = [];
+
+	for (const [actionName, action] of Object.entries(actions)) {
+		const resolved = resolveActionConfig(action, skill.metadata);
+		if (resolved.mode === "agent") continue;
+		actionLines.push(`  - ${skill.metadata.name}:${actionName}: ${resolved.description}`);
+	}
+
+	if (actionLines.length === 0) return;
+
+	// スキル自体が template でもアクションがあればヘッダーを表示
+	lines.push(`- ${skill.metadata.name}: ${skill.metadata.description}`);
+	lines.push(...actionLines);
 }
 
 export type { AnyTool, TaskpRunDeps, TaskpRunResult, ToolName };

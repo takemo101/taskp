@@ -21,7 +21,7 @@ async function executeAgentLoop(
 	writer: StreamWriter,
 ): ReturnType<AgentExecutorPort["execute"]> {
 	const startTime = Date.now();
-	const toolsResult = buildTools(input.toolNames);
+	const toolsResult = buildTools(input.toolNames, input.buildToolsOptions);
 	if (!toolsResult.ok) {
 		return toolsResult;
 	}

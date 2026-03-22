@@ -1,4 +1,5 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { BuildToolsOptions } from "../../core/execution/agent-tools";
 import type { ExecutionError } from "../../core/types/errors";
 import type { Result } from "../../core/types/result";
 
@@ -8,6 +9,7 @@ export type AgentExecutorInput = {
 	readonly prompt: string;
 	readonly toolNames: readonly string[];
 	readonly maxSteps: number;
+	readonly buildToolsOptions?: BuildToolsOptions;
 };
 
 export type AgentExecutorResult = {
