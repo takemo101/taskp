@@ -22,7 +22,8 @@ import type { ContextSource } from "./core/skill/context-source";
 import type { SkillScope } from "./core/skill/skill";
 import { parseSkillRef } from "./core/skill/skill-ref";
 import { validateActionExists, validateActionRequired } from "./core/skill/validate-skill-action";
-import { type DomainError, domainErrorMessage, ErrorType, EXIT_CODE } from "./core/types/errors";
+import { type DomainError, domainErrorMessage, EXIT_CODE } from "./core/types/errors";
+import type { Result } from "./core/types/result";
 import { type InitOutput, initSkill } from "./usecase/init-skill";
 import { createListSkillsUseCase } from "./usecase/list-skills";
 import { runAgentSkill } from "./usecase/run-agent-skill";
@@ -108,6 +109,13 @@ function formatError(error: DomainError): string {
 	return `Error: ${domainErrorMessage(error)}`;
 }
 
+// Result が失敗なら CLI エラー出力して終了、成功なら値を返す
+function exitOnError<T>(result: Result<T, DomainError>): T {
+	if (result.ok) return result.value;
+	console.error(formatError(result.error));
+	process.exit(EXIT_CODE[result.error.type]);
+}
+
 const cli = Cli.create("taskp", {
 	version: "0.1.6",
 	description:
@@ -133,37 +141,17 @@ const cli = Cli.create("taskp", {
 			set: "s",
 		},
 		async run(c) {
-			const refResult = parseSkillRef(c.args.skill);
-			if (!refResult.ok) {
-				console.error(`Error: ${refResult.error.message}`);
-				process.exit(EXIT_CODE[ErrorType.Parse]);
-			}
-			const ref = refResult.value;
+			const ref = exitOnError(parseSkillRef(c.args.skill));
 
 			const presets = parsePresets(c.options.set ?? []);
 			const skillRepository = createDefaultSkillLoader(process.cwd());
 			const promptCollector = createPromptRunner();
 
-			const findResult = await skillRepository.findByName(ref.name);
-			if (!findResult.ok) {
-				console.error(formatError(findResult.error));
-				process.exit(EXIT_CODE[findResult.error.type]);
-			}
+			const skill = exitOnError(await skillRepository.findByName(ref.name));
 
-			const skill = findResult.value;
+			exitOnError(validateActionRequired(skill, ref.action));
 
-			const actionRequiredResult = validateActionRequired(skill, ref.action);
-			if (!actionRequiredResult.ok) {
-				console.error(formatError(actionRequiredResult.error));
-				process.exit(EXIT_CODE[actionRequiredResult.error.type]);
-			}
-
-			const actionExistsResult = validateActionExists(skill, ref.action);
-			if (!actionExistsResult.ok) {
-				console.error(formatError(actionExistsResult.error));
-				process.exit(EXIT_CODE[actionExistsResult.error.type]);
-			}
-			const action = actionExistsResult.value;
+			const action = exitOnError(validateActionExists(skill, ref.action));
 
 			// アクション指定時は resolveActionConfig で mode を決定
 			const effectiveMode = action
@@ -212,12 +200,7 @@ const cli = Cli.create("taskp", {
 				},
 			);
 
-			if (!result.ok) {
-				console.error(formatError(result.error));
-				process.exit(EXIT_CODE[result.error.type]);
-			}
-
-			console.log(formatRunOutput(result.value));
+			console.log(formatRunOutput(exitOnError(result)));
 		},
 	})
 	.command("list", {
@@ -271,12 +254,7 @@ const cli = Cli.create("taskp", {
 				{ name: c.args.name, global: isGlobal, mode, actions },
 			);
 
-			if (!result.ok) {
-				console.error(formatError(result.error));
-				process.exit(EXIT_CODE[result.error.type]);
-			}
-
-			console.log(formatInitOutput(result.value));
+			console.log(formatInitOutput(exitOnError(result)));
 		},
 	})
 	.command("show", {
@@ -285,22 +263,12 @@ const cli = Cli.create("taskp", {
 			skill: z.string().describe("Skill name or skill:action to show"),
 		}),
 		async run(c) {
-			const refResult = parseSkillRef(c.args.skill);
-			if (!refResult.ok) {
-				console.error(`Error: ${refResult.error.message}`);
-				process.exit(EXIT_CODE[ErrorType.Parse]);
-			}
-			const ref = refResult.value;
+			const ref = exitOnError(parseSkillRef(c.args.skill));
 
 			const repository = createDefaultSkillLoader(process.cwd());
 			const result = await showSkill(ref.name, repository, ref.action);
 
-			if (!result.ok) {
-				console.error(formatError(result.error));
-				process.exit(EXIT_CODE[result.error.type]);
-			}
-
-			console.log(formatShowOutput(result.value));
+			console.log(formatShowOutput(exitOnError(result)));
 		},
 	})
 	.command("setup", {
@@ -327,12 +295,7 @@ const cli = Cli.create("taskp", {
 				{ global: isGlobal, force: c.options.force ?? false },
 			);
 
-			if (!result.ok) {
-				console.error(formatError(result.error));
-				process.exit(EXIT_CODE[result.error.type]);
-			}
-
-			console.log(formatSetupOutput(result.value));
+			console.log(formatSetupOutput(exitOnError(result)));
 		},
 	})
 	.command("tui", {
@@ -371,27 +334,17 @@ async function runAgentMode(
 	promptCollector: ReturnType<typeof createPromptRunner>,
 ): Promise<void> {
 	const configLoader = createDefaultConfigLoader(process.cwd());
-	const configResult = await configLoader.load();
-	if (!configResult.ok) {
-		console.error(formatError(configResult.error));
-		process.exit(EXIT_CODE[configResult.error.type]);
-	}
+	const config = exitOnError(await configLoader.load());
 
-	const aiConfig = configResult.value.ai ?? {};
-	const modelSpecResult = resolveModelSpec({
-		cliModel: c.options.model,
-		config: aiConfig,
-	});
-	if (!modelSpecResult.ok) {
-		console.error(formatError(modelSpecResult.error));
-		process.exit(EXIT_CODE[modelSpecResult.error.type]);
-	}
+	const aiConfig = config.ai ?? {};
+	const modelSpec = exitOnError(
+		resolveModelSpec({
+			cliModel: c.options.model,
+			config: aiConfig,
+		}),
+	);
 
-	const languageModelResult = createLanguageModel(modelSpecResult.value, aiConfig);
-	if (!languageModelResult.ok) {
-		console.error(formatError(languageModelResult.error));
-		process.exit(EXIT_CODE[languageModelResult.error.type]);
-	}
+	const languageModel = exitOnError(createLanguageModel(modelSpec, aiConfig));
 
 	const writer = createStreamWriter({
 		verbose: c.options.verbose ?? false,
@@ -405,17 +358,17 @@ async function runAgentMode(
 	const agentExecutor = createAgentExecutor(writer, logger);
 
 	const commandExecutor = createCommandRunner({
-		defaultTimeoutMs: configResult.value.cli?.command_timeout_ms,
+		defaultTimeoutMs: config.cli?.command_timeout_ms,
 	});
 	const hookExecutor = createHookExecutor(commandExecutor, logger);
-	const hooksConfig = configResult.value.hooks;
+	const hooksConfig = config.hooks;
 
 	const result = await runAgentSkill(
 		{
 			name: c.args.skill,
 			action: c.args.action,
 			presets,
-			model: languageModelResult.value,
+			model: languageModel,
 			noInput: c.options.skipPrompt,
 		},
 		{
@@ -429,10 +382,7 @@ async function runAgentMode(
 			hooksConfig,
 		},
 	);
-	if (!result.ok) {
-		console.error(formatError(result.error));
-		process.exit(EXIT_CODE[result.error.type]);
-	}
+	exitOnError(result);
 }
 
 function resolveScope(
