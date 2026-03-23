@@ -50,7 +50,7 @@ export function parseSkill(
 			logger?.warn('Skill-level "inputs" is ignored when "actions" is defined');
 		}
 
-		const validationResult = validateActionSections(raw, metadata);
+		const validationResult = validateActionSections(parsed.content, metadata);
 		if (!validationResult.ok) {
 			return validationResult;
 		}
@@ -58,17 +58,20 @@ export function parseSkill(
 
 	return ok({
 		metadata,
-		body: createSkillBody(raw),
+		body: createSkillBody(parsed.content),
 		location,
 		scope: scope ?? inferScope(location),
 	});
 }
 
-function validateActionSections(raw: string, metadata: SkillMetadata): Result<void, ParseError> {
+function validateActionSections(
+	content: string,
+	metadata: SkillMetadata,
+): Result<void, ParseError> {
 	const actions = metadata.actions;
 	if (!actions) return ok(undefined);
 
-	const sections = parseActionSections(raw);
+	const sections = parseActionSections(content);
 
 	const actionKeys = new Set(Object.keys(actions));
 	const sectionNames = new Set(sections.map((section) => section.name));

@@ -1,4 +1,3 @@
-import matter from "gray-matter";
 import type { Heading, Root, RootContent } from "mdast";
 import remarkParse from "remark-parse";
 import remarkStringify from "remark-stringify";
@@ -13,8 +12,7 @@ export type ActionSection = {
 	readonly codeBlocks: readonly CodeBlock[];
 };
 
-export function parseActionSections(markdown: string): readonly ActionSection[] {
-	const { content } = matter(markdown);
+export function parseActionSections(content: string): readonly ActionSection[] {
 	const tree = unified().use(remarkParse).parse(content);
 
 	const sections: ActionSection[] = [];

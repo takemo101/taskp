@@ -1,3 +1,4 @@
+import matter from "gray-matter";
 import { describe, expect, it, vi } from "vitest";
 import type { Skill } from "../../src/core/skill/skill";
 import { createSkillBody } from "../../src/core/skill/skill-body";
@@ -57,7 +58,7 @@ function createTestSkill(
 			context: [],
 			...overrides,
 		},
-		body: createSkillBody(rawMarkdown),
+		body: createSkillBody(matter(rawMarkdown).content),
 		location: "/skills/deploy",
 		scope: "global",
 	};
@@ -468,7 +469,7 @@ echo "listing tasks"
 						},
 					},
 				},
-				body: createSkillBody(ACTION_SKILL_MD),
+				body: createSkillBody(matter(ACTION_SKILL_MD).content),
 				location: "/skills/task",
 				scope: "global",
 			};

@@ -1,3 +1,4 @@
+import matter from "gray-matter";
 import { describe, expect, it } from "vitest";
 import type { TaskpRunDeps, TaskpRunResult } from "../../../src/core/execution/agent-tools";
 import { buildTools, TOOL_NAMES } from "../../../src/core/execution/agent-tools";
@@ -122,7 +123,7 @@ function createSkill(raw: string, nameOverride?: string): Skill {
 			context: [],
 			...(actions ? { actions } : {}),
 		},
-		body: createSkillBody(raw),
+		body: createSkillBody(matter(raw).content),
 		location: `/skills/${name}`,
 		scope: "global",
 	};
