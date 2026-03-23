@@ -5,6 +5,7 @@ import { createAgentExecutor } from "./adapter/agent-executor";
 import { createLanguageModel, resolveModelSpec } from "./adapter/ai-provider";
 import { createCommandRunner } from "./adapter/command-runner";
 import { createDefaultConfigLoader } from "./adapter/config-loader";
+import { createConsoleLogger } from "./adapter/console-logger";
 import { createContextCollector } from "./adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "./adapter/context-collector-deps";
 import { createHookExecutor } from "./adapter/hook-executor";
@@ -203,7 +204,8 @@ const cli = Cli.create("taskp", {
 			const progressWriter = createCliProgressWriter(process.stdout);
 
 			const hooksConfig = config?.hooks;
-			const hookExecutor = createHookExecutor(commandExecutor);
+			const logger = createConsoleLogger();
+			const hookExecutor = createHookExecutor(commandExecutor, logger);
 
 			const result = await runSkill(
 				{
@@ -413,12 +415,13 @@ async function runAgentMode(
 	const contextCollectorDeps = await createDefaultContextCollectorDeps();
 	const contextCollector = createContextCollector(contextCollectorDeps);
 
-	const agentExecutor = createAgentExecutor(writer);
+	const logger = createConsoleLogger();
+	const agentExecutor = createAgentExecutor(writer, logger);
 
 	const commandExecutor = createCommandRunner({
 		defaultTimeoutMs: configResult.value.cli?.command_timeout_ms,
 	});
-	const hookExecutor = createHookExecutor(commandExecutor);
+	const hookExecutor = createHookExecutor(commandExecutor, logger);
 	const hooksConfig = configResult.value.hooks;
 
 	const result = await runAgentSkill(

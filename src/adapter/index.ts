@@ -15,9 +15,9 @@ export {
 	resolveModelSpec,
 } from "./ai-provider";
 export { createCommandRunner } from "./command-runner";
-
 export type { AiConfig, CliConfig, Config, ProviderConfig } from "./config-loader";
 export { createConfigLoader, createDefaultConfigLoader } from "./config-loader";
+export { createConsoleLogger } from "./console-logger";
 export { createContextCollector } from "./context-collector";
 export { createPromptRunner } from "./prompt-runner";
 export type { RetryConfig } from "./retry";

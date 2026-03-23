@@ -1,5 +1,6 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { createAgentExecutor } from "../../adapter/agent-executor";
+import { createConsoleLogger } from "../../adapter/console-logger";
 import { createContextCollector } from "../../adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "../../adapter/context-collector-deps";
 import { resolveActionConfig } from "../../core/skill/action";
@@ -98,7 +99,8 @@ async function executeAgentMode(
 ): Promise<void> {
 	const writer = createTuiStreamWriter(viewPort);
 	const progressWriter = createTuiProgressWriter(viewPort);
-	const agentExecutor = createAgentExecutor(writer);
+	const logger = createConsoleLogger();
+	const agentExecutor = createAgentExecutor(writer, logger);
 
 	const contextCollectorDeps = await createDefaultContextCollectorDeps();
 	const contextCollector = createContextCollector(contextCollectorDeps);

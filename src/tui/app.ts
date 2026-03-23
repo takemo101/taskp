@@ -3,6 +3,7 @@ import { createCliRenderer } from "@opentui/core";
 import { createLanguageModel, type ModelSpec, resolveModelSpec } from "../adapter/ai-provider";
 import { createCommandRunner } from "../adapter/command-runner";
 import { createDefaultConfigLoader } from "../adapter/config-loader";
+import { createConsoleLogger } from "../adapter/console-logger";
 import { createHookExecutor } from "../adapter/hook-executor";
 import { createDefaultSkillLoader } from "../adapter/skill-loader";
 import { createSystemPromptResolver } from "../adapter/system-prompt-resolver";
@@ -50,7 +51,8 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 			await resolveModelAndConfig(options);
 
 		const commandExecutor = createCommandRunner({ defaultTimeoutMs: commandTimeoutMs });
-		const hookExecutor = createHookExecutor(commandExecutor);
+		const logger = createConsoleLogger();
+		const hookExecutor = createHookExecutor(commandExecutor, logger);
 		const executionDeps: ExecutionDeps = {
 			commandExecutor,
 			hookExecutor,

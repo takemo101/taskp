@@ -9,6 +9,10 @@ import { createSkillBody } from "./skill-body";
 import type { SkillMetadata } from "./skill-metadata";
 import { parseSkillMetadata } from "./skill-metadata";
 
+export type SkillLogger = {
+	readonly warn: (message: string) => void;
+};
+
 export type SkillScope = "local" | "global";
 
 export type Skill = {
@@ -22,6 +26,7 @@ export function parseSkill(
 	raw: string,
 	location: string,
 	scope?: SkillScope,
+	logger?: SkillLogger,
 ): Result<Skill, ParseError> {
 	// gray-matter は不正な frontmatter に対して例外を投げるため、
 	// try-catch で捕捉して Result 型に変換する
@@ -42,7 +47,7 @@ export function parseSkill(
 
 	if (metadata.actions) {
 		if (metadata.inputs.length > 0) {
-			console.warn('[taskp] Skill-level "inputs" is ignored when "actions" is defined');
+			logger?.warn('Skill-level "inputs" is ignored when "actions" is defined');
 		}
 
 		const validationResult = validateActionSections(raw, metadata);

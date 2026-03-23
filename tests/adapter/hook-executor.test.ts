@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHookExecutor } from "../../src/adapter/hook-executor";
+import { createSilentLogger } from "../../src/adapter/silent-logger";
 import type { ExecutionError } from "../../src/core/types/errors";
 import type { Result } from "../../src/core/types/result";
 import { err, ok } from "../../src/core/types/result";
@@ -9,6 +10,7 @@ import type {
 	ExecResult,
 } from "../../src/usecase/port/command-executor";
 import type { HookContext } from "../../src/usecase/port/hook-executor";
+import type { Logger } from "../../src/usecase/port/logger";
 
 type ExecutedCommand = {
 	readonly command: string;
@@ -55,7 +57,7 @@ describe("HookExecutor", () => {
 			ok({ stdout: "", stderr: "", exitCode: 0 }),
 			ok({ stdout: "", stderr: "", exitCode: 0 }),
 		]);
-		const hookExecutor = createHookExecutor(executor);
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 
 		const results = await hookExecutor.execute(["echo one", "echo two"], successContext);
 
@@ -67,7 +69,7 @@ describe("HookExecutor", () => {
 
 	it("injects environment variables correctly", async () => {
 		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
-		const hookExecutor = createHookExecutor(executor);
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 
 		await hookExecutor.execute(["echo test"], successContext);
 
@@ -86,7 +88,7 @@ describe("HookExecutor", () => {
 
 	it("injects TASKP_ACTION_NAME when actionName is present", async () => {
 		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
-		const hookExecutor = createHookExecutor(executor);
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 		const contextWithAction: HookContext = {
 			...successContext,
 			actionName: "add",
@@ -100,7 +102,7 @@ describe("HookExecutor", () => {
 
 	it("injects TASKP_SKILL_REF as skillName:actionName when actionName is present", async () => {
 		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
-		const hookExecutor = createHookExecutor(executor);
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 		const contextWithAction: HookContext = {
 			skillName: "task",
 			actionName: "add",
@@ -117,7 +119,7 @@ describe("HookExecutor", () => {
 
 	it("injects TASKP_SKILL_REF as skillName only when no actionName", async () => {
 		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
-		const hookExecutor = createHookExecutor(executor);
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 
 		await hookExecutor.execute(["echo test"], successContext);
 
@@ -127,7 +129,7 @@ describe("HookExecutor", () => {
 
 	it("injects TASKP_ERROR on failure context", async () => {
 		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
-		const hookExecutor = createHookExecutor(executor);
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 
 		await hookExecutor.execute(["echo test"], failedContext);
 
@@ -139,7 +141,7 @@ describe("HookExecutor", () => {
 
 	it("truncates TASKP_ERROR to 1024 characters", async () => {
 		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
-		const hookExecutor = createHookExecutor(executor);
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 		const longError = "x".repeat(2000);
 
 		await hookExecutor.execute(["echo test"], {
@@ -153,7 +155,7 @@ describe("HookExecutor", () => {
 
 	it("sets TASKP_ERROR to empty string on success", async () => {
 		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
-		const hookExecutor = createHookExecutor(executor);
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 
 		await hookExecutor.execute(["echo test"], successContext);
 
@@ -167,8 +169,7 @@ describe("HookExecutor", () => {
 			ok({ stdout: "", stderr: "", exitCode: 0 }),
 			err({ type: "EXECUTION_ERROR" as const, message: "timeout" }),
 		]);
-		const hookExecutor = createHookExecutor(executor);
-		vi.spyOn(console, "error").mockImplementation(() => {});
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 
 		const results = await hookExecutor.execute(
 			["bad-cmd", "good-cmd", "timeout-cmd"],
@@ -180,13 +181,11 @@ describe("HookExecutor", () => {
 		expect(results[1]).toEqual({ command: "good-cmd", success: true });
 		expect(results[2]).toEqual({ command: "timeout-cmd", success: false, error: "timeout" });
 		expect(executor.executedCommands).toHaveLength(3);
-
-		vi.restoreAllMocks();
 	});
 
 	it("returns empty array for empty commands", async () => {
 		const executor = createSpyCommandExecutor([]);
-		const hookExecutor = createHookExecutor(executor);
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 
 		const results = await hookExecutor.execute([], successContext);
 
@@ -196,7 +195,7 @@ describe("HookExecutor", () => {
 
 	it("injects TASKP_CALLER_SKILL when callerSkill is present", async () => {
 		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
-		const hookExecutor = createHookExecutor(executor);
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 		const contextWithCaller: HookContext = {
 			...successContext,
 			callerSkill: "diagnose",
@@ -210,7 +209,7 @@ describe("HookExecutor", () => {
 
 	it("sets TASKP_CALLER_SKILL to empty string when callerSkill is undefined", async () => {
 		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
-		const hookExecutor = createHookExecutor(executor);
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 
 		await hookExecutor.execute(["echo test"], successContext);
 
@@ -220,24 +219,26 @@ describe("HookExecutor", () => {
 
 	it("sets timeout to 30 seconds", async () => {
 		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
-		const hookExecutor = createHookExecutor(executor);
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 
 		await hookExecutor.execute(["echo test"], successContext);
 
 		expect(executor.executedCommands[0].options?.timeout).toBe(30_000);
 	});
 
-	it("outputs warning to stderr on command failure", async () => {
+	it("logs warning via logger on command failure", async () => {
 		const executor = createSpyCommandExecutor([
 			err({ type: "EXECUTION_ERROR" as const, message: "not found" }),
 		]);
-		const hookExecutor = createHookExecutor(executor);
-		const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+		const spyLogger: Logger = {
+			debug: vi.fn(),
+			warn: vi.fn(),
+			error: vi.fn(),
+		};
+		const hookExecutor = createHookExecutor(executor, spyLogger);
 
 		await hookExecutor.execute(["missing-cmd"], successContext);
 
-		expect(errorSpy).toHaveBeenCalledWith('[taskp] hook warning: "missing-cmd" failed: not found');
-
-		vi.restoreAllMocks();
+		expect(spyLogger.error).toHaveBeenCalledWith('hook warning: "missing-cmd" failed: not found');
 	});
 });
