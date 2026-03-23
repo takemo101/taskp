@@ -248,17 +248,28 @@ async function buildDescriptionOverrides(
 	};
 }
 
-const VALUE_FIELD: Record<ContextSource["type"], string> = {
-	file: "path",
-	glob: "pattern",
-	command: "run",
-	url: "url",
-} as const;
-
 function getContextSourceValue(source: ContextSource): string {
-	return source[VALUE_FIELD[source.type] as keyof typeof source] as string;
+	switch (source.type) {
+		case "file":
+			return source.path;
+		case "glob":
+			return source.pattern;
+		case "command":
+			return source.run;
+		case "url":
+			return source.url;
+	}
 }
 
 function withResolvedValue(source: ContextSource, value: string): ContextSource {
-	return { ...source, [VALUE_FIELD[source.type]]: value } as ContextSource;
+	switch (source.type) {
+		case "file":
+			return { ...source, path: value };
+		case "glob":
+			return { ...source, pattern: value };
+		case "command":
+			return { ...source, run: value };
+		case "url":
+			return { ...source, url: value };
+	}
 }
