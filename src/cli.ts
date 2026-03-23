@@ -18,8 +18,9 @@ import { createSystemPromptResolver } from "./adapter/system-prompt-resolver";
 import type { Action } from "./core/skill/action";
 import { resolveActionConfig } from "./core/skill/action";
 import type { ContextSource } from "./core/skill/context-source";
-import type { Skill, SkillScope } from "./core/skill/skill";
+import type { SkillScope } from "./core/skill/skill";
 import { parseSkillRef } from "./core/skill/skill-ref";
+import { validateActionExists, validateActionRequired } from "./core/skill/validate-skill-action";
 import { type DomainError, domainErrorMessage, ErrorType, EXIT_CODE } from "./core/types/errors";
 import { type InitOutput, initSkill } from "./usecase/init-skill";
 import { createListSkillsUseCase } from "./usecase/list-skills";
@@ -106,31 +107,6 @@ function formatError(error: DomainError): string {
 	return `Error: ${domainErrorMessage(error)}`;
 }
 
-function requireActionForActionsSkill(skill: Skill, actionName: string | undefined): void {
-	if (skill.metadata.actions && !actionName) {
-		const names = Object.keys(skill.metadata.actions).join(", ");
-		console.error(
-			`Error: Skill "${skill.metadata.name}" requires an action. Available actions: ${names}\nUse: taskp run ${skill.metadata.name}:<action> or use the TUI (taskp tui)`,
-		);
-		process.exit(EXIT_CODE[ErrorType.Config]);
-	}
-}
-
-function requireValidAction(skill: Skill, actionName: string | undefined): Action | undefined {
-	if (!actionName) return undefined;
-
-	const actions = skill.metadata.actions;
-	if (!actions || !(actionName in actions)) {
-		const available = actions ? Object.keys(actions).join(", ") : "none";
-		console.error(
-			`Error: Action "${actionName}" not found in skill "${skill.metadata.name}". Available actions: ${available}`,
-		);
-		process.exit(EXIT_CODE[ErrorType.SkillNotFound]);
-	}
-
-	return actions[actionName];
-}
-
 const cli = Cli.create("taskp", {
 	version: "0.1.6",
 	description:
@@ -175,8 +151,18 @@ const cli = Cli.create("taskp", {
 
 			const skill = findResult.value;
 
-			requireActionForActionsSkill(skill, ref.action);
-			const action = requireValidAction(skill, ref.action);
+			const actionRequiredResult = validateActionRequired(skill, ref.action);
+			if (!actionRequiredResult.ok) {
+				console.error(formatError(actionRequiredResult.error));
+				process.exit(EXIT_CODE[actionRequiredResult.error.type]);
+			}
+
+			const actionExistsResult = validateActionExists(skill, ref.action);
+			if (!actionExistsResult.ok) {
+				console.error(formatError(actionExistsResult.error));
+				process.exit(EXIT_CODE[actionExistsResult.error.type]);
+			}
+			const action = actionExistsResult.value;
 
 			// アクション指定時は resolveActionConfig で mode を決定
 			const effectiveMode = action
