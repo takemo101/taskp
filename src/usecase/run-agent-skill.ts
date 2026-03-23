@@ -2,7 +2,11 @@ import { dirname } from "node:path";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { buildTaskpRunDescription } from "../core/execution/agent-tools";
 import { resolveActionConfig } from "../core/skill";
-import type { ContextSource } from "../core/skill/context-source";
+import {
+	type ContextSource,
+	getContextSourceValue,
+	withResolvedValue,
+} from "../core/skill/context-source";
 import type { Skill } from "../core/skill/skill";
 import type { SkillInput } from "../core/skill/skill-input";
 import { type DomainError, domainErrorMessage, executionError } from "../core/types/errors";
@@ -246,19 +250,4 @@ async function buildDescriptionOverrides(
 	return {
 		taskp_run: buildTaskpRunDescription(skills, currentSkillName),
 	};
-}
-
-const VALUE_FIELD: Record<ContextSource["type"], string> = {
-	file: "path",
-	glob: "pattern",
-	command: "run",
-	url: "url",
-} as const;
-
-function getContextSourceValue(source: ContextSource): string {
-	return source[VALUE_FIELD[source.type] as keyof typeof source] as string;
-}
-
-function withResolvedValue(source: ContextSource, value: string): ContextSource {
-	return { ...source, [VALUE_FIELD[source.type]]: value } as ContextSource;
 }
