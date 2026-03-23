@@ -152,8 +152,10 @@ export function renderTemplate(
 
 	const rendered = expanded.replace(VARIABLE_PATTERN, (_, name: string) => {
 		const value = resolveVariable(name, variables, reserved);
-		// ステップ 3 で全変数の定義を検証済みのため undefined は到達しない
-		return value as string;
+		if (value === undefined) {
+			throw new Error(`unreachable: variable '${name}' was validated but is undefined`);
+		}
+		return value;
 	});
 
 	return ok(rendered);
