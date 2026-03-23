@@ -78,7 +78,7 @@ export function createPresetPromptCollector(
 	variables: Readonly<Record<string, string>>,
 ): PromptCollector {
 	return {
-		collect: async () => ok(variables as Record<string, string>),
+		collect: async () => ok(variables),
 	};
 }
 
