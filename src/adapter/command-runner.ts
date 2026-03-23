@@ -24,7 +24,7 @@ export function createCommandRunner(deps?: CommandRunnerDeps): CommandExecutor {
 					const result = await execaCommand(command, {
 						shell: true,
 						cwd: options?.cwd,
-						env: options?.env as Record<string, string> | undefined,
+						env: options?.env ? { ...options.env } : undefined,
 						timeout: options?.timeout ?? timeoutMs,
 					});
 
