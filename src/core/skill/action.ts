@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_TOOLS } from "../constants";
 import type { ContextSource } from "./context-source";
 import { contextSourceSchema } from "./context-source";
 import type { SkillInput } from "./skill-input";
@@ -6,8 +7,6 @@ import { skillInputSchema } from "./skill-input";
 import type { SkillMetadata } from "./skill-metadata";
 
 const skillModeSchema = z.enum(["template", "agent"]);
-
-const DEFAULT_TOOLS = ["bash", "read", "write"] as const;
 
 const actionSchema = z.object({
 	description: z.string().min(1),

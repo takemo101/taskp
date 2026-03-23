@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_TOOLS } from "../constants";
 import type { ParseError } from "../types/errors";
 import { parseError } from "../types/errors";
 import type { Result } from "../types/result";
@@ -10,10 +11,6 @@ import type { SkillInput } from "./skill-input";
 import { skillInputSchema } from "./skill-input";
 
 const skillModeSchema = z.enum(["template", "agent"]);
-
-// agent モードのスキルが最低限のファイル操作を行えるよう、
-// ツール未指定時のデフォルトセットを定義
-const DEFAULT_TOOLS = ["bash", "read", "write"] as const;
 
 const skillMetadataSchema = z
 	.object({
