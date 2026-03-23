@@ -52,7 +52,7 @@ function extractCodeBlocks(markdownContent: string, lang: string): readonly Code
 	const blocks: CodeBlock[] = [];
 
 	for (const node of tree.children) {
-		if (node.type === "code" && node.lang === lang) {
+		if (node.type === "code" && node.lang != null && node.lang === lang) {
 			blocks.push({ lang: node.lang, code: node.value });
 		}
 	}

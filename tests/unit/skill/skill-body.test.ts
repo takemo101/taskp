@@ -103,6 +103,16 @@ describe("extractCodeBlocks", () => {
 		expect(blocks).toEqual([{ lang: "bash", code: "echo hello" }]);
 	});
 
+	it("言語指定のないコードブロックを除外する", () => {
+		const raw = withFrontmatter(
+			["", "```", "bare code", "```", "", "```bash", "echo hello", "```", ""].join("\n"),
+		);
+		const body = createSkillBody(raw);
+		const blocks = body.extractCodeBlocks();
+
+		expect(blocks).toEqual([{ lang: "bash", code: "echo hello" }]);
+	});
+
 	it("コードブロックがない場合は空配列を返す", () => {
 		const raw = withFrontmatter("\n# Title\n\nNo code blocks here.\n");
 		const body = createSkillBody(raw);
