@@ -12,6 +12,11 @@ import type { SkillLoadResult, SkillRepository } from "../usecase/port/skill-rep
 const SKILL_DIR_NAME = ".taskp/skills";
 const SKILL_FILE_NAME = "SKILL.md";
 
+type SkillLoadAttempt =
+	| { readonly type: "found"; readonly ok: true; readonly value: Skill }
+	| { readonly type: "not_found" }
+	| { readonly type: "error"; readonly ok: false; readonly error: ParseError };
+
 type SkillLoaderDeps = {
 	readonly localRoot: string;
 	readonly globalRoot: string;
@@ -43,13 +48,13 @@ async function findByName(
 ): Promise<Result<Skill, SkillNotFoundError>> {
 	const localPath = join(localSkillsDir, name, SKILL_FILE_NAME);
 	const localResult = await tryLoadSkill(localPath, "local");
-	if (localResult?.ok) {
+	if (localResult.type === "found") {
 		return localResult;
 	}
 
 	const globalPath = join(globalSkillsDir, name, SKILL_FILE_NAME);
 	const globalResult = await tryLoadSkill(globalPath, "global");
-	if (globalResult?.ok) {
+	if (globalResult.type === "found") {
 		return globalResult;
 	}
 
@@ -80,10 +85,10 @@ async function scanDirectory(skillsDir: string, scope: SkillScope): Promise<Skil
 	for (const entry of entries.filter((e) => e.isDirectory())) {
 		const skillPath = join(skillsDir, entry.name, SKILL_FILE_NAME);
 		const result = await tryLoadSkill(skillPath, scope);
-		if (result === undefined) {
+		if (result.type === "not_found") {
 			continue;
 		}
-		if (result.ok) {
+		if (result.type === "found") {
 			skills.push(result.value);
 		} else {
 			failures.push({ path: skillPath, error: result.error.message });
@@ -93,21 +98,22 @@ async function scanDirectory(skillsDir: string, scope: SkillScope): Promise<Skil
 	return { skills, failures };
 }
 
-async function tryLoadSkill(
-	path: string,
-	scope: SkillScope,
-): Promise<Result<Skill, ParseError> | undefined> {
+async function tryLoadSkill(path: string, scope: SkillScope): Promise<SkillLoadAttempt> {
 	let raw: string;
 	try {
 		raw = await readFile(path, "utf-8");
 	} catch (e: unknown) {
 		if (isFileNotFound(e)) {
-			return undefined;
+			return { type: "not_found" };
 		}
-		return err(parseError(`Failed to read skill file: ${path}`));
+		return { type: "error", ok: false, error: parseError(`Failed to read skill file: ${path}`) };
 	}
 
-	return parseSkill(raw, path, scope);
+	const parseResult = parseSkill(raw, path, scope);
+	if (!parseResult.ok) {
+		return { type: "error", ...parseResult };
+	}
+	return { type: "found", ...parseResult };
 }
 
 function isFileNotFound(e: unknown): boolean {
