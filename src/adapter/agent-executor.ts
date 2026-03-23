@@ -8,6 +8,7 @@ import type {
 	AgentExecutorPort,
 	AgentExecutorResult,
 } from "../usecase/port/agent-executor";
+import type { Logger } from "../usecase/port/logger";
 import { classifyAgentError, toExecutionError } from "./agent-error-handler";
 import type { StreamWriter } from "./stream-writer";
 
@@ -15,15 +16,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function createAgentExecutor(writer: StreamWriter): AgentExecutorPort {
+export function createAgentExecutor(writer: StreamWriter, logger: Logger): AgentExecutorPort {
 	return {
-		execute: async (input) => executeAgentLoop(input, writer),
+		execute: async (input) => executeAgentLoop(input, writer, logger),
 	};
 }
 
 async function executeAgentLoop(
 	input: AgentExecutorInput,
 	writer: StreamWriter,
+	logger: Logger,
 ): ReturnType<AgentExecutorPort["execute"]> {
 	const startTime = Date.now();
 	const toolsResult = buildTools(input.toolNames, input.buildToolsOptions);
@@ -39,7 +41,7 @@ async function executeAgentLoop(
 			prompt: input.prompt,
 			tools,
 			stopWhen: stepCountIs(input.maxSteps),
-			experimental_repairToolCall: repairToolCall,
+			experimental_repairToolCall: createRepairToolCall(logger),
 		});
 
 		for await (const part of result.fullStream) {
@@ -94,23 +96,25 @@ async function executeAgentLoop(
  * 制御文字をエスケープして再パースを試みる。
  * @internal テスト用にエクスポート
  */
-export const repairToolCall: ToolCallRepairFunction<ToolSet> = async (options) => {
-	const raw = options.toolCall.input;
-	// 制御文字（U+0000〜U+001F）を \uXXXX にエスケープ
-	// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional match for JSON control chars
-	const escaped = raw.replace(/[\u0000-\u001f]/g, (ch: string) => {
-		const hex = ch.codePointAt(0)?.toString(16).padStart(4, "0") ?? "0000";
-		return `\\u${hex}`;
-	});
-	if (escaped === raw) return null; // 制御文字が原因ではない → 修復不可
+export function createRepairToolCall(logger: Logger): ToolCallRepairFunction<ToolSet> {
+	return async (options) => {
+		const raw = options.toolCall.input;
+		// 制御文字（U+0000〜U+001F）を \uXXXX にエスケープ
+		// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional match for JSON control chars
+		const escaped = raw.replace(/[\u0000-\u001f]/g, (ch: string) => {
+			const hex = ch.codePointAt(0)?.toString(16).padStart(4, "0") ?? "0000";
+			return `\\u${hex}`;
+		});
+		if (escaped === raw) return null; // 制御文字が原因ではない → 修復不可
 
-	try {
-		const parsed = JSON.parse(escaped) as Record<string, unknown>;
-		return { ...options.toolCall, input: JSON.stringify(parsed) };
-	} catch (error) {
-		console.debug(
-			`[taskp] Tool call repair failed. Original: ${raw}, Escaped: ${escaped}, Error: ${error instanceof Error ? error.message : String(error)}`,
-		);
-		return null;
-	}
-};
+		try {
+			const parsed = JSON.parse(escaped) as Record<string, unknown>;
+			return { ...options.toolCall, input: JSON.stringify(parsed) };
+		} catch (error) {
+			logger.debug(
+				`Tool call repair failed. Original: ${raw}, Escaped: ${escaped}, Error: ${error instanceof Error ? error.message : String(error)}`,
+			);
+			return null;
+		}
+	};
+}

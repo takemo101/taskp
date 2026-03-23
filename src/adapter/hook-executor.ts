@@ -1,5 +1,6 @@
 import type { CommandExecutor } from "../usecase/port/command-executor";
 import type { HookContext, HookExecutorPort, HookResult } from "../usecase/port/hook-executor";
+import type { Logger } from "../usecase/port/logger";
 
 const TIMEOUT_MS = 30_000;
 const MAX_ERROR_LENGTH = 1024;
@@ -32,7 +33,10 @@ function buildEnvVars(context: HookContext): Record<string, string> {
 	};
 }
 
-export function createHookExecutor(commandExecutor: CommandExecutor): HookExecutorPort {
+export function createHookExecutor(
+	commandExecutor: CommandExecutor,
+	logger: Logger,
+): HookExecutorPort {
 	return {
 		async execute(
 			commands: readonly string[],
@@ -54,7 +58,7 @@ export function createHookExecutor(commandExecutor: CommandExecutor): HookExecut
 				if (result.ok) {
 					results.push({ command, success: true });
 				} else {
-					console.error(`[taskp] hook warning: "${command}" failed: ${result.error.message}`);
+					logger.error(`hook warning: "${command}" failed: ${result.error.message}`);
 					results.push({ command, success: false, error: result.error.message });
 				}
 			}

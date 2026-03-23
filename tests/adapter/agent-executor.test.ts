@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { createSilentLogger } from "../../src/adapter/silent-logger";
 import type { StreamWriter } from "../../src/adapter/stream-writer";
 
 function createMockWriter(): StreamWriter & {
@@ -23,7 +24,7 @@ describe("agent-executor adapter", () => {
 	it("createAgentExecutor returns an executor with execute method", async () => {
 		const { createAgentExecutor } = await import("../../src/adapter/agent-executor");
 		const writer = createMockWriter();
-		const executor = createAgentExecutor(writer);
+		const executor = createAgentExecutor(writer, createSilentLogger());
 		expect(typeof executor.execute).toBe("function");
 	});
 
