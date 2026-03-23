@@ -1,4 +1,3 @@
-import matter from "gray-matter";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
 import type { ActionSection } from "./action-section-parser";
@@ -16,16 +15,12 @@ export interface SkillBody {
 	readonly extractActionCodeBlocks: (name: string, lang?: string) => readonly CodeBlock[];
 }
 
-export function createSkillBody(rawMarkdown: string): SkillBody {
-	// frontmatter を除いた本文のみを保持する
-	// （メタデータは SkillMetadata 側で管理するため分離）
-	const { content } = matter(rawMarkdown);
-
+export function createSkillBody(content: string): SkillBody {
 	// アクションセクションは content から一度だけパースしてキャッシュする
 	let cachedSections: readonly ActionSection[] | null = null;
 	const getSections = (): readonly ActionSection[] => {
 		if (cachedSections === null) {
-			cachedSections = parseActionSections(rawMarkdown);
+			cachedSections = parseActionSections(content);
 		}
 		return cachedSections;
 	};

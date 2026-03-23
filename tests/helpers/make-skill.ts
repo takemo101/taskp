@@ -1,3 +1,4 @@
+import matter from "gray-matter";
 import type { Skill, SkillScope } from "../../src/core/skill/skill";
 import { createSkillBody } from "../../src/core/skill/skill-body";
 import type { SkillMetadata } from "../../src/core/skill/skill-metadata";
@@ -29,7 +30,7 @@ export function makeSkill(overrides: SkillOverrides = {}): Skill {
 			context: overrides.context ?? [],
 			model: overrides.model,
 		},
-		body: createSkillBody(rawMarkdown),
+		body: createSkillBody(matter(rawMarkdown).content),
 		location: overrides.location ?? `/skills/${name}/SKILL.md`,
 		scope: overrides.scope ?? "local",
 	};
