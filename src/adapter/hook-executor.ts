@@ -58,8 +58,9 @@ export function createHookExecutor(
 				if (result.ok) {
 					results.push({ command, success: true });
 				} else {
-					logger.error(`hook warning: "${command}" failed: ${result.error.message}`);
-					results.push({ command, success: false, error: result.error.message });
+					const errorMsg = "message" in result.error ? result.error.message : String(result.error);
+					logger.error(`hook warning: "${command}" failed: ${errorMsg}`);
+					results.push({ command, success: false, error: errorMsg });
 				}
 			}
 
