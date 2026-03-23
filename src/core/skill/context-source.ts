@@ -29,6 +29,32 @@ export const contextSourceSchema = z.discriminatedUnion("type", [
 
 export type ContextSource = z.infer<typeof contextSourceSchema>;
 
+export function getContextSourceValue(source: ContextSource): string {
+	switch (source.type) {
+		case "file":
+			return source.path;
+		case "glob":
+			return source.pattern;
+		case "command":
+			return source.run;
+		case "url":
+			return source.url;
+	}
+}
+
+export function withResolvedValue(source: ContextSource, value: string): ContextSource {
+	switch (source.type) {
+		case "file":
+			return { ...source, path: value };
+		case "glob":
+			return { ...source, pattern: value };
+		case "command":
+			return { ...source, run: value };
+		case "url":
+			return { ...source, url: value };
+	}
+}
+
 export function parseContextSource(input: unknown): ContextSource {
 	return contextSourceSchema.parse(input);
 }

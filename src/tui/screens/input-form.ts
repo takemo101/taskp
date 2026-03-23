@@ -77,7 +77,6 @@ class FormController {
 			if (i === this.focusIndex) {
 				el.label.content = t`${green("?")} ${el.input.message}`;
 			} else if (el.input.name in this.values) {
-				continue;
 			} else {
 				el.label.content = t`${dim("○")} ${el.input.message}`;
 			}

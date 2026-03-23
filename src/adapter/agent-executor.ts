@@ -11,6 +11,10 @@ import type {
 import { classifyAgentError, toExecutionError } from "./agent-error-handler";
 import type { StreamWriter } from "./stream-writer";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export function createAgentExecutor(writer: StreamWriter): AgentExecutorPort {
 	return {
 		execute: async (input) => executeAgentLoop(input, writer),
@@ -43,9 +47,18 @@ async function executeAgentLoop(
 				case "text-delta":
 					if (part.text) writer.writeText(part.text);
 					break;
-				case "tool-call":
-					writer.writeToolCall(part.toolName, part.input as Record<string, unknown>);
+				case "tool-call": {
+					const input = part.input;
+					if (!isRecord(input)) {
+						return err(
+							executionError(
+								`Invalid tool input type from AI SDK: expected object, got ${typeof input}`,
+							),
+						);
+					}
+					writer.writeToolCall(part.toolName, input);
 					break;
+				}
 				case "tool-result":
 					writer.writeToolResult(part.toolName, part.output);
 					break;

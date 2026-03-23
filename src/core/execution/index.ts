@@ -3,7 +3,6 @@
 export type { AgentLoopInput, AgentLoopResult } from "./agent-loop.js";
 export { createAgentLoop } from "./agent-loop.js";
 export type {
-	AnyTool,
 	BuildToolsOptions,
 	DescriptionOverrides,
 	TaskpRunDeps,

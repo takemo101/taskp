@@ -1,6 +1,6 @@
 import { glob as fsGlob, readFile, writeFile } from "node:fs/promises";
 import { input } from "@inquirer/prompts";
-import type { JSONSchema7, Tool } from "ai";
+import type { JSONSchema7, Tool, ToolSet } from "ai";
 import { jsonSchema } from "ai";
 import { execa } from "execa";
 import { toJSONSchema, z } from "zod";
@@ -134,16 +134,16 @@ const askUserTool: Tool<AskUserInput, string> = {
 };
 
 // Tool<I, O> のジェネリクスが共変でないため、異なる I/O を持つツールを
-// 1つの Record にまとめるには型パラメータを消去する必要がある
-type AnyTool = Tool<Record<string, unknown>, unknown>;
+// 1つの Record にまとめるには Vercel AI SDK の ToolSet 値型を使う
+type ToolSetEntry = ToolSet[string];
 
 // taskp_run 以外の静的ツール
-const staticTools: Record<string, AnyTool> = {
-	bash: bashTool as AnyTool,
-	read: readTool as AnyTool,
-	write: writeTool as AnyTool,
-	glob: globTool as AnyTool,
-	ask_user: askUserTool as AnyTool,
+const staticTools: Record<string, ToolSetEntry> = {
+	bash: bashTool as ToolSetEntry,
+	read: readTool as ToolSetEntry,
+	write: writeTool as ToolSetEntry,
+	glob: globTool as ToolSetEntry,
+	ask_user: askUserTool as ToolSetEntry,
 };
 
 const MAX_NESTING_DEPTH = 3;
@@ -245,7 +245,7 @@ async function executeTaskpRun(
 	return { status: "success", output: buildTaskpRunOutput(result.value) };
 }
 
-function createTaskpRunTool(deps: TaskpRunDeps, description: string): AnyTool {
+function createTaskpRunTool(deps: TaskpRunDeps, description: string): ToolSetEntry {
 	const callStack = deps.callStack ?? [];
 
 	const tool: Tool<TaskpRunInput, TaskpRunResult> = {
@@ -255,7 +255,7 @@ function createTaskpRunTool(deps: TaskpRunDeps, description: string): AnyTool {
 			executeTaskpRun(deps, callStack, skill, set as Readonly<Record<string, string>>),
 	};
 
-	return tool as AnyTool;
+	return tool as ToolSetEntry;
 }
 
 export type DescriptionOverrides = Readonly<Record<string, string>>;
@@ -268,8 +268,8 @@ export type BuildToolsOptions = {
 export function buildTools(
 	toolNames: readonly string[],
 	options?: BuildToolsOptions,
-): Result<Record<string, AnyTool>, ExecutionError> {
-	const tools: Record<string, AnyTool> = {};
+): Result<ToolSet, ExecutionError> {
+	const tools: ToolSet = {};
 	for (const name of toolNames) {
 		if (name === "taskp_run") {
 			if (!options?.taskpRunDeps) {
@@ -378,5 +378,5 @@ export function getPrimaryArgKey(toolName: string): string | undefined {
 	return PRIMARY_ARG_KEYS[toolName as ToolName];
 }
 
-export type { AnyTool, TaskpRunDeps, TaskpRunResult, ToolName };
-export { MAX_NESTING_DEPTH, TOOL_NAMES, resolveSkillMode, validateTaskpRunCall };
+export type { TaskpRunDeps, TaskpRunResult, ToolName };
+export { MAX_NESTING_DEPTH, resolveSkillMode, TOOL_NAMES, validateTaskpRunCall };

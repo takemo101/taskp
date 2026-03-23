@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseContextSource } from "../../../src/core/skill/context-source";
+import {
+	getContextSourceValue,
+	parseContextSource,
+	withResolvedValue,
+} from "../../../src/core/skill/context-source";
 
 describe("parseContextSource", () => {
 	it("parses file type", () => {
@@ -60,7 +64,60 @@ describe("parseContextSource", () => {
 	it("throws on missing type", () => {
 		expect(() => parseContextSource({ path: "src/foo" })).toThrow();
 	});
+});
 
+describe("getContextSourceValue", () => {
+	it("returns path for file source", () => {
+		expect(getContextSourceValue({ type: "file", path: "src/index.ts" })).toBe("src/index.ts");
+	});
+
+	it("returns pattern for glob source", () => {
+		expect(getContextSourceValue({ type: "glob", pattern: "src/**/*.ts" })).toBe("src/**/*.ts");
+	});
+
+	it("returns run for command source", () => {
+		expect(getContextSourceValue({ type: "command", run: "git diff" })).toBe("git diff");
+	});
+
+	it("returns url for url source", () => {
+		expect(getContextSourceValue({ type: "url", url: "https://example.com" })).toBe(
+			"https://example.com",
+		);
+	});
+});
+
+describe("withResolvedValue", () => {
+	it("replaces path for file source", () => {
+		const source = { type: "file" as const, path: "{{target}}" };
+		expect(withResolvedValue(source, "resolved.ts")).toEqual({ type: "file", path: "resolved.ts" });
+	});
+
+	it("replaces pattern for glob source", () => {
+		const source = { type: "glob" as const, pattern: "{{pat}}" };
+		expect(withResolvedValue(source, "src/*.ts")).toEqual({ type: "glob", pattern: "src/*.ts" });
+	});
+
+	it("replaces run for command source", () => {
+		const source = { type: "command" as const, run: "{{cmd}}" };
+		expect(withResolvedValue(source, "ls -la")).toEqual({ type: "command", run: "ls -la" });
+	});
+
+	it("replaces url for url source", () => {
+		const source = { type: "url" as const, url: "{{u}}" };
+		expect(withResolvedValue(source, "https://resolved.com")).toEqual({
+			type: "url",
+			url: "https://resolved.com",
+		});
+	});
+
+	it("does not mutate the original source", () => {
+		const source = { type: "file" as const, path: "original.ts" };
+		withResolvedValue(source, "new.ts");
+		expect(source.path).toBe("original.ts");
+	});
+});
+
+describe("parseContextSource", () => {
 	it("preserves template variables as strings", () => {
 		const result = parseContextSource({
 			type: "file",
