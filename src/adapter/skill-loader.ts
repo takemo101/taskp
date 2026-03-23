@@ -11,6 +11,8 @@ import type { SkillLoadResult, SkillRepository } from "../usecase/port/skill-rep
 
 const SKILL_DIR_NAME = ".taskp/skills";
 const SKILL_FILE_NAME = "SKILL.md";
+// Node.js file system error code for "file not found"
+const FILE_NOT_FOUND_CODE = "ENOENT";
 
 type SkillLoadAttempt =
 	| { readonly type: "found"; readonly ok: true; readonly value: Skill }
@@ -132,5 +134,5 @@ async function tryLoadSkill(
 }
 
 function isFileNotFound(e: unknown): boolean {
-	return e instanceof Error && "code" in e && e.code === "ENOENT";
+	return e instanceof Error && "code" in e && e.code === FILE_NOT_FOUND_CODE;
 }
