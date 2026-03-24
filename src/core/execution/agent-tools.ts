@@ -1,4 +1,5 @@
-import { glob as fsGlob, readFile, writeFile } from "node:fs/promises";
+import { glob as fsGlob, readFile, stat, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { input } from "@inquirer/prompts";
 import type { JSONSchema7, Tool, ToolSet } from "ai";
 import { jsonSchema } from "ai";
@@ -24,7 +25,16 @@ function zodToJsonSchema<T extends z.ZodType>(schema: T) {
 	return jsonSchema<z.infer<T>>(toJSONSchema(schema) as JSONSchema7);
 }
 
-const TOOL_NAMES = ["bash", "read", "write", "edit", "glob", "ask_user", "taskp_run"] as const;
+const TOOL_NAMES = [
+	"bash",
+	"read",
+	"write",
+	"edit",
+	"glob",
+	"grep",
+	"ask_user",
+	"taskp_run",
+] as const;
 type ToolName = (typeof TOOL_NAMES)[number];
 
 const bashParams = z.object({
@@ -51,6 +61,12 @@ const editParams = z.object({
 
 const globParams = z.object({
 	pattern: z.string().describe("Glob pattern to match files"),
+});
+
+const grepParams = z.object({
+	pattern: z.string().describe("Search pattern (regex supported)"),
+	path: z.string().optional().describe("File or directory to search (default: cwd)"),
+	include: z.string().optional().describe("Glob pattern to filter files (e.g. '*.ts')"),
 });
 
 const askUserParams = z.object({
@@ -167,6 +183,87 @@ const globTool: Tool<GlobInput, readonly string[]> = {
 	},
 };
 
+const MAX_GREP_MATCHES = 500;
+
+type GrepInput = z.infer<typeof grepParams>;
+
+type GrepResult = {
+	readonly matches: string;
+	readonly count: number;
+	readonly truncated: boolean;
+};
+
+async function resolveSearchFiles(
+	searchPath: string,
+	include: string | undefined,
+	cwd: string,
+): Promise<readonly string[]> {
+	const fullPath = resolve(cwd, searchPath);
+	const fileStat = await stat(fullPath);
+
+	if (fileStat.isFile()) {
+		return [searchPath];
+	}
+
+	const globPattern = include ?? "**/*";
+	const files: string[] = [];
+	for await (const entry of fsGlob(globPattern, { cwd: fullPath })) {
+		const entryPath = join(searchPath, entry);
+		const entryStat = await stat(resolve(cwd, entryPath)).catch(() => undefined);
+		if (entryStat?.isFile()) {
+			files.push(entryPath);
+		}
+	}
+	return files;
+}
+
+function searchFileContent(
+	content: string,
+	regex: RegExp,
+	filePath: string,
+	results: string[],
+	limit: number,
+): void {
+	const lines = content.split("\n");
+	for (let i = 0; i < lines.length; i++) {
+		if (results.length >= limit) return;
+		if (regex.test(lines[i])) {
+			results.push(`${filePath}:${i + 1}:${lines[i]}`);
+		}
+	}
+}
+
+const grepTool: Tool<GrepInput, GrepResult> = {
+	description:
+		"Search file contents for a pattern and return matching lines with file paths and line numbers",
+	inputSchema: zodToJsonSchema(grepParams),
+	execute: async ({ pattern, path, include }) => {
+		const cwd = process.cwd();
+		const searchPath = path ?? ".";
+		const regex = new RegExp(pattern);
+
+		const files = await resolveSearchFiles(searchPath, include, cwd);
+
+		const results: string[] = [];
+		for (const file of files) {
+			if (results.length >= MAX_GREP_MATCHES) break;
+			const fullFilePath = resolve(cwd, file);
+			try {
+				const content = await readFile(fullFilePath, "utf-8");
+				searchFileContent(content, regex, file, results, MAX_GREP_MATCHES);
+			} catch {
+				// Skip unreadable files (binary, permission denied, etc.)
+			}
+		}
+
+		return {
+			matches: results.join("\n"),
+			count: results.length,
+			truncated: results.length >= MAX_GREP_MATCHES,
+		};
+	},
+};
+
 type AskUserInput = z.infer<typeof askUserParams>;
 
 const askUserTool: Tool<AskUserInput, string> = {
@@ -188,6 +285,7 @@ const staticTools: Record<string, ToolSetEntry> = {
 	write: writeTool as ToolSetEntry,
 	edit: editTool as ToolSetEntry,
 	glob: globTool as ToolSetEntry,
+	grep: grepTool as ToolSetEntry,
 	ask_user: askUserTool as ToolSetEntry,
 };
 
@@ -415,6 +513,7 @@ const PRIMARY_ARG_KEYS: Readonly<Record<ToolName, string | undefined>> = {
 	write: "path",
 	edit: "path",
 	glob: "pattern",
+	grep: "pattern",
 	ask_user: "question",
 	taskp_run: "skill",
 };
@@ -425,4 +524,4 @@ export function getPrimaryArgKey(toolName: string): string | undefined {
 }
 
 export type { TaskpRunDeps, TaskpRunResult, ToolName };
-export { MAX_NESTING_DEPTH, resolveSkillMode, TOOL_NAMES, validateTaskpRunCall };
+export { MAX_GREP_MATCHES, MAX_NESTING_DEPTH, resolveSkillMode, TOOL_NAMES, validateTaskpRunCall };
