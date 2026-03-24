@@ -345,6 +345,7 @@ const fetchTool: Tool<FetchInput, FetchResult> = {
 
 		const response = await fetch(url, {
 			signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+			redirect: "error",
 		});
 
 		if (!response.ok) {
