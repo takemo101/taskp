@@ -426,6 +426,38 @@ describe("validateFetchUrl", () => {
 	});
 });
 
+describe("fetch tool redirect prevention", () => {
+	it("redirect: 'error' を設定して SSRF バイパスを防止する", async () => {
+		const result = buildTools(["fetch"]);
+		if (!result.ok) throw new Error("buildTools failed");
+
+		const fetchExecute = result.value.fetch.execute;
+		if (!fetchExecute) throw new Error("fetch.execute is undefined");
+
+		let capturedInit: RequestInit | undefined;
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = ((_input: string | URL | Request, init?: RequestInit) => {
+			capturedInit = init;
+			return Promise.resolve(
+				new Response("ok", {
+					status: 200,
+					headers: { "content-type": "text/plain" },
+				}),
+			);
+		}) as typeof globalThis.fetch;
+
+		try {
+			await fetchExecute(
+				{ url: "https://example.com" },
+				{ toolCallId: "test", messages: [], abortSignal: AbortSignal.timeout(5000) },
+			);
+			expect(capturedInit?.redirect).toBe("error");
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+});
+
 describe("fetch tool truncation", () => {
 	it("MAX_FETCH_LENGTH のデフォルト値が 50000 である", () => {
 		expect(MAX_FETCH_LENGTH).toBe(50_000);
