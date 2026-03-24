@@ -5,7 +5,7 @@ import { zodToJsonSchema } from "./schema-helper";
 export const MAX_FETCH_LENGTH = 50_000;
 const FETCH_TIMEOUT_MS = 30_000;
 
-const PRIVATE_IP_PREFIXES = ["10.", "172.", "192.168."] as const;
+const PRIVATE_IP_PREFIXES = ["10.", "192.168."] as const;
 const BLOCKED_HOSTNAMES = [
 	"localhost",
 	"127.0.0.1",
@@ -13,6 +13,13 @@ const BLOCKED_HOSTNAMES = [
 	"0.0.0.0",
 	"169.254.169.254",
 ] as const;
+
+/** RFC 1918: 172.16.0.0/12 (172.16.0.0 – 172.31.255.255) */
+function isPrivate172Block(hostname: string): boolean {
+	if (!hostname.startsWith("172.")) return false;
+	const secondOctet = Number.parseInt(hostname.split(".")[1], 10);
+	return secondOctet >= 16 && secondOctet <= 31;
+}
 
 export function validateFetchUrl(url: string): void {
 	const parsed = new URL(url);
@@ -24,7 +31,8 @@ export function validateFetchUrl(url: string): void {
 	const { hostname } = parsed;
 	const isBlocked =
 		(BLOCKED_HOSTNAMES as readonly string[]).includes(hostname) ||
-		PRIVATE_IP_PREFIXES.some((prefix) => hostname.startsWith(prefix));
+		PRIVATE_IP_PREFIXES.some((prefix) => hostname.startsWith(prefix)) ||
+		isPrivate172Block(hostname);
 
 	if (isBlocked) {
 		throw new Error(`Access to internal/private addresses is not allowed: ${hostname}`);
@@ -64,6 +72,7 @@ export const fetchTool: Tool<FetchInput, FetchResult> = {
 
 		const response = await fetch(url, {
 			signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+			redirect: "error",
 		});
 
 		if (!response.ok) {

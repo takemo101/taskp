@@ -1,3 +1,4 @@
+import type { Stats } from "node:fs";
 import { glob as fsGlob, readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { Tool } from "ai";
@@ -26,7 +27,12 @@ async function resolveSearchFiles(
 	cwd: string,
 ): Promise<readonly string[]> {
 	const fullPath = resolve(cwd, searchPath);
-	const fileStat = await stat(fullPath);
+	let fileStat: Stats;
+	try {
+		fileStat = await stat(fullPath);
+	} catch {
+		throw new Error(`Path not found: ${searchPath}`);
+	}
 
 	if (fileStat.isFile()) {
 		return [searchPath];

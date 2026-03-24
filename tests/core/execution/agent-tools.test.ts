@@ -342,6 +342,13 @@ describe("grep tool", () => {
 			await rm(dir, { recursive: true });
 		}
 	});
+
+	it("存在しないパスでエラーを投げる", async () => {
+		const tools = unwrapTools(["grep"]);
+		await expect(
+			tools.grep.execute?.({ pattern: "test", path: "/nonexistent/path" }, toolCallOpts),
+		).rejects.toThrow("Path not found");
+	});
 });
 
 describe("fetch tool", () => {
@@ -415,14 +422,54 @@ describe("validateFetchUrl", () => {
 		);
 	});
 
-	it("172.x.x.x プライベート IP を拒否する", () => {
+	it("172.16.0.0/12 プライベート IP を拒否する", () => {
 		expect(() => validateFetchUrl("http://172.16.0.1")).toThrow(
 			"Access to internal/private addresses is not allowed: 172.16.0.1",
 		);
+		expect(() => validateFetchUrl("http://172.31.255.255")).toThrow(
+			"Access to internal/private addresses is not allowed: 172.31.255.255",
+		);
+	});
+
+	it("172.x.x.x の非プライベート範囲は許可する", () => {
+		expect(() => validateFetchUrl("http://172.15.0.1")).not.toThrow();
+		expect(() => validateFetchUrl("http://172.32.0.1")).not.toThrow();
 	});
 
 	it("不正な URL でエラーを投げる", () => {
 		expect(() => validateFetchUrl("not-a-url")).toThrow();
+	});
+});
+
+describe("fetch tool redirect prevention", () => {
+	it("redirect: 'error' を設定して SSRF バイパスを防止する", async () => {
+		const result = buildTools(["fetch"]);
+		if (!result.ok) throw new Error("buildTools failed");
+
+		const fetchExecute = result.value.fetch.execute;
+		if (!fetchExecute) throw new Error("fetch.execute is undefined");
+
+		let capturedInit: RequestInit | undefined;
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = ((_input: string | URL | Request, init?: RequestInit) => {
+			capturedInit = init;
+			return Promise.resolve(
+				new Response("ok", {
+					status: 200,
+					headers: { "content-type": "text/plain" },
+				}),
+			);
+		}) as typeof globalThis.fetch;
+
+		try {
+			await fetchExecute(
+				{ url: "https://example.com" },
+				{ toolCallId: "test", messages: [], abortSignal: AbortSignal.timeout(5000) },
+			);
+			expect(capturedInit?.redirect).toBe("error");
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
 	});
 });
 
