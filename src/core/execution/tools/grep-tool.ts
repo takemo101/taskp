@@ -73,6 +73,8 @@ export const grepTool: Tool<GrepInput, GrepResult> = {
 	execute: async ({ pattern, path, include }) => {
 		const cwd = process.cwd();
 		const searchPath = path ?? ".";
+		// g フラグなしで生成することで regex.test() がステートレスに動作する
+		// （g フラグ付きの場合 lastIndex が更新され、同じ文字列への連続 test() で結果が変わる）
 		const regex = new RegExp(pattern);
 
 		const files = await resolveSearchFiles(searchPath, include, cwd);
