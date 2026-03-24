@@ -94,8 +94,10 @@ describe("runAgentSkill", () => {
 		expect(executorCall.model).toBe(mockModel);
 		// systemPrompt は taskp の基盤プロンプト（ツール使用ルール等）が入る
 		expect(executorCall.systemPrompt).toContain("task execution agent");
-		// prompt に SKILL.md 本文が含まれる
-		expect(executorCall.prompt).toContain("You are a helpful assistant.");
+		// contentParts に SKILL.md 本文が含まれる
+		expect(executorCall.contentParts).toEqual([
+			{ type: "text", text: expect.stringContaining("You are a helpful assistant.") },
+		]);
 		expect(executorCall.toolNames).toEqual(["bash", "read"]);
 		expect(executorCall.maxSteps).toBe(50);
 	});
@@ -114,10 +116,11 @@ describe("runAgentSkill", () => {
 			process.cwd(),
 		);
 
-		// prompt に SKILL.md 本文と context ソース出力の両方が含まれる
+		// contentParts に SKILL.md 本文と context ソース出力の両方が含まれる
 		const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
-		expect(executorCall.prompt).toContain("You are a helpful assistant.");
-		expect(executorCall.prompt).toContain("collected context");
+		const textContent = executorCall.contentParts[0].text;
+		expect(textContent).toContain("You are a helpful assistant.");
+		expect(textContent).toContain("collected context");
 	});
 
 	it("skips context collection when no context sources defined", async () => {
@@ -366,8 +369,9 @@ describe("runAgentSkill", () => {
 
 			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
 				.calls[0][0];
-			expect(executorCall.prompt).toContain("Analyze the codebase.");
-			expect(executorCall.prompt).not.toContain("Global instructions.");
+			const textContent = executorCall.contentParts[0].text;
+			expect(textContent).toContain("Analyze the codebase.");
+			expect(textContent).not.toContain("Global instructions.");
 		});
 
 		it("uses action-specific tools", async () => {
@@ -512,7 +516,7 @@ describe("runAgentSkill", () => {
 
 			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
 				.calls[0][0];
-			expect(executorCall.prompt).toContain("Review the code in src/main.ts.");
+			expect(executorCall.contentParts[0].text).toContain("Review the code in src/main.ts.");
 		});
 	});
 

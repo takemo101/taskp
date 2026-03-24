@@ -10,4 +10,5 @@ export type {
 	ToolName,
 } from "./agent-tools.js";
 export { buildTaskpRunDescription, buildTools, TOOL_NAMES } from "./agent-tools.js";
+export type { ContentPart, ImagePart, TextPart } from "./content-part.js";
 export type { ExecutionMode } from "./execution-mode.js";

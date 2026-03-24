@@ -1,12 +1,13 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import type { BuildToolsOptions } from "../../core/execution/agent-tools";
+import type { ContentPart } from "../../core/execution/content-part";
 import type { ExecutionError } from "../../core/types/errors";
 import type { Result } from "../../core/types/result";
 
 export type AgentExecutorInput = {
 	readonly model: LanguageModelV3;
 	readonly systemPrompt: string;
-	readonly prompt: string;
+	readonly contentParts: readonly ContentPart[];
 	readonly toolNames: readonly string[];
 	readonly maxSteps: number;
 	readonly buildToolsOptions?: BuildToolsOptions;

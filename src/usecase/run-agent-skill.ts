@@ -1,6 +1,7 @@
 import { dirname } from "node:path";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { buildTaskpRunDescription } from "../core/execution/agent-tools";
+import type { ContentPart } from "../core/execution/content-part";
 import { resolveActionConfig } from "../core/skill";
 import {
 	type ContextSource,
@@ -124,7 +125,7 @@ export async function runAgentSkill(
 		promptParts.push(contextResult.value);
 	}
 
-	const prompt = promptParts.join("\n\n");
+	const contentParts: readonly ContentPart[] = [{ type: "text", text: promptParts.join("\n\n") }];
 
 	const startTime = Date.now();
 
@@ -137,7 +138,7 @@ export async function runAgentSkill(
 	const executeResult = await deps.agentExecutor.execute({
 		model: input.model,
 		systemPrompt,
-		prompt,
+		contentParts,
 		toolNames,
 		maxSteps: MAX_STEPS,
 		buildToolsOptions: descriptionOverrides ? { descriptionOverrides } : undefined,
