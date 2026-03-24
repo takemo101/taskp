@@ -479,6 +479,94 @@ describe("fetch tool truncation", () => {
 	});
 });
 
+describe("fetch tool execute", () => {
+	const toolCallOpts = {
+		toolCallId: "f1",
+		messages: [] as never[],
+		abortSignal: AbortSignal.timeout(5000),
+	};
+
+	function getFetchExecute() {
+		const result = buildTools(["fetch"]);
+		if (!result.ok) throw new Error("buildTools failed");
+		const execute = result.value.fetch.execute;
+		if (!execute) throw new Error("fetch.execute is undefined");
+		return execute;
+	}
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("テキストコンテンツを取得して返す", async () => {
+		const execute = getFetchExecute();
+		vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			new Response("hello world", {
+				status: 200,
+				headers: { "content-type": "text/plain" },
+			}),
+		);
+
+		const result = await execute({ url: "https://example.com" }, toolCallOpts);
+		expect(result).toEqual({
+			content: "hello world",
+			truncated: false,
+			length: 11,
+		});
+	});
+
+	it("非テキスト content-type でエラーを投げる", async () => {
+		const execute = getFetchExecute();
+		vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			new Response("binary", {
+				status: 200,
+				headers: { "content-type": "image/png" },
+			}),
+		);
+
+		await expect(execute({ url: "https://example.com/image.png" }, toolCallOpts)).rejects.toThrow(
+			"Non-text content type: image/png. Only text content is supported.",
+		);
+	});
+
+	it("maxLength を超える場合に truncated: true を返す", async () => {
+		const execute = getFetchExecute();
+		const longText = "a".repeat(100);
+		vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			new Response(longText, {
+				status: 200,
+				headers: { "content-type": "text/plain" },
+			}),
+		);
+
+		const result = await execute({ url: "https://example.com", maxLength: 50 }, toolCallOpts);
+		expect(result).toEqual({
+			content: "a".repeat(50),
+			truncated: true,
+			length: 100,
+		});
+	});
+
+	it("HTTP エラーステータスでエラーを投げる", async () => {
+		const execute = getFetchExecute();
+		vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			new Response("Not Found", { status: 404, statusText: "Not Found" }),
+		);
+
+		await expect(execute({ url: "https://example.com/missing" }, toolCallOpts)).rejects.toThrow(
+			"HTTP 404: Not Found",
+		);
+	});
+
+	it("内部 IP への fetch でエラーを投げる", async () => {
+		const execute = getFetchExecute();
+
+		await expect(execute({ url: "http://192.168.1.1/secret" }, toolCallOpts)).rejects.toThrow(
+			"Access to internal/private addresses is not allowed: 192.168.1.1",
+		);
+	});
+});
+
 describe("buildTools with descriptionOverrides", () => {
 	it("指定したツールの description を上書きする", () => {
 		const result = buildTools(["bash"], {
