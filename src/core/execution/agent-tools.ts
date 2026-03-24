@@ -29,6 +29,7 @@ const TOOL_NAMES = [
 	"bash",
 	"read",
 	"write",
+	"edit",
 	"glob",
 	"grep",
 	"fetch",
@@ -51,6 +52,12 @@ const readParams = z.object({
 const writeParams = z.object({
 	path: z.string().describe("File path to write"),
 	content: z.string().describe("Content to write"),
+});
+
+const editParams = z.object({
+	path: z.string().describe("File path to edit"),
+	oldString: z.string().describe("The exact string to find and replace"),
+	newString: z.string().describe("The replacement string"),
 });
 
 const globParams = z.object({
@@ -126,6 +133,44 @@ const writeTool: Tool<WriteInput, string> = {
 		} catch (error) {
 			throw new Error(`Failed to write file: ${path}`, { cause: error });
 		}
+	},
+};
+
+type EditInput = z.infer<typeof editParams>;
+
+const editTool: Tool<EditInput, string> = {
+	description:
+		"Replace a specific string in a file. The oldString must match exactly one location in the file.",
+	inputSchema: zodToJsonSchema(editParams),
+	execute: async ({ path, oldString, newString }) => {
+		let content: string;
+		try {
+			content = await readFile(path, "utf-8");
+		} catch (error) {
+			throw new Error(`Failed to read file: ${path}`, { cause: error });
+		}
+
+		const index = content.indexOf(oldString);
+		if (index === -1) {
+			throw new Error(`String not found in ${path}`);
+		}
+
+		const secondIndex = content.indexOf(oldString, index + 1);
+		if (secondIndex !== -1) {
+			throw new Error(
+				`Multiple matches found in ${path}. Provide more context in oldString to uniquely identify the location.`,
+			);
+		}
+
+		const updated = content.slice(0, index) + newString + content.slice(index + oldString.length);
+
+		try {
+			await writeFile(path, updated, "utf-8");
+		} catch (error) {
+			throw new Error(`Failed to write file: ${path}`, { cause: error });
+		}
+
+		return `Edited ${path}`;
 	},
 };
 
@@ -321,6 +366,7 @@ const staticTools: Record<string, ToolSetEntry> = {
 	bash: bashTool as ToolSetEntry,
 	read: readTool as ToolSetEntry,
 	write: writeTool as ToolSetEntry,
+	edit: editTool as ToolSetEntry,
 	glob: globTool as ToolSetEntry,
 	grep: grepTool as ToolSetEntry,
 	fetch: fetchTool as ToolSetEntry,
@@ -549,6 +595,7 @@ const PRIMARY_ARG_KEYS: Readonly<Record<ToolName, string | undefined>> = {
 	bash: "command",
 	read: "path",
 	write: "path",
+	edit: "path",
 	glob: "pattern",
 	grep: "pattern",
 	fetch: "url",
