@@ -313,11 +313,16 @@ tools:                  # Tools for agent mode (optional)
   - bash
   - read
   - write
+  - edit
+  - grep
+  - fetch
 context:                # Sources auto-included in context (optional)
   - type: file
     path: "src/{{target}}"
   - type: command
     run: "git diff --cached"
+  - type: image
+    path: "docs/diagram.png"
 actions:                # Multi-action definitions (optional)
   build:
     description: Build the project
@@ -374,9 +379,35 @@ taskp run my-skill:test --model anthropic/claude-sonnet-4-20250514
 
 Use `{{variable_name}}` in the body to expand input values.
 
-### Built-in Tool: `taskp_run`
+### Agent Tools
 
-In agent mode, the LLM can invoke other template-mode skills using the `taskp_run` tool:
+In agent mode, the following built-in tools are available:
+
+| Tool | Description |
+|------|-------------|
+| `bash` | Execute shell commands |
+| `read` | Read file contents |
+| `write` | Write to files |
+| `edit` | Replace a specific string in a file (exact single match required) |
+| `grep` | Search file contents for a pattern (regex supported) |
+| `fetch` | Fetch text content from a URL (http/https only) |
+| `glob` | Find files by glob pattern |
+| `ask_user` | Prompt the user for input during execution |
+| `taskp_run` | Invoke another template-mode skill |
+
+Specify the tools you need in the `tools` field:
+
+```yaml
+tools:
+  - bash
+  - read
+  - grep
+  - fetch
+```
+
+#### `taskp_run`
+
+The LLM can invoke other template-mode skills using the `taskp_run` tool:
 
 ```yaml
 ---
@@ -393,6 +424,20 @@ Constraints:
 - Only template-mode skills can be called (no agent nesting)
 - Recursive calls are detected and blocked
 - Maximum nesting depth: 3
+
+### Image Context
+
+Skills can include images as context for multimodal LLM processing:
+
+```yaml
+context:
+  - type: image
+    path: "docs/architecture.png"
+  - type: image
+    path: "screenshots/{{target}}.png"    # Variable expansion supported
+```
+
+Supported formats: PNG, JPEG, GIF, WebP. The image is sent as binary data directly to the LLM.
 
 ## Custom System Prompt
 

@@ -313,11 +313,16 @@ tools:                  # agent モードで使用するツール（省略可）
   - bash
   - read
   - write
+  - edit
+  - grep
+  - fetch
 context:                # 自動的にコンテキストに含めるソース（省略可）
   - type: file
     path: "src/{{target}}"
   - type: command
     run: "git diff --cached"
+  - type: image
+    path: "docs/diagram.png"
 actions:                # マルチアクション定義（省略可）
   build:
     description: プロジェクトをビルドする
@@ -374,7 +379,33 @@ taskp run my-skill:test --model anthropic/claude-sonnet-4-20250514
 
 本文中で `{{変数名}}` を使って入力値を展開できます。
 
-### 組み込みツール: `taskp_run`
+### エージェントツール
+
+agent モードでは、以下の組み込みツールが利用できます：
+
+| ツール | 説明 |
+|--------|------|
+| `bash` | シェルコマンドを実行 |
+| `read` | ファイル内容を読み取り |
+| `write` | ファイルに書き込み |
+| `edit` | ファイル内の特定文字列を置換（完全一致が1箇所のみ必要） |
+| `grep` | ファイル内容をパターン検索（正規表現対応） |
+| `fetch` | URL からテキストコンテンツを取得（http/https のみ） |
+| `glob` | glob パターンでファイルを検索 |
+| `ask_user` | 実行中にユーザーに質問 |
+| `taskp_run` | 他の template モードスキルを呼び出し |
+
+`tools` フィールドで必要なツールを指定します：
+
+```yaml
+tools:
+  - bash
+  - read
+  - grep
+  - fetch
+```
+
+#### `taskp_run`
 
 agent モードで LLM が他の template モードスキルを呼び出せます：
 
@@ -393,6 +424,20 @@ tools:
 - template モードのスキルのみ呼び出し可能（agent のネストは不可）
 - 再帰呼び出しは検出・ブロック
 - 最大ネスト深度: 3
+
+### 画像コンテキスト
+
+スキルのコンテキストに画像を含めてマルチモーダル LLM に送信できます：
+
+```yaml
+context:
+  - type: image
+    path: "docs/architecture.png"
+  - type: image
+    path: "screenshots/{{target}}.png"    # 変数展開対応
+```
+
+対応フォーマット: PNG, JPEG, GIF, WebP。画像はバイナリデータとして直接 LLM に送信されます。
 
 ## カスタムシステムプロンプト
 
