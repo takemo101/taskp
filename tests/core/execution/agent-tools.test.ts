@@ -342,6 +342,13 @@ describe("grep tool", () => {
 			await rm(dir, { recursive: true });
 		}
 	});
+
+	it("存在しないパスでエラーを投げる", async () => {
+		const tools = unwrapTools(["grep"]);
+		await expect(
+			tools.grep.execute?.({ pattern: "test", path: "/nonexistent/path" }, toolCallOpts),
+		).rejects.toThrow("Path not found");
+	});
 });
 
 describe("fetch tool", () => {
