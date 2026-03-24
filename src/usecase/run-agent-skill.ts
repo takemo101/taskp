@@ -125,6 +125,8 @@ export async function runAgentSkill(
 		contentParts.push(...toContentParts(contextResult.value));
 	}
 
+	// durationMs は LLM エージェントの実行時間のみを測定する
+	// （コンテキスト収集時間は含めない — hooks に渡す情報として実行コストを正確に反映するため）
 	const startTime = Date.now();
 
 	const descriptionOverrides = await buildDescriptionOverrides(
