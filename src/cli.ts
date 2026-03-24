@@ -491,6 +491,8 @@ function contextSourceValue(ctx: ContextSource): string {
 			return ctx.run;
 		case "url":
 			return ctx.url;
+		case "image":
+			return ctx.path;
 	}
 }
 

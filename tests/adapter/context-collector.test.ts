@@ -33,7 +33,7 @@ describe("ContextCollector", () => {
 	});
 
 	describe("file type", () => {
-		it("reads file content", async () => {
+		it("reads file content with kind text", async () => {
 			await writeFile(join(tempDir, "data.txt"), "file content");
 			const collector = createContextCollector(stubDeps());
 			const sources: ContextSource[] = [{ type: "file", path: "data.txt" }];
@@ -42,7 +42,13 @@ describe("ContextCollector", () => {
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) return;
-			expect(result.value).toBe("file content");
+			expect(result.value).toEqual([
+				{
+					kind: "text",
+					source: { type: "file", path: "data.txt" },
+					content: "file content",
+				},
+			]);
 		});
 
 		it("returns error for missing file", async () => {
@@ -59,7 +65,7 @@ describe("ContextCollector", () => {
 	});
 
 	describe("glob type", () => {
-		it("reads files matching pattern", async () => {
+		it("reads files matching pattern with kind text", async () => {
 			await writeFile(join(tempDir, "a.md"), "aaa");
 			await writeFile(join(tempDir, "b.md"), "bbb");
 			const collector = createContextCollector(
@@ -73,8 +79,17 @@ describe("ContextCollector", () => {
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) return;
-			expect(result.value).toContain("aaa");
-			expect(result.value).toContain("bbb");
+			expect(result.value).toHaveLength(2);
+			expect(result.value[0]).toEqual({
+				kind: "text",
+				source: { type: "glob", pattern: "*.md" },
+				content: "aaa",
+			});
+			expect(result.value[1]).toEqual({
+				kind: "text",
+				source: { type: "glob", pattern: "*.md" },
+				content: "bbb",
+			});
 		});
 
 		it("reads files in subdirectories", async () => {
@@ -91,10 +106,14 @@ describe("ContextCollector", () => {
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) return;
-			expect(result.value).toContain("deep content");
+			expect(result.value).toHaveLength(1);
+			expect(result.value[0].kind).toBe("text");
+			if (result.value[0].kind === "text") {
+				expect(result.value[0].content).toContain("deep content");
+			}
 		});
 
-		it("returns empty string for no matches", async () => {
+		it("returns empty array for no matches", async () => {
 			const collector = createContextCollector(stubDeps());
 			const sources: ContextSource[] = [{ type: "glob", pattern: "*.xyz" }];
 
@@ -102,7 +121,7 @@ describe("ContextCollector", () => {
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) return;
-			expect(result.value).toBe("");
+			expect(result.value).toEqual([]);
 		});
 
 		it("returns error when scanGlob fails", async () => {
@@ -141,7 +160,7 @@ describe("ContextCollector", () => {
 	});
 
 	describe("command type", () => {
-		it("returns command stdout", async () => {
+		it("returns command stdout with kind text", async () => {
 			const collector = createContextCollector(
 				stubDeps({
 					executeCommand: async () => ok("command output"),
@@ -153,7 +172,13 @@ describe("ContextCollector", () => {
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) return;
-			expect(result.value).toBe("command output");
+			expect(result.value).toEqual([
+				{
+					kind: "text",
+					source: { type: "command", run: "echo hello" },
+					content: "command output",
+				},
+			]);
 		});
 
 		it("passes cwd to command executor", async () => {
@@ -190,7 +215,7 @@ describe("ContextCollector", () => {
 	});
 
 	describe("url type", () => {
-		it("returns fetched content", async () => {
+		it("returns fetched content with kind text", async () => {
 			const collector = createContextCollector(
 				stubDeps({
 					fetchUrl: async () => ok("fetched content"),
@@ -202,7 +227,13 @@ describe("ContextCollector", () => {
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) return;
-			expect(result.value).toBe("fetched content");
+			expect(result.value).toEqual([
+				{
+					kind: "text",
+					source: { type: "url", url: "https://example.com" },
+					content: "fetched content",
+				},
+			]);
 		});
 
 		it("returns error on fetch failure", async () => {
@@ -222,8 +253,90 @@ describe("ContextCollector", () => {
 		});
 	});
 
+	describe("image type", () => {
+		it("reads image as Uint8Array with correct mediaType", async () => {
+			const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+			await writeFile(join(tempDir, "test.png"), imageData);
+			const collector = createContextCollector(stubDeps());
+			const sources: ContextSource[] = [{ type: "image", path: "test.png" }];
+
+			const result = await collector.collect(sources, tempDir);
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value).toHaveLength(1);
+			expect(result.value[0].kind).toBe("image");
+			if (result.value[0].kind === "image") {
+				expect(result.value[0].data).toBeInstanceOf(Uint8Array);
+				expect(result.value[0].data).toEqual(imageData);
+				expect(result.value[0].mediaType).toBe("image/png");
+				expect(result.value[0].source).toEqual({ type: "image", path: "test.png" });
+			}
+		});
+
+		it.each([
+			[".png", "image/png"],
+			[".jpg", "image/jpeg"],
+			[".jpeg", "image/jpeg"],
+			[".gif", "image/gif"],
+			[".webp", "image/webp"],
+		])("resolves %s to %s", async (ext, expectedMediaType) => {
+			const imageData = new Uint8Array([0xff, 0xd8]);
+			await writeFile(join(tempDir, `test${ext}`), imageData);
+			const collector = createContextCollector(stubDeps());
+			const sources: ContextSource[] = [{ type: "image", path: `test${ext}` }];
+
+			const result = await collector.collect(sources, tempDir);
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value[0].kind).toBe("image");
+			if (result.value[0].kind === "image") {
+				expect(result.value[0].mediaType).toBe(expectedMediaType);
+			}
+		});
+
+		it("returns error for unsupported extension", async () => {
+			await writeFile(join(tempDir, "test.svg"), "<svg></svg>");
+			const collector = createContextCollector(stubDeps());
+			const sources: ContextSource[] = [{ type: "image", path: "test.svg" }];
+
+			const result = await collector.collect(sources, tempDir);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("EXECUTION_ERROR");
+			expect(result.error.message).toContain("Unsupported image extension: .svg");
+		});
+
+		it("returns error for bmp extension", async () => {
+			await writeFile(join(tempDir, "test.bmp"), new Uint8Array([0x42, 0x4d]));
+			const collector = createContextCollector(stubDeps());
+			const sources: ContextSource[] = [{ type: "image", path: "test.bmp" }];
+
+			const result = await collector.collect(sources, tempDir);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("EXECUTION_ERROR");
+			expect(result.error.message).toContain("Unsupported image extension: .bmp");
+		});
+
+		it("returns error for missing image file", async () => {
+			const collector = createContextCollector(stubDeps());
+			const sources: ContextSource[] = [{ type: "image", path: "missing.png" }];
+
+			const result = await collector.collect(sources, tempDir);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("EXECUTION_ERROR");
+			expect(result.error.message).toContain("Failed to read image");
+		});
+	});
+
 	describe("multiple sources", () => {
-		it("joins content from multiple sources", async () => {
+		it("collects all sources in order", async () => {
 			await writeFile(join(tempDir, "file.txt"), "from file");
 			const collector = createContextCollector(
 				stubDeps({
@@ -239,7 +352,36 @@ describe("ContextCollector", () => {
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) return;
-			expect(result.value).toBe("from file\n\nfrom command");
+			expect(result.value).toHaveLength(2);
+			expect(result.value[0]).toEqual({
+				kind: "text",
+				source: { type: "file", path: "file.txt" },
+				content: "from file",
+			});
+			expect(result.value[1]).toEqual({
+				kind: "text",
+				source: { type: "command", run: "echo hi" },
+				content: "from command",
+			});
+		});
+
+		it("mixes text and image sources", async () => {
+			await writeFile(join(tempDir, "file.txt"), "text content");
+			const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+			await writeFile(join(tempDir, "photo.png"), imageData);
+			const collector = createContextCollector(stubDeps());
+			const sources: ContextSource[] = [
+				{ type: "file", path: "file.txt" },
+				{ type: "image", path: "photo.png" },
+			];
+
+			const result = await collector.collect(sources, tempDir);
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value).toHaveLength(2);
+			expect(result.value[0].kind).toBe("text");
+			expect(result.value[1].kind).toBe("image");
 		});
 
 		it("stops on first error", async () => {

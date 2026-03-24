@@ -41,6 +41,22 @@ describe("parseContextSource", () => {
 		});
 	});
 
+	it("parses image type", () => {
+		const result = parseContextSource({
+			type: "image",
+			path: "mockup.png",
+		});
+		expect(result).toEqual({ type: "image", path: "mockup.png" });
+	});
+
+	it("parses image type with template variable", () => {
+		const result = parseContextSource({
+			type: "image",
+			path: "{{image_path}}",
+		});
+		expect(result).toEqual({ type: "image", path: "{{image_path}}" });
+	});
+
 	it("throws on invalid type", () => {
 		expect(() => parseContextSource({ type: "invalid" })).toThrow();
 	});
@@ -59,6 +75,10 @@ describe("parseContextSource", () => {
 
 	it("throws on missing required field for url", () => {
 		expect(() => parseContextSource({ type: "url" })).toThrow();
+	});
+
+	it("throws on missing required field for image", () => {
+		expect(() => parseContextSource({ type: "image" })).toThrow();
 	});
 
 	it("throws on missing type", () => {
@@ -84,6 +104,10 @@ describe("getContextSourceValue", () => {
 			"https://example.com",
 		);
 	});
+
+	it("returns path for image source", () => {
+		expect(getContextSourceValue({ type: "image", path: "screenshot.png" })).toBe("screenshot.png");
+	});
 });
 
 describe("withResolvedValue", () => {
@@ -107,6 +131,14 @@ describe("withResolvedValue", () => {
 		expect(withResolvedValue(source, "https://resolved.com")).toEqual({
 			type: "url",
 			url: "https://resolved.com",
+		});
+	});
+
+	it("replaces path for image source", () => {
+		const source = { type: "image" as const, path: "{{img}}" };
+		expect(withResolvedValue(source, "photo.jpg")).toEqual({
+			type: "image",
+			path: "photo.jpg",
 		});
 	});
 

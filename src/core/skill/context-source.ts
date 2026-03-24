@@ -20,11 +20,17 @@ const urlSourceSchema = z.object({
 	url: z.string(),
 });
 
+const imageSourceSchema = z.object({
+	type: z.literal("image"),
+	path: z.string(),
+});
+
 export const contextSourceSchema = z.discriminatedUnion("type", [
 	fileSourceSchema,
 	globSourceSchema,
 	commandSourceSchema,
 	urlSourceSchema,
+	imageSourceSchema,
 ]);
 
 export type ContextSource = z.infer<typeof contextSourceSchema>;
@@ -39,6 +45,8 @@ export function getContextSourceValue(source: ContextSource): string {
 			return source.run;
 		case "url":
 			return source.url;
+		case "image":
+			return source.path;
 	}
 }
 
@@ -52,6 +60,8 @@ export function withResolvedValue(source: ContextSource, value: string): Context
 			return { ...source, run: value };
 		case "url":
 			return { ...source, url: value };
+		case "image":
+			return { ...source, path: value };
 	}
 }
 

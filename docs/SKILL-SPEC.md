@@ -163,6 +163,8 @@ context:
     run: "git diff --cached"
   - type: url
     url: "https://example.com/api-docs"
+  - type: image
+    path: "{{image_path}}"        # 画像ファイル（変数展開可能）
 ```
 
 ```typescript
@@ -170,8 +172,24 @@ type ContextSource =
   | { type: "file"; path: string }
   | { type: "glob"; pattern: string }
   | { type: "command"; run: string }
-  | { type: "url"; url: string };
+  | { type: "url"; url: string }
+  | { type: "image"; path: string };
 ```
+
+#### image タイプ
+
+画像ファイルを `Uint8Array` + mediaType としてバイナリ読み込みし、マルチモーダルコンテンツとして LLM に送信する。
+
+対応フォーマット:
+
+| 拡張子 | mediaType |
+|--------|-----------|
+| `.png` | `image/png` |
+| `.jpg`, `.jpeg` | `image/jpeg` |
+| `.gif` | `image/gif` |
+| `.webp` | `image/webp` |
+
+未対応の拡張子（`.svg`, `.bmp` 等）はエラーになる。
 
 ## スキル探索ルール
 

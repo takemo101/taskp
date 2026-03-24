@@ -35,6 +35,9 @@ export function formatContextSources(sources: readonly ContextSource[]): string 
 			case "url":
 				lines.push(`🔗 ${source.url}`);
 				break;
+			case "image":
+				lines.push(`🖼️ ${source.path}`);
+				break;
 		}
 	}
 	return `${lines.join("\n")}\n`;

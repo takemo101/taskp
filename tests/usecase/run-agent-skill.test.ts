@@ -48,7 +48,15 @@ function createMockDeps(skill: Skill) {
 	};
 
 	const contextCollector: ContextCollectorPort = {
-		collect: vi.fn().mockResolvedValue(ok("collected context")),
+		collect: vi.fn().mockResolvedValue(
+			ok([
+				{
+					kind: "text" as const,
+					source: { type: "file" as const, path: "README.md" },
+					content: "collected context",
+				},
+			]),
+		),
 	};
 
 	const agentExecutor: AgentExecutorPort = {
@@ -116,11 +124,89 @@ describe("runAgentSkill", () => {
 			process.cwd(),
 		);
 
-		// contentParts に SKILL.md 本文と context ソース出力の両方が含まれる
+		// contentParts にスキル本文（先頭）と context ソース出力が別々の part として含まれる
 		const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
-		const textContent = executorCall.contentParts[0].text;
-		expect(textContent).toContain("You are a helpful assistant.");
-		expect(textContent).toContain("collected context");
+		expect(executorCall.contentParts[0]).toEqual({
+			type: "text",
+			text: expect.stringContaining("You are a helpful assistant."),
+		});
+		expect(executorCall.contentParts[1]).toEqual({
+			type: "text",
+			text: "collected context",
+		});
+	});
+
+	it("converts image CollectedContext to ImagePart in contentParts", async () => {
+		const skill = createAgentSkill({
+			context: [{ type: "image", path: "mockup.png" }],
+		});
+		const deps = createMockDeps(skill);
+		const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+		(deps.contextCollector.collect as ReturnType<typeof vi.fn>).mockResolvedValue(
+			ok([
+				{
+					kind: "image" as const,
+					source: { type: "image" as const, path: "mockup.png" },
+					data: imageData,
+					mediaType: "image/png",
+				},
+			]),
+		);
+
+		await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+
+		const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
+		expect(executorCall.contentParts).toHaveLength(2);
+		expect(executorCall.contentParts[0].type).toBe("text");
+		expect(executorCall.contentParts[1]).toEqual({
+			type: "image",
+			data: imageData,
+			mediaType: "image/png",
+		});
+	});
+
+	it("preserves source definition order in contentParts", async () => {
+		const skill = createAgentSkill({
+			context: [
+				{ type: "file", path: "README.md" },
+				{ type: "image", path: "mockup.png" },
+			],
+		});
+		const deps = createMockDeps(skill);
+		const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+		(deps.contextCollector.collect as ReturnType<typeof vi.fn>).mockResolvedValue(
+			ok([
+				{
+					kind: "text" as const,
+					source: { type: "file" as const, path: "README.md" },
+					content: "readme content",
+				},
+				{
+					kind: "image" as const,
+					source: { type: "image" as const, path: "mockup.png" },
+					data: imageData,
+					mediaType: "image/png",
+				},
+			]),
+		);
+
+		await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+
+		const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
+		expect(executorCall.contentParts).toHaveLength(3);
+		expect(executorCall.contentParts[0]).toEqual({
+			type: "text",
+			text: expect.stringContaining("You are a helpful assistant."),
+		});
+		expect(executorCall.contentParts[1]).toEqual({
+			type: "text",
+			text: "readme content",
+		});
+		expect(executorCall.contentParts[2]).toEqual({
+			type: "image",
+			data: imageData,
+			mediaType: "image/png",
+		});
 	});
 
 	it("skips context collection when no context sources defined", async () => {

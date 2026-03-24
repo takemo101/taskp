@@ -17,7 +17,7 @@ import type { ReservedVars } from "../core/variable/template-renderer";
 import { renderTemplate } from "../core/variable/template-renderer";
 import { type HooksConfig, runHooks } from "./hook-runner";
 import type { AgentExecutorPort, AgentExecutorResult } from "./port/agent-executor";
-import type { ContextCollectorPort } from "./port/context-collector";
+import type { CollectedContext, ContextCollectorPort } from "./port/context-collector";
 import type { HookExecutorPort } from "./port/hook-executor";
 import { createNoopProgressWriter, type ProgressWriter } from "./port/progress-writer";
 import type { PromptCollector } from "./port/prompt-collector";
@@ -103,9 +103,9 @@ export async function runAgentSkill(
 		date: reserved.date,
 	});
 
-	// prompt: SKILL.md 本文（タスク指示）+ context ソース出力（データ）を結合
-	// system = 「どう振る舞うか」、prompt = 「何をするか」の分離
-	const promptParts: string[] = [skillPrompt];
+	// prompt: SKILL.md 本文（タスク指示）を先頭に、context ソース出力（データ）を続けて配置
+	// system = 「どう振る舞うか」、contentParts = 「何をするか」の分離
+	const contentParts: ContentPart[] = [{ type: "text", text: skillPrompt }];
 
 	const contextSources: readonly ContextSource[] = resolved?.context ?? skill.metadata.context;
 
@@ -122,10 +122,8 @@ export async function runAgentSkill(
 		if (!contextResult.ok) {
 			return contextResult;
 		}
-		promptParts.push(contextResult.value);
+		contentParts.push(...toContentParts(contextResult.value));
 	}
-
-	const contentParts: readonly ContentPart[] = [{ type: "text", text: promptParts.join("\n\n") }];
 
 	const startTime = Date.now();
 
@@ -238,6 +236,19 @@ function resolveContextSources(
 	}
 
 	return ok(resolved);
+}
+
+function toContentPart(ctx: CollectedContext): ContentPart {
+	switch (ctx.kind) {
+		case "text":
+			return { type: "text", text: ctx.content };
+		case "image":
+			return { type: "image", data: ctx.data, mediaType: ctx.mediaType };
+	}
+}
+
+function toContentParts(contexts: readonly CollectedContext[]): readonly ContentPart[] {
+	return contexts.map(toContentPart);
 }
 
 async function buildDescriptionOverrides(

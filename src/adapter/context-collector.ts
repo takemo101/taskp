@@ -1,16 +1,20 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import type { ContextSource } from "../core/skill/context-source";
 import type { ExecutionError } from "../core/types/errors";
 import { executionError } from "../core/types/errors";
 import type { Result } from "../core/types/result";
-import { ok } from "../core/types/result";
+import { err, ok } from "../core/types/result";
+import type { CollectedContext } from "../usecase/port/context-collector";
 import { tryCatch } from "./error-handler-utils";
 
-type CollectedContext = {
-	readonly source: ContextSource;
-	readonly content: string;
-};
+const IMAGE_MEDIA_TYPES: ReadonlyMap<string, string> = new Map([
+	[".png", "image/png"],
+	[".jpg", "image/jpeg"],
+	[".jpeg", "image/jpeg"],
+	[".gif", "image/gif"],
+	[".webp", "image/webp"],
+]);
 
 export type ContextCollectorDeps = {
 	readonly executeCommand: (
@@ -29,7 +33,8 @@ export function createContextCollector(deps: ContextCollectorDeps) {
 		collect: (
 			sources: readonly ContextSource[],
 			cwd: string,
-		): Promise<Result<string, ExecutionError>> => collectAll(sources, cwd, deps),
+		): Promise<Result<readonly CollectedContext[], ExecutionError>> =>
+			collectAll(sources, cwd, deps),
 	};
 }
 
@@ -39,7 +44,7 @@ async function collectAll(
 	sources: readonly ContextSource[],
 	cwd: string,
 	deps: ContextCollectorDeps,
-): Promise<Result<string, ExecutionError>> {
+): Promise<Result<readonly CollectedContext[], ExecutionError>> {
 	const results: CollectedContext[] = [];
 
 	for (const source of sources) {
@@ -50,7 +55,7 @@ async function collectAll(
 		results.push(...result.value);
 	}
 
-	return ok(results.map((r) => r.content).join("\n\n"));
+	return ok(results);
 }
 
 async function collectOne(
@@ -67,6 +72,8 @@ async function collectOne(
 			return collectCommand(source.run, cwd, deps);
 		case "url":
 			return collectUrl(source.url, deps);
+		case "image":
+			return collectImage(source.path, cwd);
 	}
 }
 
@@ -78,7 +85,7 @@ async function collectFile(
 	return tryCatch(
 		async () => {
 			const content = await readFile(fullPath, "utf-8");
-			return [{ source: { type: "file" as const, path }, content }];
+			return [{ kind: "text" as const, source: { type: "file" as const, path }, content }];
 		},
 		() => executionError(`Failed to read file: ${fullPath}`),
 	);
@@ -100,13 +107,15 @@ async function collectGlob(
 		paths.map((path, i) => readGlobMatch(pattern, join(cwd, path), i, total)),
 	);
 
+	const collected: CollectedContext[] = [];
 	for (const result of results) {
 		if (!result.ok) {
 			return result;
 		}
+		collected.push(result.value);
 	}
 
-	return ok(results.filter((r) => r.ok).map((r) => r.value));
+	return ok(collected);
 }
 
 async function readGlobMatch(
@@ -118,7 +127,7 @@ async function readGlobMatch(
 	return tryCatch(
 		async () => {
 			const content = await readFile(fullPath, "utf-8");
-			return { source: { type: "glob" as const, pattern }, content };
+			return { kind: "text" as const, source: { type: "glob" as const, pattern }, content };
 		},
 		(e) =>
 			executionError(
@@ -136,7 +145,7 @@ async function collectCommand(
 	if (!result.ok) {
 		return result;
 	}
-	return ok([{ source: { type: "command", run }, content: result.value }]);
+	return ok([{ kind: "text", source: { type: "command", run }, content: result.value }]);
 }
 
 async function collectUrl(
@@ -147,5 +156,40 @@ async function collectUrl(
 	if (!result.ok) {
 		return result;
 	}
-	return ok([{ source: { type: "url", url }, content: result.value }]);
+	return ok([{ kind: "text", source: { type: "url", url }, content: result.value }]);
+}
+
+function resolveImageMediaType(filePath: string): Result<string, ExecutionError> {
+	const ext = extname(filePath).toLowerCase();
+	const mediaType = IMAGE_MEDIA_TYPES.get(ext);
+	if (!mediaType) {
+		return err(executionError(`Unsupported image extension: ${ext || "(none)"}`));
+	}
+	return ok(mediaType);
+}
+
+async function collectImage(
+	path: string,
+	cwd: string,
+): Promise<Result<readonly CollectedContext[], ExecutionError>> {
+	const fullPath = join(cwd, path);
+	const mediaTypeResult = resolveImageMediaType(fullPath);
+	if (!mediaTypeResult.ok) {
+		return mediaTypeResult;
+	}
+
+	return tryCatch(
+		async () => {
+			const data = new Uint8Array(await readFile(fullPath));
+			return [
+				{
+					kind: "image" as const,
+					source: { type: "image" as const, path },
+					data,
+					mediaType: mediaTypeResult.value,
+				},
+			];
+		},
+		() => executionError(`Failed to read image: ${fullPath}`),
+	);
 }
