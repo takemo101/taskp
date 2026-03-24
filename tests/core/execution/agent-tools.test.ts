@@ -14,6 +14,7 @@ import {
 	validateFetchUrl,
 	validateTaskpRunCall,
 } from "../../../src/core/execution/agent-tools";
+import { isTextContentType } from "../../../src/core/execution/tools/fetch-tool";
 import type { Skill } from "../../../src/core/skill/skill";
 
 describe("buildTools", () => {
@@ -722,5 +723,24 @@ describe("resolveSkillMode", () => {
 	it("存在しないアクション名でスキルのモードを返す", () => {
 		const skill = createSkillFixture({ name: "s", description: "d", mode: "template" });
 		expect(resolveSkillMode(skill, "nonexistent")).toBe("template");
+	});
+});
+
+describe("isTextContentType", () => {
+	it.each([
+		"text/html",
+		"text/plain",
+		"text/csv",
+		"application/json",
+		"application/xml",
+		"application/ld+json",
+		"application/atom+xml",
+		"application/javascript",
+	])("%s をテキストとして許可する", (ct) => {
+		expect(isTextContentType(ct)).toBe(true);
+	});
+
+	it.each(["image/png", "application/octet-stream", "application/pdf"])("%s を拒否する", (ct) => {
+		expect(isTextContentType(ct)).toBe(false);
 	});
 });

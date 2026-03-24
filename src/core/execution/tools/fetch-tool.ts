@@ -55,11 +55,15 @@ type FetchResult = {
 	readonly length: number;
 };
 
-function isTextContentType(contentType: string): boolean {
+/** @internal テスト用に export */
+export function isTextContentType(contentType: string): boolean {
 	return (
 		contentType.includes("text/") ||
 		contentType.includes("application/json") ||
-		contentType.includes("application/xml")
+		contentType.includes("application/xml") ||
+		contentType.includes("+json") ||
+		contentType.includes("+xml") ||
+		contentType.includes("application/javascript")
 	);
 }
 
