@@ -92,6 +92,8 @@ async function executeAgentLoop(
 	}
 }
 
+// AI SDK の ImagePart は image: DataContent | URL, mediaType?: string と広い型。
+// ここでは Uint8Array と必須の mimeType に絞り、不正な入力を型レベルで防ぐ。
 type AiSdkImagePart = { type: "image"; image: Uint8Array; mimeType: string };
 
 function toAiSdkContentPart(part: ContentPart): AiSdkTextPart | AiSdkImagePart {
