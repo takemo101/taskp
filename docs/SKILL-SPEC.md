@@ -61,7 +61,7 @@ npm run deploy:{{environment}}
 | `inputs` | `Input[]` | `[]` | 入力定義（質問リスト）。`actions` が定義されている場合は無視される |
 | `model` | `string` | 設定ファイルのデフォルト | 使用する LLM モデル。`provider/model` 形式でプロバイダも同時に指定可能 |
 | `timeout` | `number` | `30000` | template モードのコマンド実行タイムアウト（ミリ秒、最大: 3,600,000）。agent モードでは無視される |
-| `tools` | `string[]` | `["bash", "read", "write"]` | agent モードで使用するツール |
+| `tools` | `string[]` | `["bash", "read", "write"]` | agent モードで使用するツール。利用可能: `bash`, `read`, `write`, `edit`, `glob`, `ask_user`, `taskp_run` |
 | `context` | `ContextSource[]` | `[]` | 自動的にコンテキストに含めるソース |
 | `actions` | `Record<string, Action>` | - | アクション定義マップ。1つのスキルで複数のアクションを持つ場合に使用 |
 
