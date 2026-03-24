@@ -1,6 +1,7 @@
-import type { ToolCallRepairFunction, ToolSet } from "ai";
+import type { TextPart as AiSdkTextPart, ToolCallRepairFunction, ToolSet, UserContent } from "ai";
 import { stepCountIs, streamText } from "ai";
 import { buildTools } from "../core/execution/agent-tools";
+import type { ContentPart } from "../core/execution/content-part";
 import { executionError } from "../core/types/errors";
 import { err, ok } from "../core/types/result";
 import type {
@@ -38,7 +39,7 @@ async function executeAgentLoop(
 		const result = streamText({
 			model: input.model,
 			system: input.systemPrompt,
-			prompt: input.prompt,
+			messages: [{ role: "user", content: toAiSdkContent(input.contentParts) }],
 			tools,
 			stopWhen: stepCountIs(input.maxSteps),
 			experimental_repairToolCall: createRepairToolCall(logger),
@@ -89,6 +90,21 @@ async function executeAgentLoop(
 		}
 		return err(toExecutionError(classified));
 	}
+}
+
+type AiSdkImagePart = { type: "image"; image: Uint8Array; mimeType: string };
+
+function toAiSdkContentPart(part: ContentPart): AiSdkTextPart | AiSdkImagePart {
+	switch (part.type) {
+		case "text":
+			return { type: "text", text: part.text };
+		case "image":
+			return { type: "image", image: part.data, mimeType: part.mediaType };
+	}
+}
+
+function toAiSdkContent(parts: readonly ContentPart[]): UserContent {
+	return parts.map(toAiSdkContentPart);
 }
 
 /**
