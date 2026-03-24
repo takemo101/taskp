@@ -6,10 +6,12 @@ import {
 	buildTaskpRunDescription,
 	buildTools,
 	getPrimaryArgKey,
+	MAX_FETCH_LENGTH,
 	MAX_GREP_MATCHES,
 	MAX_NESTING_DEPTH,
 	resolveSkillMode,
 	TOOL_NAMES,
+	validateFetchUrl,
 	validateTaskpRunCall,
 } from "../../../src/core/execution/agent-tools";
 import type { Skill } from "../../../src/core/skill/skill";
@@ -342,6 +344,94 @@ describe("grep tool", () => {
 	});
 });
 
+describe("fetch tool", () => {
+	it("buildTools に fetch を渡してツールが生成される", () => {
+		const result = buildTools(["fetch"]);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.fetch).toBeDefined();
+		expect(result.value.fetch.execute).toBeTypeOf("function");
+	});
+});
+
+describe("validateFetchUrl", () => {
+	it("https URL を許可する", () => {
+		expect(() => validateFetchUrl("https://example.com")).not.toThrow();
+	});
+
+	it("http URL を許可する", () => {
+		expect(() => validateFetchUrl("http://example.com")).not.toThrow();
+	});
+
+	it("file:// プロトコルを拒否する", () => {
+		expect(() => validateFetchUrl("file:///etc/passwd")).toThrow(
+			"Unsupported protocol: file:. Only http and https are allowed.",
+		);
+	});
+
+	it("ftp:// プロトコルを拒否する", () => {
+		expect(() => validateFetchUrl("ftp://example.com")).toThrow("Unsupported protocol: ftp:");
+	});
+
+	it("localhost を拒否する", () => {
+		expect(() => validateFetchUrl("http://localhost:8080")).toThrow(
+			"Access to internal/private addresses is not allowed: localhost",
+		);
+	});
+
+	it("127.0.0.1 を拒否する", () => {
+		expect(() => validateFetchUrl("http://127.0.0.1")).toThrow(
+			"Access to internal/private addresses is not allowed: 127.0.0.1",
+		);
+	});
+
+	it("::1 を拒否する", () => {
+		expect(() => validateFetchUrl("http://[::1]")).toThrow(
+			"Access to internal/private addresses is not allowed: [::1]",
+		);
+	});
+
+	it("0.0.0.0 を拒否する", () => {
+		expect(() => validateFetchUrl("http://0.0.0.0")).toThrow(
+			"Access to internal/private addresses is not allowed: 0.0.0.0",
+		);
+	});
+
+	it("クラウドメタデータエンドポイントを拒否する", () => {
+		expect(() => validateFetchUrl("http://169.254.169.254/latest/meta-data")).toThrow(
+			"Access to internal/private addresses is not allowed: 169.254.169.254",
+		);
+	});
+
+	it("192.168.x.x プライベート IP を拒否する", () => {
+		expect(() => validateFetchUrl("http://192.168.1.1")).toThrow(
+			"Access to internal/private addresses is not allowed: 192.168.1.1",
+		);
+	});
+
+	it("10.x.x.x プライベート IP を拒否する", () => {
+		expect(() => validateFetchUrl("http://10.0.0.1")).toThrow(
+			"Access to internal/private addresses is not allowed: 10.0.0.1",
+		);
+	});
+
+	it("172.x.x.x プライベート IP を拒否する", () => {
+		expect(() => validateFetchUrl("http://172.16.0.1")).toThrow(
+			"Access to internal/private addresses is not allowed: 172.16.0.1",
+		);
+	});
+
+	it("不正な URL でエラーを投げる", () => {
+		expect(() => validateFetchUrl("not-a-url")).toThrow();
+	});
+});
+
+describe("fetch tool truncation", () => {
+	it("MAX_FETCH_LENGTH のデフォルト値が 50000 である", () => {
+		expect(MAX_FETCH_LENGTH).toBe(50_000);
+	});
+});
+
 describe("buildTools with descriptionOverrides", () => {
 	it("指定したツールの description を上書きする", () => {
 		const result = buildTools(["bash"], {
@@ -511,6 +601,7 @@ describe("getPrimaryArgKey", () => {
 		expect(getPrimaryArgKey("edit")).toBe("path");
 		expect(getPrimaryArgKey("glob")).toBe("pattern");
 		expect(getPrimaryArgKey("grep")).toBe("pattern");
+		expect(getPrimaryArgKey("fetch")).toBe("url");
 		expect(getPrimaryArgKey("ask_user")).toBe("question");
 		expect(getPrimaryArgKey("taskp_run")).toBe("skill");
 	});
