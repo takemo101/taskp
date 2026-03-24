@@ -369,6 +369,16 @@ describe("grep tool", () => {
 			tools.grep.execute?.({ pattern: "test", path: "/nonexistent/path" }, toolCallOpts),
 		).rejects.toThrow("Path not found");
 	});
+
+	it("存在しないディレクトリでエラーを投げる", async () => {
+		const tools = unwrapTools(["grep"]);
+		await expect(
+			tools.grep.execute?.(
+				{ pattern: "test", path: "/tmp/surely-does-not-exist-xyz" },
+				toolCallOpts,
+			),
+		).rejects.toThrow("Path not found");
+	});
 });
 
 describe("fetch tool", () => {
