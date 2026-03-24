@@ -39,6 +39,14 @@ describe("buildTools", () => {
 		expect(Object.keys(result.value)).toHaveLength(0);
 	});
 
+	it("edit ツールを生成できる", () => {
+		const result = buildTools(["edit"]);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(Object.keys(result.value)).toEqual(["edit"]);
+		expect(result.value.edit.execute).toBeTypeOf("function");
+	});
+
 	it("不明なツール名で ExecutionError を返す", () => {
 		const result = buildTools(["unknown_tool"]);
 		expect(result.ok).toBe(false);
@@ -136,6 +144,71 @@ describe("glob tool", () => {
 			{ toolCallId: "5", messages: [], abortSignal: AbortSignal.timeout(5000) },
 		)) as string[];
 		expect(result).toContain("tests/core/execution/agent-tools.test.ts");
+	});
+});
+
+describe("edit tool", () => {
+	it("ファイルの一部を置換する", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "agent-tools-test-"));
+		const filePath = join(dir, "test.txt");
+		try {
+			await writeFile(filePath, "hello world foo bar", "utf-8");
+			const tools = unwrapTools(["edit"]);
+			const result = await tools.edit.execute?.(
+				{ path: filePath, oldString: "world", newString: "universe" },
+				{ toolCallId: "e1", messages: [], abortSignal: AbortSignal.timeout(5000) },
+			);
+			expect(result).toBe(`Edited ${filePath}`);
+			const content = await readFile(filePath, "utf-8");
+			expect(content).toBe("hello universe foo bar");
+		} finally {
+			await rm(dir, { recursive: true });
+		}
+	});
+
+	it("oldString が見つからない場合エラーを投げる", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "agent-tools-test-"));
+		const filePath = join(dir, "test.txt");
+		try {
+			await writeFile(filePath, "hello world", "utf-8");
+			const tools = unwrapTools(["edit"]);
+			await expect(
+				tools.edit.execute?.(
+					{ path: filePath, oldString: "nonexistent", newString: "replaced" },
+					{ toolCallId: "e2", messages: [], abortSignal: AbortSignal.timeout(5000) },
+				),
+			).rejects.toThrow(`String not found in ${filePath}`);
+		} finally {
+			await rm(dir, { recursive: true });
+		}
+	});
+
+	it("複数マッチ時にエラーを投げる", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "agent-tools-test-"));
+		const filePath = join(dir, "test.txt");
+		try {
+			await writeFile(filePath, "hello hello hello", "utf-8");
+			const tools = unwrapTools(["edit"]);
+			await expect(
+				tools.edit.execute?.(
+					{ path: filePath, oldString: "hello", newString: "hi" },
+					{ toolCallId: "e3", messages: [], abortSignal: AbortSignal.timeout(5000) },
+				),
+			).rejects.toThrow(`Multiple matches found in ${filePath}`);
+		} finally {
+			await rm(dir, { recursive: true });
+		}
+	});
+
+	it("存在しないファイルでエラーを投げる", async () => {
+		const tools = unwrapTools(["edit"]);
+		const invalidPath = "/nonexistent/path/file.txt";
+		await expect(
+			tools.edit.execute?.(
+				{ path: invalidPath, oldString: "old", newString: "new" },
+				{ toolCallId: "e4", messages: [], abortSignal: AbortSignal.timeout(5000) },
+			),
+		).rejects.toThrow(`Failed to read file: ${invalidPath}`);
 	});
 });
 
@@ -435,6 +508,7 @@ describe("getPrimaryArgKey", () => {
 		expect(getPrimaryArgKey("bash")).toBe("command");
 		expect(getPrimaryArgKey("read")).toBe("path");
 		expect(getPrimaryArgKey("write")).toBe("path");
+		expect(getPrimaryArgKey("edit")).toBe("path");
 		expect(getPrimaryArgKey("glob")).toBe("pattern");
 		expect(getPrimaryArgKey("grep")).toBe("pattern");
 		expect(getPrimaryArgKey("ask_user")).toBe("question");
