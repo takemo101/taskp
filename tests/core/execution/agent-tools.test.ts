@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -6,6 +6,7 @@ import {
 	buildTaskpRunDescription,
 	buildTools,
 	getPrimaryArgKey,
+	MAX_GREP_MATCHES,
 	MAX_NESTING_DEPTH,
 	resolveSkillMode,
 	TOOL_NAMES,
@@ -135,6 +136,136 @@ describe("glob tool", () => {
 			{ toolCallId: "5", messages: [], abortSignal: AbortSignal.timeout(5000) },
 		)) as string[];
 		expect(result).toContain("tests/core/execution/agent-tools.test.ts");
+	});
+});
+
+describe("grep tool", () => {
+	const toolCallOpts = {
+		toolCallId: "grep-1",
+		messages: [],
+		abortSignal: AbortSignal.timeout(10_000),
+	};
+
+	it("buildTools に grep を渡してツールが生成される", () => {
+		const result = buildTools(["grep"]);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.grep).toBeDefined();
+		expect(result.value.grep.execute).toBeTypeOf("function");
+	});
+
+	it("パターンマッチ結果がファイルパス・行番号付きで返る", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "grep-test-"));
+		try {
+			await writeFile(join(dir, "hello.txt"), "hello world\nfoo bar\nhello again\n");
+			const tools = unwrapTools(["grep"]);
+			const result = (await tools.grep.execute?.(
+				{ pattern: "hello", path: dir },
+				toolCallOpts,
+			)) as { matches: string; count: number; truncated: boolean };
+			expect(result.count).toBe(2);
+			expect(result.truncated).toBe(false);
+			const lines = result.matches.split("\n");
+			expect(lines[0]).toContain("hello.txt:1:hello world");
+			expect(lines[1]).toContain("hello.txt:3:hello again");
+		} finally {
+			await rm(dir, { recursive: true });
+		}
+	});
+
+	it("include でファイル種別を絞り込める", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "grep-test-"));
+		try {
+			await writeFile(join(dir, "app.ts"), "const x = 1;\n");
+			await writeFile(join(dir, "app.js"), "const x = 1;\n");
+			const tools = unwrapTools(["grep"]);
+			const result = (await tools.grep.execute?.(
+				{ pattern: "const", path: dir, include: "*.ts" },
+				toolCallOpts,
+			)) as { matches: string; count: number; truncated: boolean };
+			expect(result.count).toBe(1);
+			expect(result.matches).toContain("app.ts");
+			expect(result.matches).not.toContain("app.js");
+		} finally {
+			await rm(dir, { recursive: true });
+		}
+	});
+
+	it("マッチなしの場合は空文字列・count: 0 を返す", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "grep-test-"));
+		try {
+			await writeFile(join(dir, "file.txt"), "nothing here\n");
+			const tools = unwrapTools(["grep"]);
+			const result = (await tools.grep.execute?.(
+				{ pattern: "ZZZZZ_NO_MATCH", path: dir },
+				toolCallOpts,
+			)) as { matches: string; count: number; truncated: boolean };
+			expect(result.matches).toBe("");
+			expect(result.count).toBe(0);
+			expect(result.truncated).toBe(false);
+		} finally {
+			await rm(dir, { recursive: true });
+		}
+	});
+
+	it("MAX_GREP_MATCHES で打ち切りが発生する", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "grep-test-"));
+		try {
+			const lines = Array.from({ length: MAX_GREP_MATCHES + 100 }, (_, i) => `match-${i}`);
+			await writeFile(join(dir, "big.txt"), lines.join("\n"));
+			const tools = unwrapTools(["grep"]);
+			const result = (await tools.grep.execute?.(
+				{ pattern: "match-", path: dir },
+				toolCallOpts,
+			)) as { matches: string; count: number; truncated: boolean };
+			expect(result.count).toBe(MAX_GREP_MATCHES);
+			expect(result.truncated).toBe(true);
+		} finally {
+			await rm(dir, { recursive: true });
+		}
+	});
+
+	it("不正な正規表現でエラーを投げる", async () => {
+		const tools = unwrapTools(["grep"]);
+		await expect(
+			tools.grep.execute?.({ pattern: "[invalid", path: "." }, toolCallOpts),
+		).rejects.toThrow();
+	});
+
+	it("単一ファイルを直接検索できる", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "grep-test-"));
+		try {
+			await writeFile(join(dir, "target.txt"), "line1\nfind me\nline3\n");
+			const tools = unwrapTools(["grep"]);
+			const result = (await tools.grep.execute?.(
+				{ pattern: "find me", path: join(dir, "target.txt") },
+				toolCallOpts,
+			)) as { matches: string; count: number; truncated: boolean };
+			expect(result.count).toBe(1);
+			expect(result.matches).toContain(":2:find me");
+		} finally {
+			await rm(dir, { recursive: true });
+		}
+	});
+
+	it("サブディレクトリのファイルも再帰的に検索する", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "grep-test-"));
+		try {
+			const subDir = join(dir, "sub");
+			await mkdir(subDir);
+			await writeFile(join(dir, "root.txt"), "target line\n");
+			await writeFile(join(subDir, "nested.txt"), "target line\n");
+			const tools = unwrapTools(["grep"]);
+			const result = (await tools.grep.execute?.(
+				{ pattern: "target", path: dir },
+				toolCallOpts,
+			)) as { matches: string; count: number; truncated: boolean };
+			expect(result.count).toBe(2);
+			expect(result.matches).toContain("root.txt");
+			expect(result.matches).toContain("nested.txt");
+		} finally {
+			await rm(dir, { recursive: true });
+		}
 	});
 });
 
@@ -305,6 +436,7 @@ describe("getPrimaryArgKey", () => {
 		expect(getPrimaryArgKey("read")).toBe("path");
 		expect(getPrimaryArgKey("write")).toBe("path");
 		expect(getPrimaryArgKey("glob")).toBe("pattern");
+		expect(getPrimaryArgKey("grep")).toBe("pattern");
 		expect(getPrimaryArgKey("ask_user")).toBe("question");
 		expect(getPrimaryArgKey("taskp_run")).toBe("skill");
 	});
