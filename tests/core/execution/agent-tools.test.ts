@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -211,6 +211,25 @@ describe("edit tool", () => {
 				{ toolCallId: "e4", messages: [], abortSignal: AbortSignal.timeout(5000) },
 			),
 		).rejects.toThrow(`Failed to read file: ${invalidPath}`);
+	});
+
+	it("oldString と newString が同一の場合は書き込みをスキップする", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "agent-tools-test-"));
+		const filePath = join(dir, "test.txt");
+		try {
+			await writeFile(filePath, "hello world", "utf-8");
+			const { mtimeMs: mtimeBefore } = await stat(filePath);
+			const tools = unwrapTools(["edit"]);
+			const result = await tools.edit.execute?.(
+				{ path: filePath, oldString: "world", newString: "world" },
+				{ toolCallId: "e5", messages: [], abortSignal: AbortSignal.timeout(5000) },
+			);
+			expect(result).toBe(`No changes needed in ${filePath}`);
+			const { mtimeMs: mtimeAfter } = await stat(filePath);
+			expect(mtimeAfter).toBe(mtimeBefore);
+		} finally {
+			await rm(dir, { recursive: true });
+		}
 	});
 });
 

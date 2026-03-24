@@ -16,6 +16,10 @@ export const editTool: Tool<EditInput, string> = {
 		"Replace a specific string in a file. The oldString must match exactly one location in the file.",
 	inputSchema: zodToJsonSchema(editParams),
 	execute: async ({ path, oldString, newString }) => {
+		if (oldString === newString) {
+			return `No changes needed in ${path}`;
+		}
+
 		let content: string;
 		try {
 			content = await readFile(path, "utf-8");
