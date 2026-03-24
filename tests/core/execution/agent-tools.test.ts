@@ -415,10 +415,18 @@ describe("validateFetchUrl", () => {
 		);
 	});
 
-	it("172.x.x.x プライベート IP を拒否する", () => {
+	it("172.16.0.0/12 プライベート IP を拒否する", () => {
 		expect(() => validateFetchUrl("http://172.16.0.1")).toThrow(
 			"Access to internal/private addresses is not allowed: 172.16.0.1",
 		);
+		expect(() => validateFetchUrl("http://172.31.255.255")).toThrow(
+			"Access to internal/private addresses is not allowed: 172.31.255.255",
+		);
+	});
+
+	it("172.x.x.x の非プライベート範囲は許可する", () => {
+		expect(() => validateFetchUrl("http://172.15.0.1")).not.toThrow();
+		expect(() => validateFetchUrl("http://172.32.0.1")).not.toThrow();
 	});
 
 	it("不正な URL でエラーを投げる", () => {
