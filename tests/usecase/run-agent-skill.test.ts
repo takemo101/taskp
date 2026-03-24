@@ -606,6 +606,158 @@ describe("runAgentSkill", () => {
 		});
 	});
 
+	describe("image context E2E integration", () => {
+		it("sends image contentPart when skill uses image context with variable expansion", async () => {
+			const skill: Skill = {
+				metadata: {
+					name: "analyze-image",
+					description: "画像を分析してフィードバックを返す",
+					mode: "agent",
+					inputs: [
+						{ name: "image_path", type: "text", message: "分析する画像のパスは？" },
+						{
+							name: "focus",
+							type: "text",
+							message: "何に注目して分析しますか？（空欄で全般）",
+							required: false,
+						},
+					],
+					model: undefined,
+					tools: ["read"],
+					context: [{ type: "image", path: "{{image_path}}" }],
+				},
+				body: {
+					content: "# 画像分析\n\n提供された画像を分析してください。\n",
+					extractCodeBlocks: () => [],
+					extractActionSection: () => undefined,
+					extractActionCodeBlocks: () => [],
+				},
+				location: "/tmp/skills/analyze-image/SKILL.md",
+				scope: "local",
+			};
+
+			const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+			const deps = createMockDeps(skill);
+			(deps.promptCollector.collect as ReturnType<typeof vi.fn>).mockResolvedValue(
+				ok({ image_path: "screenshot.png", focus: "" }),
+			);
+			(deps.contextCollector.collect as ReturnType<typeof vi.fn>).mockResolvedValue(
+				ok([
+					{
+						kind: "image" as const,
+						source: { type: "image" as const, path: "screenshot.png" },
+						data: imageData,
+						mediaType: "image/png",
+					},
+				]),
+			);
+
+			const result = await runAgentSkill(
+				{ name: "analyze-image", presets: { image_path: "screenshot.png" }, model: mockModel },
+				deps,
+			);
+
+			expect(result.ok).toBe(true);
+
+			// context collector receives resolved path (variable expanded)
+			expect(deps.contextCollector.collect).toHaveBeenCalledWith(
+				[{ type: "image", path: "screenshot.png" }],
+				process.cwd(),
+			);
+
+			// contentParts: [TextPart(skill body), ImagePart(context)]
+			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
+				.calls[0][0];
+			expect(executorCall.contentParts).toHaveLength(2);
+			expect(executorCall.contentParts[0]).toEqual({
+				type: "text",
+				text: expect.stringContaining("画像分析"),
+			});
+			expect(executorCall.contentParts[1]).toEqual({
+				type: "image",
+				data: imageData,
+				mediaType: "image/png",
+			});
+		});
+
+		it("preserves definition order: skill body → text context → image context", async () => {
+			const skill = createAgentSkill({
+				context: [
+					{ type: "file", path: "README.md" },
+					{ type: "image", path: "mockup.png" },
+					{ type: "command", run: "git log -5" },
+				],
+			});
+			const deps = createMockDeps(skill);
+			const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+			(deps.contextCollector.collect as ReturnType<typeof vi.fn>).mockResolvedValue(
+				ok([
+					{
+						kind: "text" as const,
+						source: { type: "file" as const, path: "README.md" },
+						content: "readme content",
+					},
+					{
+						kind: "image" as const,
+						source: { type: "image" as const, path: "mockup.png" },
+						data: imageData,
+						mediaType: "image/png",
+					},
+					{
+						kind: "text" as const,
+						source: { type: "command" as const, run: "git log -5" },
+						content: "commit log",
+					},
+				]),
+			);
+
+			await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+
+			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
+				.calls[0][0];
+			expect(executorCall.contentParts).toHaveLength(4);
+			expect(executorCall.contentParts[0].type).toBe("text"); // skill body
+			expect(executorCall.contentParts[1]).toEqual({
+				type: "text",
+				text: "readme content",
+			});
+			expect(executorCall.contentParts[2]).toEqual({
+				type: "image",
+				data: imageData,
+				mediaType: "image/png",
+			});
+			expect(executorCall.contentParts[3]).toEqual({
+				type: "text",
+				text: "commit log",
+			});
+		});
+
+		it("text-only skills produce only TextPart contentParts (no regression)", async () => {
+			const skill = createAgentSkill({
+				context: [{ type: "file", path: "src/main.ts" }],
+			});
+			const deps = createMockDeps(skill);
+			(deps.contextCollector.collect as ReturnType<typeof vi.fn>).mockResolvedValue(
+				ok([
+					{
+						kind: "text" as const,
+						source: { type: "file" as const, path: "src/main.ts" },
+						content: "const x = 1;",
+					},
+				]),
+			);
+
+			await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+
+			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
+				.calls[0][0];
+			expect(executorCall.contentParts).toHaveLength(2);
+			for (const part of executorCall.contentParts) {
+				expect(part.type).toBe("text");
+			}
+		});
+	});
+
 	it("resolves model priority: CLI model takes precedence", async () => {
 		const skill = createAgentSkill();
 		const deps = createMockDeps(skill);
