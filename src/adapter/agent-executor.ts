@@ -92,16 +92,16 @@ async function executeAgentLoop(
 	}
 }
 
-// AI SDK の ImagePart は image: DataContent | URL, mediaType?: string と広い型。
-// ここでは Uint8Array と必須の mimeType に絞り、不正な入力を型レベルで防ぐ。
-type AiSdkImagePart = { type: "image"; image: Uint8Array; mimeType: string };
+// AI SDK の FilePart（type: "file" + mediaType）を使用する。
+// SDK 内部でプロバイダに応じた形式（Responses API → input_image、Chat Completions → image_url）に変換される。
+type AiSdkFilePart = { type: "file"; data: Uint8Array; mediaType: string };
 
-function toAiSdkContentPart(part: ContentPart): AiSdkTextPart | AiSdkImagePart {
+function toAiSdkContentPart(part: ContentPart): AiSdkTextPart | AiSdkFilePart {
 	switch (part.type) {
 		case "text":
 			return { type: "text", text: part.text };
 		case "image":
-			return { type: "image", image: part.data, mimeType: part.mediaType };
+			return { type: "file", data: part.data, mediaType: part.mediaType };
 	}
 }
 

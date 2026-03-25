@@ -6,6 +6,7 @@ export type SetupResult = {
 	readonly location: SetupLocation;
 	readonly created: readonly string[];
 	readonly skipped: readonly string[];
+	readonly linked: readonly string[];
 };
 
 export type ProjectInitializer = {

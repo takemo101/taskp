@@ -1,5 +1,6 @@
-import { mkdir, stat, writeFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { mkdir, readdir, stat, symlink, writeFile } from "node:fs/promises";
+import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import type { Result } from "../core/types/result";
 import type {
@@ -118,9 +119,59 @@ async function createDirIfNeeded(
 	}
 }
 
+/**
+ * taskp パッケージに同梱されたデフォルトスキルのディレクトリ候補を返す。
+ * 呼び出し元で非同期に存在確認を行う。
+ *
+ * - 開発時: src/adapter/ → ../../skills
+ * - ビルド後: dist/ → ../skills
+ */
+function getBundledSkillsDirCandidates(): readonly string[] {
+	const currentDir =
+		typeof import.meta.dirname === "string"
+			? import.meta.dirname
+			: dirname(fileURLToPath(import.meta.url));
+	return [resolve(currentDir, "..", "skills"), resolve(currentDir, "..", "..", "skills")];
+}
+
+async function resolveBundledSkillsDir(candidates: readonly string[]): Promise<string | undefined> {
+	for (const candidate of candidates) {
+		if (await fileExists(candidate)) {
+			return candidate;
+		}
+	}
+	return undefined;
+}
+
+async function linkBundledSkills(
+	skillsDir: string,
+	bundledSkillsDir: string,
+): Promise<readonly string[]> {
+	if (!(await fileExists(bundledSkillsDir))) {
+		return [];
+	}
+
+	const entries = await readdir(bundledSkillsDir, { withFileTypes: true });
+	const linked: string[] = [];
+
+	for (const entry of entries.filter((e) => e.isDirectory())) {
+		const linkPath = join(skillsDir, entry.name);
+		if (await fileExists(linkPath)) {
+			continue;
+		}
+		// 相対パスでシンボリックリンクを作成（npm update でパスが変わっても追従可能）
+		const relTarget = relative(dirname(linkPath), join(bundledSkillsDir, entry.name));
+		await symlink(relTarget, linkPath, "dir");
+		linked.push(entry.name);
+	}
+
+	return linked;
+}
+
 type ProjectInitializerDeps = {
 	readonly baseDir: string;
 	readonly location: SetupLocation;
+	readonly bundledSkillsDir?: string;
 };
 
 export function createProjectInitializer(deps: ProjectInitializerDeps): ProjectInitializer {
@@ -136,7 +187,20 @@ export function createProjectInitializer(deps: ProjectInitializerDeps): ProjectI
 					const skipped: string[] = [];
 
 					await createDirIfNeeded({ path: taskpDir }, deps.baseDir, created);
+
+					// .taskp/skills/ が未作成の場合のみ、ディレクトリ作成 + バンドルスキルのシンボリックリンクを行う
+					const skillsDirExisted = await fileExists(skillsDir);
 					await createDirIfNeeded({ path: skillsDir }, deps.baseDir, created);
+
+					let linked: readonly string[] = [];
+					if (!skillsDirExisted) {
+						const bundledDir =
+							deps.bundledSkillsDir ??
+							(await resolveBundledSkillsDir(getBundledSkillsDirCandidates()));
+						if (bundledDir) {
+							linked = await linkBundledSkills(skillsDir, bundledDir);
+						}
+					}
 
 					const configPath = join(taskpDir, CONFIG_FILE);
 					const configContent = isGlobal ? GLOBAL_CONFIG_TEMPLATE : CONFIG_TEMPLATE;
@@ -172,6 +236,7 @@ export function createProjectInitializer(deps: ProjectInitializerDeps): ProjectI
 						location: deps.location,
 						created,
 						skipped,
+						linked,
 					};
 				},
 				(e) => new Error(`Failed to setup project: ${e.message}`),

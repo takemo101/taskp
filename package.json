@@ -18,7 +18,8 @@
 	},
 	"files": [
 		"dist/",
-		"src/"
+		"src/",
+		"skills/"
 	],
 	"scripts": {
 		"prepare": "bun run generate-config-schema && lefthook install || true",
