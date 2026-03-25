@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -224,6 +224,89 @@ describe("SkillLoader", () => {
 			const { failures } = await loader.listGlobal();
 
 			expect(failures).toHaveLength(1);
+		});
+	});
+
+	describe("symlink", () => {
+		const externalDirs: string[] = [];
+
+		afterEach(() => {
+			for (const dir of externalDirs) {
+				rmSync(dir, { recursive: true, force: true });
+			}
+			externalDirs.length = 0;
+		});
+
+		it("シンボリックリンクされたスキルディレクトリを読み込める", async () => {
+			const externalDir = mkdtempSync(join(tmpdir(), "taskp-external-"));
+			externalDirs.push(externalDir);
+			const externalSkillDir = join(externalDir, "my-skill");
+			mkdirSync(externalSkillDir, { recursive: true });
+			writeFileSync(join(externalSkillDir, "SKILL.md"), makeSkillMd("my-skill", "外部スキル"));
+
+			const skillsDir = join(localRoot, ".taskp", "skills");
+			mkdirSync(skillsDir, { recursive: true });
+			symlinkSync(externalSkillDir, join(skillsDir, "my-skill"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const { skills } = await loader.listLocal();
+
+			expect(skills).toHaveLength(1);
+			expect(skills[0].metadata.name).toBe("my-skill");
+		});
+
+		it("シンボリックリンクされたスキルを findByName で検索できる", async () => {
+			const externalDir = mkdtempSync(join(tmpdir(), "taskp-external-"));
+			externalDirs.push(externalDir);
+			const externalSkillDir = join(externalDir, "linked-skill");
+			mkdirSync(externalSkillDir, { recursive: true });
+			writeFileSync(
+				join(externalSkillDir, "SKILL.md"),
+				makeSkillMd("linked-skill", "リンクスキル"),
+			);
+
+			const skillsDir = join(globalRoot, ".taskp", "skills");
+			mkdirSync(skillsDir, { recursive: true });
+			symlinkSync(externalSkillDir, join(skillsDir, "linked-skill"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const result = await loader.findByName("linked-skill");
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.metadata.name).toBe("linked-skill");
+			expect(result.value.scope).toBe("global");
+		});
+
+		it("壊れたシンボリックリンクはスキップされる", async () => {
+			const skillsDir = join(localRoot, ".taskp", "skills");
+			mkdirSync(skillsDir, { recursive: true });
+			symlinkSync("/nonexistent/path/to/skill", join(skillsDir, "broken-link"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const { skills, failures } = await loader.listLocal();
+
+			expect(skills).toHaveLength(0);
+			expect(failures).toHaveLength(0);
+		});
+
+		it("ファイルへのシンボリックリンクは failures に記録される", async () => {
+			const externalDir = mkdtempSync(join(tmpdir(), "taskp-external-"));
+			externalDirs.push(externalDir);
+			const externalFile = join(externalDir, "not-a-dir.md");
+			writeFileSync(externalFile, makeSkillMd("oops", "ファイルリンク"));
+
+			const skillsDir = join(localRoot, ".taskp", "skills");
+			mkdirSync(skillsDir, { recursive: true });
+			symlinkSync(externalFile, join(skillsDir, "file-link"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const { skills, failures } = await loader.listLocal();
+
+			// ファイルへの symlink は file-link/SKILL.md を readFile → ENOTDIR で失敗する
+			expect(skills).toHaveLength(0);
+			expect(failures).toHaveLength(1);
+			expect(failures[0].path).toMatch(/file-link/);
 		});
 	});
 });

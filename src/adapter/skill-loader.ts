@@ -95,7 +95,12 @@ async function scanDirectory(
 	const skills: Skill[] = [];
 	const failures: { path: string; error: string }[] = [];
 
-	for (const entry of entries.filter((e) => e.isDirectory())) {
+	// Node.js の readdir({ withFileTypes: true }) はシンボリックリンクを stat-follow しないため、
+	// symlink 先がディレクトリでも isDirectory() が false を返す。isSymbolicLink() を併用して
+	// symlink 先ディレクトリも走査対象に含める。
+	// Note: symlink はスキルディレクトリ外の任意パスを指せるが、開発者が自身の環境で
+	// 配置する CLI ツールのため、パスの制限は行わない。
+	for (const entry of entries.filter((e) => e.isDirectory() || e.isSymbolicLink())) {
 		const skillPath = join(skillsDir, entry.name, SKILL_FILE_NAME);
 		const result = await tryLoadSkill(skillPath, scope, logger);
 		if (result.type === "not_found") {
