@@ -12,6 +12,7 @@ import type { Skill } from "../core/skill/skill";
 import type { SkillInput } from "../core/skill/skill-input";
 import type { HooksConfig } from "../usecase/hook-runner";
 import { copyToClipboard } from "./clipboard";
+import { showEmptyState } from "./screens/empty-state";
 import {
 	createPresetPromptCollector,
 	createSingleSkillRepository,
@@ -43,7 +44,7 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 		const { skills } = await skillRepository.listAll();
 
 		if (skills.length === 0) {
-			console.log("No skills found.");
+			await showEmptyState(renderer);
 			return;
 		}
 
