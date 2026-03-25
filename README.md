@@ -15,7 +15,13 @@ A CLI tool that runs skills (task procedures) defined in Markdown — collecting
 ## Installation
 
 ```bash
-bun add -g github:takemo101/taskp
+bun install -g github:takemo101/taskp
+```
+
+To install a specific version:
+
+```bash
+bun install -g github:takemo101/taskp#v0.1.7
 ```
 
 > **Requirements:** Bun >= 1.2.0
@@ -30,7 +36,7 @@ source ~/.zshrc
 ### Update
 
 ```bash
-bun add -g github:takemo101/taskp
+bun install -g github:takemo101/taskp
 ```
 
 ### Uninstall

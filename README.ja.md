@@ -15,7 +15,13 @@
 ## インストール
 
 ```bash
-bun add -g github:takemo101/taskp
+bun install -g github:takemo101/taskp
+```
+
+バージョンを指定してインストール：
+
+```bash
+bun install -g github:takemo101/taskp#v0.1.7
 ```
 
 > **必要環境:** Bun >= 1.2.0
@@ -30,7 +36,7 @@ source ~/.zshrc
 ### アップデート
 
 ```bash
-bun add -g github:takemo101/taskp
+bun install -g github:takemo101/taskp
 ```
 
 ### アンインストール
