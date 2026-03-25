@@ -40,6 +40,22 @@ export async function createDefaultContextCollectorDeps(): Promise<ContextCollec
 				return err(executionError(`Network error fetching ${url}: ${toErrorMessage(error)}`));
 			}
 		},
+		fetchBinary: async (url) => {
+			try {
+				const response = await fetch(url);
+				if (!response.ok) {
+					return err(executionError(`Failed to fetch image (HTTP ${response.status}): ${url}`));
+				}
+				const contentType = response.headers.get("content-type")?.split(";")[0]?.trim();
+				const mediaType = contentType?.startsWith("image/") ? contentType : undefined;
+				return ok({
+					data: new Uint8Array(await response.arrayBuffer()),
+					mediaType,
+				});
+			} catch (error) {
+				return err(executionError(`Network error fetching image ${url}: ${toErrorMessage(error)}`));
+			}
+		},
 		scanGlob: async (pattern, cwd) => {
 			return tryCatch(
 				async () => {

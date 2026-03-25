@@ -102,6 +102,14 @@ function formatSetupOutput(output: SetupOutput): string {
 		}
 	}
 
+	if (output.linked.length > 0) {
+		lines.push("");
+		lines.push("Linked default skills:");
+		for (const path of output.linked) {
+			lines.push(`  ${path}`);
+		}
+	}
+
 	return lines.join("\n");
 }
 

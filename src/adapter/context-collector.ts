@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { extname, resolve } from "node:path";
 import type { ContextSource } from "../core/skill/context-source";
 import type { ExecutionError } from "../core/types/errors";
 import { executionError } from "../core/types/errors";
@@ -22,6 +22,11 @@ export type ContextCollectorDeps = {
 		cwd: string,
 	) => Promise<Result<string, ExecutionError>>;
 	readonly fetchUrl: (url: string) => Promise<Result<string, ExecutionError>>;
+	readonly fetchBinary: (
+		url: string,
+	) => Promise<
+		Result<{ readonly data: Uint8Array; readonly mediaType: string | undefined }, ExecutionError>
+	>;
 	readonly scanGlob: (
 		pattern: string,
 		cwd: string,
@@ -73,7 +78,7 @@ async function collectOne(
 		case "url":
 			return collectUrl(source.url, deps);
 		case "image":
-			return collectImage(source.path, cwd);
+			return collectImage(source.path, cwd, deps);
 	}
 }
 
@@ -81,7 +86,7 @@ async function collectFile(
 	path: string,
 	cwd: string,
 ): Promise<Result<readonly CollectedContext[], ExecutionError>> {
-	const fullPath = join(cwd, path);
+	const fullPath = resolve(cwd, path);
 	return tryCatch(
 		async () => {
 			const content = await readFile(fullPath, "utf-8");
@@ -104,7 +109,7 @@ async function collectGlob(
 	const total = paths.length;
 
 	const results = await Promise.all(
-		paths.map((path, i) => readGlobMatch(pattern, join(cwd, path), i, total)),
+		paths.map((path, i) => readGlobMatch(pattern, resolve(cwd, path), i, total)),
 	);
 
 	const collected: CollectedContext[] = [];
@@ -159,25 +164,47 @@ async function collectUrl(
 	return ok([{ kind: "text", source: { type: "url", url }, content: result.value }]);
 }
 
-function resolveImageMediaType(filePath: string): Result<string, ExecutionError> {
-	const ext = extname(filePath).toLowerCase();
-	const mediaType = IMAGE_MEDIA_TYPES.get(ext);
-	if (!mediaType) {
-		return err(executionError(`Unsupported image extension: ${ext || "(none)"}`));
+function isUrl(value: string): boolean {
+	return value.startsWith("http://") || value.startsWith("https://");
+}
+
+/** 拡張子から mediaType を解決する。URL の場合はクエリパラメータを除去してから判定する */
+function resolveMediaTypeFromExtension(pathOrUrl: string): string | undefined {
+	let pathname: string;
+	if (isUrl(pathOrUrl)) {
+		try {
+			pathname = new URL(pathOrUrl).pathname;
+		} catch {
+			return undefined;
+		}
+	} else {
+		pathname = pathOrUrl;
 	}
-	return ok(mediaType);
+	return IMAGE_MEDIA_TYPES.get(extname(pathname).toLowerCase());
 }
 
 async function collectImage(
 	path: string,
 	cwd: string,
+	deps: ContextCollectorDeps,
 ): Promise<Result<readonly CollectedContext[], ExecutionError>> {
-	const fullPath = join(cwd, path);
-	const mediaTypeResult = resolveImageMediaType(fullPath);
-	if (!mediaTypeResult.ok) {
-		return mediaTypeResult;
+	if (isUrl(path)) {
+		return collectImageFromUrl(path, deps);
 	}
+	const mediaType = resolveMediaTypeFromExtension(path);
+	if (!mediaType) {
+		const ext = extname(path).toLowerCase();
+		return err(executionError(`Unsupported image extension: ${ext || "(none)"}`));
+	}
+	return collectImageFromFile(path, cwd, mediaType);
+}
 
+async function collectImageFromFile(
+	path: string,
+	cwd: string,
+	mediaType: string,
+): Promise<Result<readonly CollectedContext[], ExecutionError>> {
+	const fullPath = resolve(cwd, path);
 	return tryCatch(
 		async () => {
 			const data = new Uint8Array(await readFile(fullPath));
@@ -186,10 +213,32 @@ async function collectImage(
 					kind: "image" as const,
 					source: { type: "image" as const, path },
 					data,
-					mediaType: mediaTypeResult.value,
+					mediaType,
 				},
 			];
 		},
 		() => executionError(`Failed to read image: ${fullPath}`),
 	);
+}
+
+async function collectImageFromUrl(
+	url: string,
+	deps: ContextCollectorDeps,
+): Promise<Result<readonly CollectedContext[], ExecutionError>> {
+	const result = await deps.fetchBinary(url);
+	if (!result.ok) {
+		return result;
+	}
+
+	// Content-Type ヘッダーから mediaType を取得し、取れなければ拡張子から推測する
+	const mediaType = result.value.mediaType ?? resolveMediaTypeFromExtension(url) ?? "image/png";
+
+	return ok([
+		{
+			kind: "image" as const,
+			source: { type: "image" as const, path: url },
+			data: result.value.data,
+			mediaType,
+		},
+	]);
 }

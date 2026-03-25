@@ -8,9 +8,10 @@ function stubInitializer(result: {
 	location: SetupLocation;
 	created: string[];
 	skipped: string[];
+	linked?: string[];
 }): ProjectInitializer {
 	return {
-		setup: () => Promise.resolve(ok(result)),
+		setup: () => Promise.resolve(ok({ linked: [], ...result })),
 	};
 }
 
@@ -84,7 +85,9 @@ describe("setupProject", () => {
 		const initializer: ProjectInitializer = {
 			setup: (options) => {
 				capturedForce = options.force;
-				return Promise.resolve(ok({ location: "project" as const, created: [], skipped: [] }));
+				return Promise.resolve(
+					ok({ location: "project" as const, created: [], skipped: [], linked: [] }),
+				);
 			},
 		};
 

@@ -12,11 +12,18 @@ import { err, ok } from "../../src/core/types/result";
 function stubDeps(overrides?: {
 	executeCommand?: (command: string, cwd: string) => Promise<Result<string, ExecutionError>>;
 	fetchUrl?: (url: string) => Promise<Result<string, ExecutionError>>;
+	fetchBinary?: (
+		url: string,
+	) => Promise<
+		Result<{ readonly data: Uint8Array; readonly mediaType: string | undefined }, ExecutionError>
+	>;
 	scanGlob?: (pattern: string, cwd: string) => Promise<Result<readonly string[], ExecutionError>>;
 }) {
 	return {
 		executeCommand: overrides?.executeCommand ?? (async () => ok("")),
 		fetchUrl: overrides?.fetchUrl ?? (async () => ok("")),
+		fetchBinary:
+			overrides?.fetchBinary ?? (async () => ok({ data: new Uint8Array(), mediaType: undefined })),
 		scanGlob: overrides?.scanGlob ?? (async () => ok([] as readonly string[])),
 	};
 }
@@ -332,6 +339,70 @@ describe("ContextCollector", () => {
 			if (result.ok) return;
 			expect(result.error.type).toBe("EXECUTION_ERROR");
 			expect(result.error.message).toContain("Failed to read image");
+		});
+
+		it("fetches image from URL via fetchBinary", async () => {
+			const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+			const collector = createContextCollector(
+				stubDeps({
+					fetchBinary: async () => ok({ data: imageData, mediaType: "image/png" }),
+				}),
+			);
+			const sources: ContextSource[] = [{ type: "image", path: "https://example.com/photo.png" }];
+
+			const result = await collector.collect(sources, tempDir);
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value).toHaveLength(1);
+			expect(result.value[0].kind).toBe("image");
+			if (result.value[0].kind === "image") {
+				expect(result.value[0].data).toEqual(imageData);
+				expect(result.value[0].mediaType).toBe("image/png");
+				expect(result.value[0].source).toEqual({
+					type: "image",
+					path: "https://example.com/photo.png",
+				});
+			}
+		});
+
+		it("returns error when URL image fetch fails", async () => {
+			const collector = createContextCollector(
+				stubDeps({
+					fetchBinary: async () =>
+						err(
+							executionError("Failed to fetch image (HTTP 404): https://example.com/missing.jpg"),
+						),
+				}),
+			);
+			const sources: ContextSource[] = [{ type: "image", path: "https://example.com/missing.jpg" }];
+
+			const result = await collector.collect(sources, tempDir);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.message).toContain("HTTP 404");
+		});
+
+		it("resolves media type from URL ignoring query params", async () => {
+			const imageData = new Uint8Array([0xff, 0xd8]);
+			const collector = createContextCollector(
+				stubDeps({
+					fetchBinary: async () => ok({ data: imageData, mediaType: undefined }),
+				}),
+			);
+			const sources: ContextSource[] = [
+				{ type: "image", path: "https://example.com/photo.jpg?width=800&format=original" },
+			];
+
+			const result = await collector.collect(sources, tempDir);
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value[0].kind).toBe("image");
+			if (result.value[0].kind === "image") {
+				expect(result.value[0].mediaType).toBe("image/jpeg");
+			}
 		});
 	});
 
