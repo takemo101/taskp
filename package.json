@@ -1,6 +1,6 @@
 {
 	"name": "taskp",
-	"version": "0.1.6",
+	"version": "0.1.8",
 	"description": "Markdown-defined skill runner with interactive argument collection and LLM execution",
 	"license": "MIT",
 	"type": "module",
@@ -22,7 +22,6 @@
 	],
 	"scripts": {
 		"prepare": "bun run generate-config-schema && lefthook install || true",
-
 		"dev": "bun run src/cli.ts",
 		"build": "bun build src/cli.ts --outdir dist --target bun",
 		"check": "biome check .",
