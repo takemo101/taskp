@@ -18,6 +18,7 @@ import type { Skill } from "../../core/skill/skill";
 import type { SkillInput } from "../../core/skill/skill-input";
 import { KeyHelp } from "../components/key-help";
 import { flatSelectStyle } from "../components/styles";
+import { clearScreen } from "./clear-screen";
 
 const CONTAINER_ID = "form-container";
 const TEXTAREA_DEFAULT_HEIGHT = 5;
@@ -356,10 +357,4 @@ function createTextInputElement(
 	});
 
 	return inputElement;
-}
-
-function clearScreen(renderer: CliRenderer): void {
-	for (const child of renderer.root.getChildren()) {
-		renderer.root.remove(child.id);
-	}
 }

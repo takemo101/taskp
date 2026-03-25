@@ -14,6 +14,7 @@ import { KeyHelp } from "../components/key-help";
 import { SPINNER_FRAMES, SPINNER_INTERVAL_MS } from "../components/spinner";
 import { ToolStatusDisplay } from "../components/tool-status";
 import type { ExecutionViewPort } from "../tui-stream-writer";
+import { clearScreen } from "./clear-screen";
 import { type ExecutionDeps, runExecution } from "./execution-runner";
 
 export type {
@@ -184,10 +185,4 @@ function startSpinner(text: TextRenderable): () => void {
 		text.fg = "#FFFFFF";
 		text.content = "";
 	};
-}
-
-function clearScreen(renderer: CliRenderer): void {
-	for (const child of renderer.root.getChildren()) {
-		renderer.root.remove(child.id);
-	}
 }

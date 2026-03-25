@@ -16,6 +16,7 @@ import {
 } from "../components/fuzzy-select";
 import { KeyHelp } from "../components/key-help";
 import { flatSelectStyle } from "../components/styles";
+import { clearScreen } from "./clear-screen";
 
 const CONTAINER_ID = "selector-container";
 
@@ -199,11 +200,5 @@ function autoExpandForSearch(
 		if (opt.parentSkillName) {
 			expandedSkills.add(opt.parentSkillName);
 		}
-	}
-}
-
-function clearScreen(renderer: CliRenderer): void {
-	for (const child of renderer.root.getChildren()) {
-		renderer.root.remove(child.id);
 	}
 }
