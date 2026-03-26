@@ -2,7 +2,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createConfigLoader } from "../../src/adapter/config-loader";
+import {
+	createConfigLoader,
+	mergeAiConfig,
+	mergeCliConfig,
+	mergeHooksConfig,
+	mergeOptional,
+	mergeProviders,
+} from "../../src/adapter/config-loader";
 
 function writeConfig(root: string, content: string): void {
 	const dir = join(root, ".taskp");
@@ -377,5 +384,107 @@ command_timeout_ms = -1
 
 			expect(result.ok).toBe(false);
 		});
+	});
+});
+
+describe("mergeOptional", () => {
+	const concat = (a: string, b: string) => a + b;
+
+	it("returns undefined when both are undefined", () => {
+		expect(mergeOptional(undefined, undefined, concat)).toBeUndefined();
+	});
+
+	it("returns project when global is undefined", () => {
+		expect(mergeOptional(undefined, "project", concat)).toBe("project");
+	});
+
+	it("returns global when project is undefined", () => {
+		expect(mergeOptional("global", undefined, concat)).toBe("global");
+	});
+
+	it("calls merge when both are defined", () => {
+		expect(mergeOptional("global", "project", concat)).toBe("globalproject");
+	});
+});
+
+describe("mergeProviders", () => {
+	it("merges non-overlapping providers", () => {
+		const global = { anthropic: { api_key_env: "KEY" } };
+		const project = { ollama: { base_url: "http://localhost" } };
+
+		const result = mergeProviders(global, project);
+
+		expect(result).toEqual({
+			anthropic: { api_key_env: "KEY" },
+			ollama: { base_url: "http://localhost" },
+		});
+	});
+
+	it("merges overlapping provider fields", () => {
+		const global = { openai: { api_key_env: "KEY", default_model: "gpt-4" } };
+		const project = { openai: { default_model: "gpt-5" } };
+
+		const result = mergeProviders(global, project);
+
+		expect(result).toEqual({
+			openai: { api_key_env: "KEY", default_model: "gpt-5" },
+		});
+	});
+
+	it("project provider replaces global when global has no entry", () => {
+		const global = {};
+		const project = { ollama: { base_url: "http://localhost" } };
+
+		const result = mergeProviders(global, project);
+
+		expect(result).toEqual({ ollama: { base_url: "http://localhost" } });
+	});
+});
+
+describe("mergeAiConfig", () => {
+	it("project fields override global fields", () => {
+		const global = { default_provider: "anthropic" as const, default_model: "claude" };
+		const project = { default_provider: "ollama" as const };
+
+		const result = mergeAiConfig(global, project);
+
+		expect(result.default_provider).toBe("ollama");
+		expect(result.default_model).toBe("claude");
+	});
+
+	it("merges providers from both configs", () => {
+		const global = { providers: { anthropic: { api_key_env: "KEY" } } };
+		const project = { providers: { ollama: { base_url: "http://localhost" } } };
+
+		const result = mergeAiConfig(global, project);
+
+		expect(result.providers?.anthropic?.api_key_env).toBe("KEY");
+		expect(result.providers?.ollama?.base_url).toBe("http://localhost");
+	});
+});
+
+describe("mergeHooksConfig", () => {
+	it("project on_success overrides global", () => {
+		const global = { on_success: ["global"], on_failure: ["fail"] };
+		const project = { on_success: ["project"] };
+
+		const result = mergeHooksConfig(global, project);
+
+		expect(result.on_success).toEqual(["project"]);
+		expect(result.on_failure).toEqual(["fail"]);
+	});
+});
+
+describe("mergeCliConfig", () => {
+	it("project command_timeout_ms overrides global", () => {
+		const result = mergeCliConfig({ command_timeout_ms: 30000 }, { command_timeout_ms: 60000 });
+
+		expect(result.command_timeout_ms).toBe(60000);
+	});
+
+	it("falls back to global when project is undefined", () => {
+		const result = mergeCliConfig({ command_timeout_ms: 30000 }, {});
+
+		expect(result.command_timeout_ms).toBe(30000);
 	});
 });
