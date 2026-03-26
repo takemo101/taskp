@@ -1,10 +1,10 @@
 import type { Tool } from "ai";
 import { z } from "zod";
 import { zodToJsonSchema } from "./schema-helper";
+import { DEFAULT_TOOL_TIMEOUT_MS } from "./tool-constants";
 import { type ToolResult, toolFailure, toolSuccess } from "./tool-output";
 
 export const MAX_FETCH_LENGTH = 50_000;
-const FETCH_TIMEOUT_MS = 30_000;
 
 const PRIVATE_IP_PREFIXES = ["10.", "192.168."] as const;
 const BLOCKED_HOSTNAMES = [
@@ -84,7 +84,7 @@ export const fetchTool: Tool<FetchInput, ToolResult<FetchData>> = {
 		let response: Response;
 		try {
 			response = await fetch(url, {
-				signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+				signal: AbortSignal.timeout(DEFAULT_TOOL_TIMEOUT_MS),
 				redirect: "error",
 			});
 		} catch {
