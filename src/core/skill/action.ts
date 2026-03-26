@@ -37,7 +37,7 @@ function resolveActionConfig(action: Action, skill: SkillMetadata): ResolvedActi
 		model: action.model ?? skill.model ?? undefined,
 		inputs: action.inputs ?? skill.inputs,
 		context: action.context ?? skill.context ?? [],
-		tools: action.tools ?? skill.tools ?? [...DEFAULT_TOOLS],
+		tools: action.tools ?? skill.tools ?? DEFAULT_TOOLS,
 		timeout: action.timeout ?? skill.timeout ?? undefined,
 	};
 }
