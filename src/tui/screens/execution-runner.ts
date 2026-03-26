@@ -103,7 +103,7 @@ async function executeAgentMode(
 	const agentExecutor = createAgentExecutor(writer, logger);
 
 	const contextCollectorDeps = await createDefaultContextCollectorDeps();
-	const contextCollector = createContextCollector(contextCollectorDeps);
+	const contextCollector = createContextCollector({ ...contextCollectorDeps, logger });
 
 	const result = await runAgentSkill(
 		{ name: skill.metadata.name, action: actionName, presets: variables, model },
