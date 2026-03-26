@@ -95,6 +95,69 @@ describe("runHooks", () => {
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
+	it("returns err with details when a hook command fails", async () => {
+		const executor: HookExecutorPort = {
+			execute: vi.fn(async (commands: readonly string[]) =>
+				commands.map((cmd) =>
+					cmd === "fail-cmd"
+						? { command: cmd, success: false, error: "exit code 1" }
+						: { command: cmd, success: true },
+				),
+			),
+		};
+
+		const result = await runHooks({
+			hookExecutor: executor,
+			hooksConfig: { on_success: ["echo ok", "fail-cmd"] },
+			context: { skillName: "deploy", mode: "template", status: "success", durationMs: 100 },
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.type).toBe(ErrorType.Execution);
+			expect(result.error.message).toBe('Hook partially failed: "fail-cmd": exit code 1');
+		}
+	});
+
+	it("returns err listing all failed hooks when multiple commands fail", async () => {
+		const executor: HookExecutorPort = {
+			execute: vi.fn(async (commands: readonly string[]) =>
+				commands.map((cmd) => ({ command: cmd, success: false, error: `${cmd} broken` })),
+			),
+		};
+
+		const result = await runHooks({
+			hookExecutor: executor,
+			hooksConfig: { on_failure: ["notify", "cleanup"] },
+			context: { skillName: "deploy", mode: "template", status: "failed", durationMs: 50 },
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.type).toBe(ErrorType.Execution);
+			expect(result.error.message).toBe(
+				'Hook partially failed: "notify": notify broken, "cleanup": cleanup broken',
+			);
+		}
+	});
+
+	it("returns err with 'unknown error' when failed hook has no error message", async () => {
+		const executor: HookExecutorPort = {
+			execute: vi.fn(async () => [{ command: "bad-cmd", success: false }]),
+		};
+
+		const result = await runHooks({
+			hookExecutor: executor,
+			hooksConfig: { on_success: ["bad-cmd"] },
+			context: { skillName: "deploy", mode: "template", status: "success", durationMs: 100 },
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.message).toBe('Hook partially failed: "bad-cmd": unknown error');
+		}
+	});
+
 	it("returns err with ExecutionError when executor throws", async () => {
 		const throwingExecutor: HookExecutorPort = {
 			execute: vi.fn(async () => {
