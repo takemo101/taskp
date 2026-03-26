@@ -15,17 +15,28 @@ export const grepParams = z.object({
 
 type GrepInput = z.infer<typeof grepParams>;
 
+type SkippedFile = {
+	readonly file: string;
+	readonly reason: string;
+};
+
 type GrepResult = {
 	readonly matches: string;
 	readonly count: number;
 	readonly truncated: boolean;
+	readonly skipped: readonly SkippedFile[];
+};
+
+type ResolveResult = {
+	readonly files: readonly string[];
+	readonly skipped: readonly SkippedFile[];
 };
 
 async function resolveSearchFiles(
 	searchPath: string,
 	include: string | undefined,
 	cwd: string,
-): Promise<readonly string[]> {
+): Promise<ResolveResult> {
 	const fullPath = resolve(cwd, searchPath);
 	let fileStat: Stats;
 	try {
@@ -35,19 +46,27 @@ async function resolveSearchFiles(
 	}
 
 	if (fileStat.isFile()) {
-		return [searchPath];
+		return { files: [searchPath], skipped: [] };
 	}
 
 	const globPattern = include ?? "**/*";
 	const files: string[] = [];
+	const skipped: SkippedFile[] = [];
 	for await (const entry of fsGlob(globPattern, { cwd: fullPath })) {
 		const entryPath = join(searchPath, entry);
-		const entryStat = await stat(resolve(cwd, entryPath)).catch(() => undefined);
-		if (entryStat?.isFile()) {
-			files.push(entryPath);
+		try {
+			const entryStat = await stat(resolve(cwd, entryPath));
+			if (entryStat.isFile()) {
+				files.push(entryPath);
+			}
+		} catch (error) {
+			skipped.push({
+				file: entryPath,
+				reason: error instanceof Error ? error.message : String(error),
+			});
 		}
 	}
-	return files;
+	return { files, skipped };
 }
 
 function searchFileContent(
@@ -77,8 +96,9 @@ export const grepTool: Tool<GrepInput, GrepResult> = {
 		// （g フラグ付きの場合 lastIndex が更新され、同じ文字列への連続 test() で結果が変わる）
 		const regex = new RegExp(pattern);
 
-		const files = await resolveSearchFiles(searchPath, include, cwd);
+		const { files, skipped: resolveSkipped } = await resolveSearchFiles(searchPath, include, cwd);
 
+		const readSkipped: SkippedFile[] = [];
 		const results: string[] = [];
 		for (const file of files) {
 			if (results.length >= MAX_GREP_MATCHES) break;
@@ -86,8 +106,11 @@ export const grepTool: Tool<GrepInput, GrepResult> = {
 			try {
 				const content = await readFile(fullFilePath, "utf-8");
 				searchFileContent(content, regex, file, results, MAX_GREP_MATCHES);
-			} catch {
-				// Skip unreadable files (binary, permission denied, etc.)
+			} catch (error) {
+				readSkipped.push({
+					file,
+					reason: error instanceof Error ? error.message : String(error),
+				});
 			}
 		}
 
@@ -95,6 +118,7 @@ export const grepTool: Tool<GrepInput, GrepResult> = {
 			matches: results.join("\n"),
 			count: results.length,
 			truncated: results.length >= MAX_GREP_MATCHES,
+			skipped: [...resolveSkipped, ...readSkipped],
 		};
 	},
 };
