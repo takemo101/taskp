@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { lstat, readdir, readFile, realpath } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { Skill, SkillLogger, SkillScope } from "../core/skill/skill";
@@ -51,16 +51,26 @@ async function findByName(
 	globalSkillsDir: string,
 	logger?: SkillLogger,
 ): Promise<Result<Skill, SkillNotFoundError>> {
-	const localPath = join(localSkillsDir, name, SKILL_FILE_NAME);
-	const localResult = await tryLoadSkill(localPath, "local", logger);
-	if (localResult.type === "found") {
-		return localResult;
+	const localDir = join(localSkillsDir, name);
+	if (await isSymlinkOutsideRoot(localDir, localSkillsDir)) {
+		logger?.warn(`Skipping symlink outside skills root: ${localDir}`);
+	} else {
+		const localPath = join(localDir, SKILL_FILE_NAME);
+		const localResult = await tryLoadSkill(localPath, "local", logger);
+		if (localResult.type === "found") {
+			return localResult;
+		}
 	}
 
-	const globalPath = join(globalSkillsDir, name, SKILL_FILE_NAME);
-	const globalResult = await tryLoadSkill(globalPath, "global", logger);
-	if (globalResult.type === "found") {
-		return globalResult;
+	const globalDir = join(globalSkillsDir, name);
+	if (await isSymlinkOutsideRoot(globalDir, globalSkillsDir)) {
+		logger?.warn(`Skipping symlink outside skills root: ${globalDir}`);
+	} else {
+		const globalPath = join(globalDir, SKILL_FILE_NAME);
+		const globalResult = await tryLoadSkill(globalPath, "global", logger);
+		if (globalResult.type === "found") {
+			return globalResult;
+		}
 	}
 
 	return err(skillNotFoundError(name));
@@ -98,9 +108,16 @@ async function scanDirectory(
 	// Node.js の readdir({ withFileTypes: true }) はシンボリックリンクを stat-follow しないため、
 	// symlink 先がディレクトリでも isDirectory() が false を返す。isSymbolicLink() を併用して
 	// symlink 先ディレクトリも走査対象に含める。
-	// Note: symlink はスキルディレクトリ外の任意パスを指せるが、開発者が自身の環境で
-	// 配置する CLI ツールのため、パスの制限は行わない。
 	for (const entry of entries.filter((e) => e.isDirectory() || e.isSymbolicLink())) {
+		if (entry.isSymbolicLink()) {
+			const entryPath = join(skillsDir, entry.name);
+			const withinRoot = await isWithinRoot(entryPath, skillsDir);
+			if (!withinRoot) {
+				logger?.warn(`Skipping symlink outside skills root: ${entryPath}`);
+				continue;
+			}
+		}
+
 		const skillPath = join(skillsDir, entry.name, SKILL_FILE_NAME);
 		const result = await tryLoadSkill(skillPath, scope, logger);
 		if (result.type === "not_found") {
@@ -140,4 +157,26 @@ async function tryLoadSkill(
 
 function isFileNotFound(e: unknown): boolean {
 	return e instanceof Error && "code" in e && e.code === FILE_NOT_FOUND_CODE;
+}
+
+async function isWithinRoot(symlinkPath: string, rootDir: string): Promise<boolean> {
+	try {
+		const resolved = await realpath(symlinkPath);
+		const normalizedRoot = await realpath(rootDir);
+		return resolved.startsWith(`${normalizedRoot}/`);
+	} catch {
+		return false;
+	}
+}
+
+async function isSymlinkOutsideRoot(path: string, rootDir: string): Promise<boolean> {
+	try {
+		const stat = await lstat(path);
+		if (!stat.isSymbolicLink()) {
+			return false;
+		}
+		return !(await isWithinRoot(path, rootDir));
+	} catch {
+		return false;
+	}
 }
