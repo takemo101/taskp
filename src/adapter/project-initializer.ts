@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import type { Result } from "../core/types/result";
 import type {
+	FailedLink,
 	ProjectInitializer,
 	SetupLocation,
 	SetupResult,
@@ -143,16 +144,22 @@ async function resolveBundledSkillsDir(candidates: readonly string[]): Promise<s
 	return undefined;
 }
 
+type LinkBundledSkillsResult = {
+	readonly linked: readonly string[];
+	readonly failed: readonly FailedLink[];
+};
+
 async function linkBundledSkills(
 	skillsDir: string,
 	bundledSkillsDir: string,
-): Promise<readonly string[]> {
+): Promise<LinkBundledSkillsResult> {
 	if (!(await fileExists(bundledSkillsDir))) {
-		return [];
+		return { linked: [], failed: [] };
 	}
 
 	const entries = await readdir(bundledSkillsDir, { withFileTypes: true });
 	const linked: string[] = [];
+	const failed: FailedLink[] = [];
 
 	for (const entry of entries.filter((e) => e.isDirectory())) {
 		const linkPath = join(skillsDir, entry.name);
@@ -161,11 +168,18 @@ async function linkBundledSkills(
 		}
 		// 相対パスでシンボリックリンクを作成（npm update でパスが変わっても追従可能）
 		const relTarget = relative(dirname(linkPath), join(bundledSkillsDir, entry.name));
-		await symlink(relTarget, linkPath, "dir");
-		linked.push(entry.name);
+		try {
+			await symlink(relTarget, linkPath, "dir");
+			linked.push(entry.name);
+		} catch (e) {
+			failed.push({
+				name: entry.name,
+				error: e instanceof Error ? e.message : String(e),
+			});
+		}
 	}
 
-	return linked;
+	return { linked, failed };
 }
 
 type ProjectInitializerDeps = {
@@ -193,12 +207,15 @@ export function createProjectInitializer(deps: ProjectInitializerDeps): ProjectI
 					await createDirIfNeeded({ path: skillsDir }, deps.baseDir, created);
 
 					let linked: readonly string[] = [];
+					let failedLinks: readonly FailedLink[] = [];
 					if (!skillsDirExisted) {
 						const bundledDir =
 							deps.bundledSkillsDir ??
 							(await resolveBundledSkillsDir(getBundledSkillsDirCandidates()));
 						if (bundledDir) {
-							linked = await linkBundledSkills(skillsDir, bundledDir);
+							const linkResult = await linkBundledSkills(skillsDir, bundledDir);
+							linked = linkResult.linked;
+							failedLinks = linkResult.failed;
 						}
 					}
 
@@ -237,6 +254,7 @@ export function createProjectInitializer(deps: ProjectInitializerDeps): ProjectI
 						created,
 						skipped,
 						linked,
+						failedLinks,
 					};
 				},
 				(e) => new Error(`Failed to setup project: ${e.message}`),
