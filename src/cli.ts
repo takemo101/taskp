@@ -110,6 +110,14 @@ function formatSetupOutput(output: SetupOutput): string {
 		}
 	}
 
+	if (output.failedLinks.length > 0) {
+		lines.push("");
+		lines.push("Failed to link skills:");
+		for (const fail of output.failedLinks) {
+			lines.push(`  ${fail.name}: ${fail.error}`);
+		}
+	}
+
 	return lines.join("\n");
 }
 

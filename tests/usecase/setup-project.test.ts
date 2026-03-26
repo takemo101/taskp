@@ -9,9 +9,10 @@ function stubInitializer(result: {
 	created: string[];
 	skipped: string[];
 	linked?: string[];
+	failedLinks?: { name: string; error: string }[];
 }): ProjectInitializer {
 	return {
-		setup: () => Promise.resolve(ok({ linked: [], ...result })),
+		setup: () => Promise.resolve(ok({ linked: [], failedLinks: [], ...result })),
 	};
 }
 
@@ -86,7 +87,13 @@ describe("setupProject", () => {
 			setup: (options) => {
 				capturedForce = options.force;
 				return Promise.resolve(
-					ok({ location: "project" as const, created: [], skipped: [], linked: [] }),
+					ok({
+						location: "project" as const,
+						created: [],
+						skipped: [],
+						linked: [],
+						failedLinks: [],
+					}),
 				);
 			},
 		};
