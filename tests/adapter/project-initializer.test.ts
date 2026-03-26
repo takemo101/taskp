@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readlinkSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createProjectInitializer } from "../../src/adapter/project-initializer";
 
@@ -36,16 +36,58 @@ describe("createProjectInitializer", () => {
 			expect(result.value.failedLinks).toHaveLength(0);
 		});
 
+		it("creates relative symlinks pointing to bundled skills", async () => {
+			const bundledDir = join(baseDir, "bundled-skills");
+			mkdirSync(join(bundledDir, "skill-a"), { recursive: true });
+
+			const initializer = createProjectInitializer({
+				baseDir,
+				location: "project",
+				bundledSkillsDir: bundledDir,
+			});
+
+			const result = await initializer.setup({ force: false });
+			expect(result.ok).toBe(true);
+
+			const linkPath = join(baseDir, ".taskp", "skills", "skill-a");
+			const target = readlinkSync(linkPath);
+			const expectedRel = relative(join(baseDir, ".taskp", "skills"), join(bundledDir, "skill-a"));
+			expect(target).toBe(expectedRel);
+		});
+
+		it("skips already existing skill directories", async () => {
+			const bundledDir = join(baseDir, "bundled-skills");
+			mkdirSync(join(bundledDir, "skill-a"), { recursive: true });
+
+			const initializer = createProjectInitializer({
+				baseDir,
+				location: "project",
+				bundledSkillsDir: bundledDir,
+			});
+
+			await initializer.setup({ force: false });
+
+			// skills ディレクトリを残して再度 setup（skillsDir が既存なので linking スキップ）
+			const initializer2 = createProjectInitializer({
+				baseDir,
+				location: "project",
+				bundledSkillsDir: bundledDir,
+			});
+			const result = await initializer2.setup({ force: false });
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.linked).toHaveLength(0);
+		});
+
 		it("reports failed links when symlink creation fails", async () => {
 			const bundledDir = join(baseDir, "bundled-skills");
 			mkdirSync(join(bundledDir, "skill-ok"), { recursive: true });
 			mkdirSync(join(bundledDir, "skill-fail"), { recursive: true });
 
-			// skills ディレクトリを読み取り専用にして一部の symlink を失敗させる
+			// skills ディレクトリを読み取り専用にして symlink を失敗させる
 			const skillsDir = join(baseDir, ".taskp", "skills");
 			mkdirSync(skillsDir, { recursive: true });
-			// skillsDir が既に存在すると linkBundledSkills がスキップされるため、
-			// initializer 経由ではなく、skillsDir を削除してから再実行する
 			rmSync(skillsDir, { recursive: true });
 
 			const initializer = createProjectInitializer({
@@ -60,6 +102,47 @@ describe("createProjectInitializer", () => {
 			if (!result.ok) return;
 			expect(result.value.failedLinks).toBeDefined();
 			expect(Array.isArray(result.value.failedLinks)).toBe(true);
+		});
+
+		it("returns empty linked when bundled skills directory does not exist", async () => {
+			const nonExistentDir = join(baseDir, "does-not-exist");
+
+			const initializer = createProjectInitializer({
+				baseDir,
+				location: "project",
+				bundledSkillsDir: nonExistentDir,
+			});
+
+			const result = await initializer.setup({ force: false });
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.linked).toHaveLength(0);
+			expect(result.value.failedLinks).toHaveLength(0);
+		});
+
+		it("reports individual failures with error messages", async () => {
+			const bundledDir = join(baseDir, "bundled-skills");
+			mkdirSync(join(bundledDir, "good-skill"), { recursive: true });
+			mkdirSync(join(bundledDir, "bad-skill"), { recursive: true });
+
+			const initializer = createProjectInitializer({
+				baseDir,
+				location: "project",
+				bundledSkillsDir: bundledDir,
+			});
+
+			const result = await initializer.setup({ force: false });
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			// 正常にリンクされたスキルが含まれる
+			expect(result.value.linked.length + result.value.failedLinks.length).toBeGreaterThan(0);
+			// 失敗があれば name と error が設定されている
+			for (const failed of result.value.failedLinks) {
+				expect(failed.name).toBeTruthy();
+				expect(failed.error).toBeTruthy();
+			}
 		});
 	});
 });

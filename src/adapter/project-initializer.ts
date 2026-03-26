@@ -149,6 +149,24 @@ type LinkBundledSkillsResult = {
 	readonly failed: readonly FailedLink[];
 };
 
+/**
+ * ディレクトリへのシンボリックリンクを作成する。
+ *
+ * Windows では 'junction' を使用（管理者権限・デベロッパーモード不要）。
+ * Unix 系では 'dir' を使用。
+ * @see https://nodejs.org/api/fs.html#fssymlinktarget-path-type-callback
+ */
+async function createDirSymlink(target: string, path: string): Promise<void> {
+	const type = process.platform === "win32" ? "junction" : "dir";
+	await symlink(target, path, type);
+}
+
+/**
+ * バンドルスキルへのシンボリックリンクを作成する。
+ *
+ * 相対パスを使用し、npm update でパッケージパスが変わっても追従可能。
+ * Windows では junction を使用するため管理者権限不要。
+ */
 async function linkBundledSkills(
 	skillsDir: string,
 	bundledSkillsDir: string,
@@ -166,10 +184,9 @@ async function linkBundledSkills(
 		if (await fileExists(linkPath)) {
 			continue;
 		}
-		// 相対パスでシンボリックリンクを作成（npm update でパスが変わっても追従可能）
 		const relTarget = relative(dirname(linkPath), join(bundledSkillsDir, entry.name));
 		try {
-			await symlink(relTarget, linkPath, "dir");
+			await createDirSymlink(relTarget, linkPath);
 			linked.push(entry.name);
 		} catch (e) {
 			failed.push({
