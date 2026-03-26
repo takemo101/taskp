@@ -34,7 +34,10 @@ function makeSkill(name: string): Skill {
 		body: {
 			content: "",
 			extractCodeBlocks: () => [],
-			extractActionSection: () => undefined,
+			extractActionSection: () => ({
+				ok: false,
+				error: { type: "EXECUTION_ERROR" as const, message: "not found" },
+			}),
 			extractActionCodeBlocks: () => [],
 		},
 		location: `.taskp/skills/${name}/SKILL.md`,

@@ -1,5 +1,9 @@
 import remarkParse from "remark-parse";
 import { unified } from "unified";
+import type { DomainError } from "../types/errors";
+import { executionError } from "../types/errors";
+import type { Result } from "../types/result";
+import { err, ok } from "../types/result";
 import type { ActionSection } from "./action-section-parser";
 import { getActionSection, parseActionSections } from "./action-section-parser";
 
@@ -14,7 +18,7 @@ export interface SkillBody {
 	 * @param lang - Code language filter (defaults to "bash")
 	 */
 	readonly extractCodeBlocks: (lang?: string) => readonly CodeBlock[];
-	readonly extractActionSection: (name: string) => string | undefined;
+	readonly extractActionSection: (name: string) => Result<string, DomainError>;
 	/**
 	 * @param name - Action name
 	 * @param lang - Code language filter (defaults to "bash")
@@ -35,9 +39,12 @@ export function createSkillBody(content: string): SkillBody {
 	return {
 		content,
 		extractCodeBlocks: (lang = "bash") => extractCodeBlocks(content, lang),
-		extractActionSection: (name: string) => {
+		extractActionSection: (name: string): Result<string, DomainError> => {
 			const section = getActionSection(getSections(), name);
-			return section?.content;
+			if (!section) {
+				return err(executionError(`Action section "## action:${name}" not found in skill body`));
+			}
+			return ok(section.content);
 		},
 		extractActionCodeBlocks: (name: string, lang = "bash") => {
 			const section = getActionSection(getSections(), name);

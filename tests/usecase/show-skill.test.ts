@@ -40,7 +40,10 @@ function createSkill(overrides: Partial<Skill["metadata"]> = {}): Skill {
 		body: {
 			content: "# deploy",
 			extractCodeBlocks: () => [],
-			extractActionSection: () => undefined,
+			extractActionSection: () => ({
+				ok: false,
+				error: { type: "EXECUTION_ERROR" as const, message: "not found" },
+			}),
 			extractActionCodeBlocks: () => [],
 		},
 		location: "/project/.taskp/skills/deploy/SKILL.md",
