@@ -33,6 +33,7 @@ export type ExecutionDeps = {
 	readonly skillRepositoryFactory: SkillRepositoryFactory;
 	readonly promptCollectorFactory: PromptCollectorFactory;
 	readonly systemPromptResolver: SystemPromptResolver;
+	readonly maxAgentSteps?: number;
 };
 
 export async function runExecution(
@@ -106,7 +107,13 @@ async function executeAgentMode(
 	const contextCollector = createContextCollector({ ...contextCollectorDeps, logger });
 
 	const result = await runAgentSkill(
-		{ name: skill.metadata.name, action: actionName, presets: variables, model },
+		{
+			name: skill.metadata.name,
+			action: actionName,
+			presets: variables,
+			model,
+			maxAgentSteps: deps.maxAgentSteps,
+		},
 		{
 			skillRepository: deps.skillRepositoryFactory(skill),
 			promptCollector: deps.promptCollectorFactory(variables),

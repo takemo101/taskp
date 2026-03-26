@@ -385,6 +385,7 @@ async function runAgentMode(
 			presets,
 			model: languageModel,
 			noInput: c.options.skipPrompt,
+			maxAgentSteps: config.cli?.max_agent_steps,
 		},
 		{
 			skillRepository,

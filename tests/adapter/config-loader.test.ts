@@ -384,6 +384,50 @@ command_timeout_ms = -1
 
 			expect(result.ok).toBe(false);
 		});
+
+		it("loads max_agent_steps", async () => {
+			writeConfig(
+				projectRoot,
+				`
+[cli]
+max_agent_steps = 100
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.cli?.max_agent_steps).toBe(100);
+		});
+
+		it("rejects max_agent_steps below 1", async () => {
+			writeConfig(
+				projectRoot,
+				`
+[cli]
+max_agent_steps = 0
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(false);
+		});
+
+		it("rejects max_agent_steps above 200", async () => {
+			writeConfig(
+				projectRoot,
+				`
+[cli]
+max_agent_steps = 201
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(false);
+		});
 	});
 });
 

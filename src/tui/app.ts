@@ -48,7 +48,7 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 			return;
 		}
 
-		const { model, modelSpec, hooksConfig, commandTimeoutMs } =
+		const { model, modelSpec, hooksConfig, commandTimeoutMs, maxAgentSteps } =
 			await resolveModelAndConfig(options);
 
 		const commandExecutor = createCommandRunner({ defaultTimeoutMs: commandTimeoutMs });
@@ -61,6 +61,7 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 			skillRepositoryFactory: createSingleSkillRepository,
 			promptCollectorFactory: createPresetPromptCollector,
 			systemPromptResolver: createSystemPromptResolver(process.cwd()),
+			maxAgentSteps,
 		};
 
 		while (true) {
@@ -90,6 +91,7 @@ type ModelAndConfig = {
 	readonly modelSpec: ModelSpec | null;
 	readonly hooksConfig: HooksConfig | undefined;
 	readonly commandTimeoutMs: number | undefined;
+	readonly maxAgentSteps: number | undefined;
 };
 
 // config.toml からデフォルトの LLM モデルとフック設定を解決する。
@@ -98,22 +100,37 @@ async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConf
 	const configLoader = createDefaultConfigLoader(process.cwd());
 	const configResult = await configLoader.load();
 	if (!configResult.ok)
-		return { model: null, modelSpec: null, hooksConfig: undefined, commandTimeoutMs: undefined };
+		return {
+			model: null,
+			modelSpec: null,
+			hooksConfig: undefined,
+			commandTimeoutMs: undefined,
+			maxAgentSteps: undefined,
+		};
 
 	const hooksConfig = configResult.value.hooks;
 	const commandTimeoutMs = configResult.value.cli?.command_timeout_ms;
+	const maxAgentSteps = configResult.value.cli?.max_agent_steps;
 
 	const aiConfig = configResult.value.ai ?? {};
 	const specResult = resolveModelSpec({
 		cliModel: options?.model,
 		config: aiConfig,
 	});
-	if (!specResult.ok) return { model: null, modelSpec: null, hooksConfig, commandTimeoutMs };
+	if (!specResult.ok)
+		return { model: null, modelSpec: null, hooksConfig, commandTimeoutMs, maxAgentSteps };
 
 	const modelResult = createLanguageModel(specResult.value, aiConfig);
-	if (!modelResult.ok) return { model: null, modelSpec: null, hooksConfig, commandTimeoutMs };
+	if (!modelResult.ok)
+		return { model: null, modelSpec: null, hooksConfig, commandTimeoutMs, maxAgentSteps };
 
-	return { model: modelResult.value, modelSpec: specResult.value, hooksConfig, commandTimeoutMs };
+	return {
+		model: modelResult.value,
+		modelSpec: specResult.value,
+		hooksConfig,
+		commandTimeoutMs,
+		maxAgentSteps,
+	};
 }
 
 function resolveActionInputs(skill: Skill, actionName?: string): readonly SkillInput[] | undefined {
