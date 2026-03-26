@@ -173,6 +173,7 @@ export function mergeHooksConfig(global: HooksConfig, project: HooksConfig): Hoo
 export function mergeCliConfig(global: CliConfig, project: CliConfig): CliConfig {
 	return {
 		command_timeout_ms: project.command_timeout_ms ?? global.command_timeout_ms,
+		max_agent_steps: project.max_agent_steps ?? global.max_agent_steps,
 	};
 }
 
