@@ -23,11 +23,30 @@ export const collectGlob: SourceCollector = async (source: ContextSource, cwd, d
 	);
 
 	const collected: CollectedContext[] = [];
-	for (const result of results) {
-		if (!result.ok) {
-			return result;
+	const failures: string[] = [];
+
+	for (let i = 0; i < results.length; i++) {
+		const result = results[i];
+		if (result.ok) {
+			collected.push(result.value);
+		} else {
+			failures.push(`${paths[i]}: ${result.error.message}`);
 		}
-		collected.push(result.value);
+	}
+
+	if (failures.length > 0 && collected.length === 0) {
+		return {
+			ok: false,
+			error: executionError(
+				`All glob matches failed for "${source.pattern}":\n${failures.join("\n")}`,
+			),
+		};
+	}
+
+	if (failures.length > 0) {
+		deps.logger.warn(
+			`${failures.length} of ${total} glob matches failed for "${source.pattern}":\n${failures.join("\n")}`,
+		);
 	}
 
 	return ok(collected);

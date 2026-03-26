@@ -10,7 +10,7 @@ import { collectImage } from "./image-collector";
 import type { ContextCollectorDeps, SourceCollector } from "./types";
 import { collectUrl } from "./url-collector";
 
-export type { ContextCollectorDeps } from "./types";
+export type { ContextCollectorDeps, ContextCollectorIoDeps } from "./types";
 
 const sourceCollectors: ReadonlyMap<ContextSource["type"], SourceCollector> = new Map([
 	["file", collectFile],

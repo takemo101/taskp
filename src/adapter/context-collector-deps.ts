@@ -1,9 +1,9 @@
 import { executionError } from "../core/types/errors";
 import { err, ok } from "../core/types/result";
-import type { ContextCollectorDeps } from "./context-collector";
+import type { ContextCollectorIoDeps } from "./context-collector";
 import { toErrorMessage, tryCatch } from "./error-handler-utils";
 
-export async function createDefaultContextCollectorDeps(): Promise<ContextCollectorDeps> {
+export async function createDefaultContextCollectorDeps(): Promise<ContextCollectorIoDeps> {
 	const { execa } = await import("execa");
 	const { glob } = await import("node:fs/promises");
 

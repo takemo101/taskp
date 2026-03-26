@@ -359,10 +359,9 @@ async function runAgentMode(
 		output: process.stdout,
 	});
 
-	const contextCollectorDeps = await createDefaultContextCollectorDeps();
-	const contextCollector = createContextCollector(contextCollectorDeps);
-
 	const logger = createConsoleLogger();
+	const contextCollectorDeps = await createDefaultContextCollectorDeps();
+	const contextCollector = createContextCollector({ ...contextCollectorDeps, logger });
 	const agentExecutor = createAgentExecutor(writer, logger);
 
 	const commandExecutor = createCommandRunner({
