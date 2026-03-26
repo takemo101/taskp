@@ -1,4 +1,5 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
+import { DEFAULT_MAX_AGENT_STEPS } from "../core/constants";
 import { buildTaskpRunDescription } from "../core/execution/agent-tools";
 import type { ContentPart } from "../core/execution/content-part";
 import {
@@ -21,14 +22,13 @@ import type { PromptCollector } from "./port/prompt-collector";
 import type { SkillRepository } from "./port/skill-repository";
 import type { SystemPromptResolver } from "./port/system-prompt-resolver";
 
-const MAX_STEPS = 50;
-
 export type RunAgentSkillInput = {
 	readonly name: string;
 	readonly action?: string;
 	readonly presets: Readonly<Record<string, string>>;
 	readonly model: LanguageModelV3;
 	readonly noInput?: boolean;
+	readonly maxAgentSteps?: number;
 };
 
 export type RunAgentSkillOutput = {
@@ -126,7 +126,7 @@ export async function runAgentSkill(
 		systemPrompt,
 		contentParts,
 		toolNames,
-		maxSteps: MAX_STEPS,
+		maxSteps: input.maxAgentSteps ?? DEFAULT_MAX_AGENT_STEPS,
 		toolDescriptions,
 	});
 

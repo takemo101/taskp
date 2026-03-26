@@ -46,6 +46,13 @@ export const cliConfigSchema = z.object({
 		.positive()
 		.optional()
 		.describe("Default timeout for command execution in milliseconds"),
+	max_agent_steps: z
+		.number()
+		.int()
+		.min(1)
+		.max(200)
+		.optional()
+		.describe("Maximum number of agent loop steps (1–200, default: 50)"),
 });
 
 export const configSchema = z.object({
