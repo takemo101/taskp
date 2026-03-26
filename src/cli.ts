@@ -8,6 +8,7 @@ import { createDefaultConfigLoader } from "./adapter/config-loader";
 import { createConsoleLogger } from "./adapter/console-logger";
 import { createContextCollector } from "./adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "./adapter/context-collector-deps";
+import { createNodeFileSystem } from "./adapter/file-system-port";
 import { createHookExecutor } from "./adapter/hook-executor";
 import { createCliProgressWriter } from "./adapter/progress-formatter";
 import { createProjectInitializer } from "./adapter/project-initializer";
@@ -296,6 +297,7 @@ const cli = Cli.create("taskp", {
 			const projectInitializer = createProjectInitializer({
 				baseDir,
 				location: isGlobal ? "global" : "project",
+				fs: createNodeFileSystem(),
 			});
 
 			const result = await setupProject(

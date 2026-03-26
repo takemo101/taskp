@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createConfigLoader } from "../../src/adapter/config-loader";
+import { createNodeFileSystem } from "../../src/adapter/file-system-port";
 import { createProjectInitializer } from "../../src/adapter/project-initializer";
 import { createSkillLoader } from "../../src/adapter/skill-loader";
 import { type ReservedVars, renderTemplate } from "../../src/core/variable/template-renderer";
@@ -291,6 +292,7 @@ describe("Adapter Integration", () => {
 			const initializer = createProjectInitializer({
 				baseDir: localRoot,
 				location: "project",
+				fs: createNodeFileSystem(),
 			});
 
 			const result = await initializer.setup({ force: false });
@@ -315,6 +317,7 @@ describe("Adapter Integration", () => {
 			const initializer = createProjectInitializer({
 				baseDir: globalRoot,
 				location: "global",
+				fs: createNodeFileSystem(),
 			});
 
 			const result = await initializer.setup({ force: false });
@@ -336,6 +339,7 @@ describe("Adapter Integration", () => {
 			const initializer = createProjectInitializer({
 				baseDir: localRoot,
 				location: "project",
+				fs: createNodeFileSystem(),
 			});
 
 			const result = await initializer.setup({ force: false });
@@ -357,6 +361,7 @@ describe("Adapter Integration", () => {
 			const initializer = createProjectInitializer({
 				baseDir: localRoot,
 				location: "project",
+				fs: createNodeFileSystem(),
 			});
 
 			const result = await initializer.setup({ force: true });
