@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import type { Tool } from "ai";
 import { z } from "zod";
 import { zodToJsonSchema } from "./schema-helper";
+import { type ToolResult, toolFailure, toolSuccess } from "./tool-output";
 
 export const MAX_GREP_MATCHES = 500;
 
@@ -15,11 +16,13 @@ export const grepParams = z.object({
 
 type GrepInput = z.infer<typeof grepParams>;
 
-type GrepResult = {
+type GrepData = {
 	readonly matches: string;
 	readonly count: number;
 	readonly truncated: boolean;
 };
+
+export type { GrepData };
 
 async function resolveSearchFiles(
 	searchPath: string,
@@ -66,18 +69,23 @@ function searchFileContent(
 	}
 }
 
-export const grepTool: Tool<GrepInput, GrepResult> = {
+export const grepTool: Tool<GrepInput, ToolResult<GrepData>> = {
 	description:
 		"Search file contents for a pattern and return matching lines with file paths and line numbers",
 	inputSchema: zodToJsonSchema(grepParams),
-	execute: async ({ pattern, path, include }) => {
+	execute: async ({ pattern, path, include }): Promise<ToolResult<GrepData>> => {
 		const cwd = process.cwd();
 		const searchPath = path ?? ".";
 		// g フラグなしで生成することで regex.test() がステートレスに動作する
 		// （g フラグ付きの場合 lastIndex が更新され、同じ文字列への連続 test() で結果が変わる）
 		const regex = new RegExp(pattern);
 
-		const files = await resolveSearchFiles(searchPath, include, cwd);
+		let files: readonly string[];
+		try {
+			files = await resolveSearchFiles(searchPath, include, cwd);
+		} catch {
+			return toolFailure(`Failed to search path: ${searchPath}`);
+		}
 
 		const results: string[] = [];
 		for (const file of files) {
@@ -91,10 +99,10 @@ export const grepTool: Tool<GrepInput, GrepResult> = {
 			}
 		}
 
-		return {
+		return toolSuccess({
 			matches: results.join("\n"),
 			count: results.length,
 			truncated: results.length >= MAX_GREP_MATCHES,
-		};
+		});
 	},
 };

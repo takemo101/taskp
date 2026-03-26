@@ -7,7 +7,10 @@ export type {
 	DescriptionOverrides,
 	TaskpRunDeps,
 	TaskpRunResult,
+	ToolError,
 	ToolName,
+	ToolOutput,
+	ToolResult,
 } from "./agent-tools.js";
 export { buildTaskpRunDescription, buildTools, TOOL_NAMES } from "./agent-tools.js";
 export type { ContentPart, ImagePart, TextPart } from "./content-part.js";

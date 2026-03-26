@@ -189,8 +189,9 @@ describe("taskp_run tool", () => {
 			toolContext,
 		)) as TaskpRunResult;
 
-		expect(result.status).toBe("success");
-		expect(result.output).toContain("Hello world");
+		expect(result.success).toBe(true);
+		if (!result.success) return;
+		expect(result.data.output).toContain("Hello world");
 	});
 
 	it("skill:action 形式でアクション付きスキルを実行できる", async () => {
@@ -203,8 +204,9 @@ describe("taskp_run tool", () => {
 			toolContext,
 		)) as TaskpRunResult;
 
-		expect(result.status).toBe("success");
-		expect(result.output).toContain("listing done");
+		expect(result.success).toBe(true);
+		if (!result.success) return;
+		expect(result.data.output).toContain("listing done");
 	});
 
 	it("agent モードスキルの呼び出しを拒否する", async () => {
@@ -214,7 +216,8 @@ describe("taskp_run tool", () => {
 
 		const result = (await tool.execute?.({ skill: "agent-skill" }, toolContext)) as TaskpRunResult;
 
-		expect(result.status).toBe("failed");
+		expect(result.success).toBe(false);
+		if (result.success) return;
 		expect(result.error).toContain("Cannot call agent mode skill");
 	});
 
@@ -228,7 +231,8 @@ describe("taskp_run tool", () => {
 			toolContext,
 		)) as TaskpRunResult;
 
-		expect(result.status).toBe("failed");
+		expect(result.success).toBe(false);
+		if (result.success) return;
 		expect(result.error).toContain("Cannot call agent mode skill");
 	});
 
@@ -238,7 +242,8 @@ describe("taskp_run tool", () => {
 
 		const result = (await tool.execute?.({ skill: "nonexistent" }, toolContext)) as TaskpRunResult;
 
-		expect(result.status).toBe("failed");
+		expect(result.success).toBe(false);
+		if (result.success) return;
 		expect(result.error).toContain("Skill not found");
 	});
 
@@ -249,7 +254,8 @@ describe("taskp_run tool", () => {
 
 		const result = (await tool.execute?.({ skill: "greet" }, toolContext)) as TaskpRunResult;
 
-		expect(result.status).toBe("failed");
+		expect(result.success).toBe(false);
+		if (result.success) return;
 		expect(result.error).toContain("Recursive call detected");
 	});
 
@@ -263,7 +269,8 @@ describe("taskp_run tool", () => {
 			toolContext,
 		)) as TaskpRunResult;
 
-		expect(result.status).toBe("failed");
+		expect(result.success).toBe(false);
+		if (result.success) return;
 		expect(result.error).toContain("Recursive call detected");
 	});
 
@@ -277,7 +284,8 @@ describe("taskp_run tool", () => {
 			toolContext,
 		)) as TaskpRunResult;
 
-		expect(result.status).toBe("failed");
+		expect(result.success).toBe(false);
+		if (result.success) return;
 		expect(result.error).toContain("Maximum nesting depth");
 	});
 
@@ -305,6 +313,6 @@ describe("taskp_run tool", () => {
 		const result = (await tool.execute?.({ skill: "greet" }, toolContext)) as TaskpRunResult;
 
 		// noInput=true かつ set なしなので、テンプレート変数が未解決でエラー
-		expect(result.status).toBe("failed");
+		expect(result.success).toBe(false);
 	});
 });

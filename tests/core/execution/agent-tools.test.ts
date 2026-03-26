@@ -74,7 +74,7 @@ describe("bash tool", () => {
 			{ command: "echo hello" },
 			{ toolCallId: "1", messages: [], abortSignal: AbortSignal.timeout(5000) },
 		);
-		expect(result).toEqual({ ok: true, value: { stdout: "hello", stderr: "", exitCode: 0 } });
+		expect(result).toEqual({ success: true, data: { stdout: "hello", stderr: "", exitCode: 0 } });
 	});
 
 	it("失敗したコマンドの exitCode と stderr を返す", async () => {
@@ -82,10 +82,10 @@ describe("bash tool", () => {
 		const result = (await tools.bash.execute?.(
 			{ command: "echo err >&2 && exit 1" },
 			{ toolCallId: "2", messages: [], abortSignal: AbortSignal.timeout(5000) },
-		)) as { ok: true; value: { stdout: string; stderr: string; exitCode: number } };
-		expect(result.ok).toBe(true);
-		expect(result.value.exitCode).toBe(1);
-		expect(result.value.stderr).toBe("err");
+		)) as { success: true; data: { stdout: string; stderr: string; exitCode: number } };
+		expect(result.success).toBe(true);
+		expect(result.data.exitCode).toBe(1);
+		expect(result.data.stderr).toBe("err");
 	});
 });
 
@@ -95,9 +95,9 @@ describe("read tool", () => {
 		const result = (await tools.read.execute?.(
 			{ path: join(__dirname, "agent-tools.test.ts") },
 			{ toolCallId: "3", messages: [], abortSignal: AbortSignal.timeout(5000) },
-		)) as { ok: true; value: string };
-		expect(result.ok).toBe(true);
-		expect(result.value).toContain("describe");
+		)) as { success: true; data: { content: string } };
+		expect(result.success).toBe(true);
+		expect(result.data.content).toContain("describe");
 	});
 
 	it("存在しないファイルで err を返す", async () => {
@@ -107,11 +107,8 @@ describe("read tool", () => {
 			{ toolCallId: "3", messages: [], abortSignal: AbortSignal.timeout(5000) },
 		);
 		expect(result).toEqual({
-			ok: false,
-			error: {
-				type: "EXECUTION_ERROR",
-				message: "Failed to read file: /nonexistent/path/file.txt",
-			},
+			success: false,
+			error: "Failed to read file: /nonexistent/path/file.txt",
 		});
 	});
 });
@@ -126,7 +123,7 @@ describe("write tool", () => {
 				{ path: filePath, content: "hello world" },
 				{ toolCallId: "4", messages: [], abortSignal: AbortSignal.timeout(5000) },
 			);
-			expect(result).toEqual({ ok: true, value: `Written to ${filePath}` });
+			expect(result).toEqual({ success: true, data: { path: filePath } });
 			const written = await readFile(filePath, "utf-8");
 			expect(written).toBe("hello world");
 		} finally {
@@ -142,8 +139,8 @@ describe("write tool", () => {
 			{ toolCallId: "4", messages: [], abortSignal: AbortSignal.timeout(5000) },
 		);
 		expect(result).toEqual({
-			ok: false,
-			error: { type: "EXECUTION_ERROR", message: `Failed to write file: ${invalidPath}` },
+			success: false,
+			error: `Failed to write file: ${invalidPath}`,
 		});
 	});
 });
@@ -154,9 +151,9 @@ describe("glob tool", () => {
 		const result = (await tools.glob.execute?.(
 			{ pattern: "tests/core/execution/*.test.ts" },
 			{ toolCallId: "5", messages: [], abortSignal: AbortSignal.timeout(5000) },
-		)) as { ok: true; value: readonly string[] };
-		expect(result.ok).toBe(true);
-		expect(result.value).toContain("tests/core/execution/agent-tools.test.ts");
+		)) as { success: true; data: { files: readonly string[] } };
+		expect(result.success).toBe(true);
+		expect(result.data.files).toContain("tests/core/execution/agent-tools.test.ts");
 	});
 });
 
@@ -171,7 +168,7 @@ describe("edit tool", () => {
 				{ path: filePath, oldString: "world", newString: "universe" },
 				{ toolCallId: "e1", messages: [], abortSignal: AbortSignal.timeout(5000) },
 			);
-			expect(result).toEqual({ ok: true, value: `Edited ${filePath}` });
+			expect(result).toEqual({ success: true, data: { path: filePath } });
 			const content = await readFile(filePath, "utf-8");
 			expect(content).toBe("hello universe foo bar");
 		} finally {
@@ -190,8 +187,8 @@ describe("edit tool", () => {
 				{ toolCallId: "e2", messages: [], abortSignal: AbortSignal.timeout(5000) },
 			);
 			expect(result).toEqual({
-				ok: false,
-				error: { type: "EXECUTION_ERROR", message: `String not found in ${filePath}` },
+				success: false,
+				error: `String not found in ${filePath}`,
 			});
 		} finally {
 			await rm(dir, { recursive: true });
@@ -209,11 +206,8 @@ describe("edit tool", () => {
 				{ toolCallId: "e3", messages: [], abortSignal: AbortSignal.timeout(5000) },
 			);
 			expect(result).toEqual({
-				ok: false,
-				error: {
-					type: "EXECUTION_ERROR",
-					message: `Multiple matches found in ${filePath}. Provide more context in oldString to uniquely identify the location.`,
-				},
+				success: false,
+				error: `Multiple matches found in ${filePath}. Provide more context in oldString to uniquely identify the location.`,
 			});
 		} finally {
 			await rm(dir, { recursive: true });
@@ -228,8 +222,8 @@ describe("edit tool", () => {
 			{ toolCallId: "e4", messages: [], abortSignal: AbortSignal.timeout(5000) },
 		);
 		expect(result).toEqual({
-			ok: false,
-			error: { type: "EXECUTION_ERROR", message: `Failed to read file: ${invalidPath}` },
+			success: false,
+			error: `Failed to read file: ${invalidPath}`,
 		});
 	});
 
@@ -244,7 +238,7 @@ describe("edit tool", () => {
 				{ path: filePath, oldString: "world", newString: "world" },
 				{ toolCallId: "e5", messages: [], abortSignal: AbortSignal.timeout(5000) },
 			);
-			expect(result).toEqual({ ok: true, value: `No changes needed in ${filePath}` });
+			expect(result).toEqual({ success: true, data: { path: filePath } });
 			const { mtimeMs: mtimeAfter } = await stat(filePath);
 			expect(mtimeAfter).toBe(mtimeBefore);
 		} finally {
@@ -276,10 +270,10 @@ describe("grep tool", () => {
 			const result = (await tools.grep.execute?.(
 				{ pattern: "hello", path: dir },
 				toolCallOpts,
-			)) as { matches: string; count: number; truncated: boolean };
-			expect(result.count).toBe(2);
-			expect(result.truncated).toBe(false);
-			const lines = result.matches.split("\n");
+			)) as { success: true; data: { matches: string; count: number; truncated: boolean } };
+			expect(result.data.count).toBe(2);
+			expect(result.data.truncated).toBe(false);
+			const lines = result.data.matches.split("\n");
 			expect(lines[0]).toContain("hello.txt:1:hello world");
 			expect(lines[1]).toContain("hello.txt:3:hello again");
 		} finally {
@@ -296,10 +290,10 @@ describe("grep tool", () => {
 			const result = (await tools.grep.execute?.(
 				{ pattern: "const", path: dir, include: "*.ts" },
 				toolCallOpts,
-			)) as { matches: string; count: number; truncated: boolean };
-			expect(result.count).toBe(1);
-			expect(result.matches).toContain("app.ts");
-			expect(result.matches).not.toContain("app.js");
+			)) as { success: true; data: { matches: string; count: number; truncated: boolean } };
+			expect(result.data.count).toBe(1);
+			expect(result.data.matches).toContain("app.ts");
+			expect(result.data.matches).not.toContain("app.js");
 		} finally {
 			await rm(dir, { recursive: true });
 		}
@@ -313,10 +307,10 @@ describe("grep tool", () => {
 			const result = (await tools.grep.execute?.(
 				{ pattern: "ZZZZZ_NO_MATCH", path: dir },
 				toolCallOpts,
-			)) as { matches: string; count: number; truncated: boolean };
-			expect(result.matches).toBe("");
-			expect(result.count).toBe(0);
-			expect(result.truncated).toBe(false);
+			)) as { success: true; data: { matches: string; count: number; truncated: boolean } };
+			expect(result.data.matches).toBe("");
+			expect(result.data.count).toBe(0);
+			expect(result.data.truncated).toBe(false);
 		} finally {
 			await rm(dir, { recursive: true });
 		}
@@ -331,9 +325,9 @@ describe("grep tool", () => {
 			const result = (await tools.grep.execute?.(
 				{ pattern: "match-", path: dir },
 				toolCallOpts,
-			)) as { matches: string; count: number; truncated: boolean };
-			expect(result.count).toBe(MAX_GREP_MATCHES);
-			expect(result.truncated).toBe(true);
+			)) as { success: true; data: { matches: string; count: number; truncated: boolean } };
+			expect(result.data.count).toBe(MAX_GREP_MATCHES);
+			expect(result.data.truncated).toBe(true);
 		} finally {
 			await rm(dir, { recursive: true });
 		}
@@ -354,9 +348,9 @@ describe("grep tool", () => {
 			const result = (await tools.grep.execute?.(
 				{ pattern: "find me", path: join(dir, "target.txt") },
 				toolCallOpts,
-			)) as { matches: string; count: number; truncated: boolean };
-			expect(result.count).toBe(1);
-			expect(result.matches).toContain(":2:find me");
+			)) as { success: true; data: { matches: string; count: number; truncated: boolean } };
+			expect(result.data.count).toBe(1);
+			expect(result.data.matches).toContain(":2:find me");
 		} finally {
 			await rm(dir, { recursive: true });
 		}
@@ -373,30 +367,34 @@ describe("grep tool", () => {
 			const result = (await tools.grep.execute?.(
 				{ pattern: "target", path: dir },
 				toolCallOpts,
-			)) as { matches: string; count: number; truncated: boolean };
-			expect(result.count).toBe(2);
-			expect(result.matches).toContain("root.txt");
-			expect(result.matches).toContain("nested.txt");
+			)) as { success: true; data: { matches: string; count: number; truncated: boolean } };
+			expect(result.data.count).toBe(2);
+			expect(result.data.matches).toContain("root.txt");
+			expect(result.data.matches).toContain("nested.txt");
 		} finally {
 			await rm(dir, { recursive: true });
 		}
 	});
 
-	it("存在しないパスでエラーを投げる", async () => {
+	it("存在しないパスでエラーを返す", async () => {
 		const tools = unwrapTools(["grep"]);
-		await expect(
-			tools.grep.execute?.({ pattern: "test", path: "/nonexistent/path" }, toolCallOpts),
-		).rejects.toThrow("Path not found");
+		const result = await tools.grep.execute?.(
+			{ pattern: "test", path: "/nonexistent/path" },
+			toolCallOpts,
+		);
+		expect(result).toEqual({ success: false, error: "Failed to search path: /nonexistent/path" });
 	});
 
-	it("存在しないディレクトリでエラーを投げる", async () => {
+	it("存在しないディレクトリでエラーを返す", async () => {
 		const tools = unwrapTools(["grep"]);
-		await expect(
-			tools.grep.execute?.(
-				{ pattern: "test", path: "/tmp/surely-does-not-exist-xyz" },
-				toolCallOpts,
-			),
-		).rejects.toThrow("Path not found");
+		const result = await tools.grep.execute?.(
+			{ pattern: "test", path: "/tmp/surely-does-not-exist-xyz" },
+			toolCallOpts,
+		);
+		expect(result).toEqual({
+			success: false,
+			error: "Failed to search path: /tmp/surely-does-not-exist-xyz",
+		});
 	});
 });
 
@@ -558,13 +556,12 @@ describe("fetch tool execute", () => {
 
 		const result = await execute({ url: "https://example.com" }, toolCallOpts);
 		expect(result).toEqual({
-			content: "hello world",
-			truncated: false,
-			length: 11,
+			success: true,
+			data: { content: "hello world", truncated: false, length: 11 },
 		});
 	});
 
-	it("非テキスト content-type でエラーを投げる", async () => {
+	it("非テキスト content-type でエラーを返す", async () => {
 		const execute = getFetchExecute();
 		vi.spyOn(globalThis, "fetch").mockResolvedValue(
 			new Response("binary", {
@@ -573,9 +570,11 @@ describe("fetch tool execute", () => {
 			}),
 		);
 
-		await expect(execute({ url: "https://example.com/image.png" }, toolCallOpts)).rejects.toThrow(
-			"Non-text content type: image/png. Only text content is supported.",
-		);
+		const result = await execute({ url: "https://example.com/image.png" }, toolCallOpts);
+		expect(result).toEqual({
+			success: false,
+			error: "Non-text content type: image/png. Only text content is supported.",
+		});
 	});
 
 	it("maxLength を超える場合に truncated: true を返す", async () => {
@@ -590,29 +589,32 @@ describe("fetch tool execute", () => {
 
 		const result = await execute({ url: "https://example.com", maxLength: 50 }, toolCallOpts);
 		expect(result).toEqual({
-			content: "a".repeat(50),
-			truncated: true,
-			length: 100,
+			success: true,
+			data: { content: "a".repeat(50), truncated: true, length: 100 },
 		});
 	});
 
-	it("HTTP エラーステータスでエラーを投げる", async () => {
+	it("HTTP エラーステータスでエラーを返す", async () => {
 		const execute = getFetchExecute();
 		vi.spyOn(globalThis, "fetch").mockResolvedValue(
 			new Response("Not Found", { status: 404, statusText: "Not Found" }),
 		);
 
-		await expect(execute({ url: "https://example.com/missing" }, toolCallOpts)).rejects.toThrow(
-			"HTTP 404: Not Found",
-		);
+		const result = await execute({ url: "https://example.com/missing" }, toolCallOpts);
+		expect(result).toEqual({
+			success: false,
+			error: "HTTP 404: Not Found",
+		});
 	});
 
-	it("内部 IP への fetch でエラーを投げる", async () => {
+	it("内部 IP への fetch でエラーを返す", async () => {
 		const execute = getFetchExecute();
 
-		await expect(execute({ url: "http://192.168.1.1/secret" }, toolCallOpts)).rejects.toThrow(
-			"Access to internal/private addresses is not allowed: 192.168.1.1",
-		);
+		const result = await execute({ url: "http://192.168.1.1/secret" }, toolCallOpts);
+		expect(result).toEqual({
+			success: false,
+			error: "Access to internal/private addresses is not allowed: 192.168.1.1",
+		});
 	});
 });
 
