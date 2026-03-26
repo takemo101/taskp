@@ -46,6 +46,13 @@ export const cliConfigSchema = z.object({
 		.positive()
 		.optional()
 		.describe("Default timeout for command execution in milliseconds"),
+	max_agent_steps: z
+		.number()
+		.int()
+		.min(1)
+		.max(200)
+		.optional()
+		.describe("Maximum number of agent loop steps (1–200, default: 50)"),
 });
 
 export const configSchema = z.object({
@@ -126,7 +133,7 @@ function parseConfig(raw: string, path: string): Result<Config, ConfigError> {
 	return ok(result.data);
 }
 
-function mergeOptional<T>(
+export function mergeOptional<T>(
 	global: T | undefined,
 	project: T | undefined,
 	merge: (g: T, p: T) => T,
@@ -137,25 +144,42 @@ function mergeOptional<T>(
 	return merge(global, project);
 }
 
+export function mergeProviders(
+	global: Record<string, ProviderConfig>,
+	project: Record<string, ProviderConfig>,
+): Record<string, ProviderConfig> {
+	const merged: Record<string, ProviderConfig> = { ...global };
+	for (const [key, value] of Object.entries(project)) {
+		merged[key] = global[key] !== undefined ? { ...global[key], ...value } : value;
+	}
+	return merged;
+}
+
+export function mergeAiConfig(global: AiConfig, project: AiConfig): AiConfig {
+	return {
+		default_provider: project.default_provider ?? global.default_provider,
+		default_model: project.default_model ?? global.default_model,
+		providers: mergeOptional(global.providers, project.providers, mergeProviders),
+	};
+}
+
+export function mergeHooksConfig(global: HooksConfig, project: HooksConfig): HooksConfig {
+	return {
+		on_success: project.on_success ?? global.on_success,
+		on_failure: project.on_failure ?? global.on_failure,
+	};
+}
+
+export function mergeCliConfig(global: CliConfig, project: CliConfig): CliConfig {
+	return {
+		command_timeout_ms: project.command_timeout_ms ?? global.command_timeout_ms,
+	};
+}
+
 function mergeConfigs(global: Config, project: Config): Config {
 	return {
-		ai: mergeOptional(global.ai, project.ai, (g, p) => ({
-			default_provider: p.default_provider ?? g.default_provider,
-			default_model: p.default_model ?? g.default_model,
-			providers: mergeOptional(g.providers, p.providers, (gp, pp) => {
-				const merged: Record<string, ProviderConfig> = { ...gp };
-				for (const [key, value] of Object.entries(pp)) {
-					merged[key] = gp[key] !== undefined ? { ...gp[key], ...value } : value;
-				}
-				return merged;
-			}),
-		})),
-		hooks: mergeOptional(global.hooks, project.hooks, (g, p) => ({
-			on_success: p.on_success ?? g.on_success,
-			on_failure: p.on_failure ?? g.on_failure,
-		})),
-		cli: mergeOptional(global.cli, project.cli, (g, p) => ({
-			command_timeout_ms: p.command_timeout_ms ?? g.command_timeout_ms,
-		})),
+		ai: mergeOptional(global.ai, project.ai, mergeAiConfig),
+		hooks: mergeOptional(global.hooks, project.hooks, mergeHooksConfig),
+		cli: mergeOptional(global.cli, project.cli, mergeCliConfig),
 	};
 }

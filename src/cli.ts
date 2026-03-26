@@ -111,6 +111,14 @@ function formatSetupOutput(output: SetupOutput): string {
 		}
 	}
 
+	if (output.failedLinks.length > 0) {
+		lines.push("");
+		lines.push("Failed to link skills:");
+		for (const fail of output.failedLinks) {
+			lines.push(`  ${fail.name}: ${fail.error}`);
+		}
+	}
+
 	return lines.join("\n");
 }
 
@@ -361,10 +369,9 @@ async function runAgentMode(
 		output: process.stdout,
 	});
 
-	const contextCollectorDeps = await createDefaultContextCollectorDeps();
-	const contextCollector = createContextCollector(contextCollectorDeps);
-
 	const logger = createConsoleLogger();
+	const contextCollectorDeps = await createDefaultContextCollectorDeps();
+	const contextCollector = createContextCollector({ ...contextCollectorDeps, logger });
 	const agentExecutor = createAgentExecutor(writer, logger);
 
 	const commandExecutor = createCommandRunner({
@@ -380,6 +387,7 @@ async function runAgentMode(
 			presets,
 			model: languageModel,
 			noInput: c.options.skipPrompt,
+			maxAgentSteps: config.cli?.max_agent_steps,
 		},
 		{
 			skillRepository,

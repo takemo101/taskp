@@ -1,13 +1,21 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createContextCollector } from "../../src/adapter/context-collector";
 import type { ContextSource } from "../../src/core/skill/context-source";
 import type { ExecutionError } from "../../src/core/types/errors";
 import { executionError } from "../../src/core/types/errors";
 import type { Result } from "../../src/core/types/result";
 import { err, ok } from "../../src/core/types/result";
+
+function createSpyLogger() {
+	return {
+		debug: vi.fn<(message: string) => void>(),
+		warn: vi.fn<(message: string) => void>(),
+		error: vi.fn<(message: string) => void>(),
+	};
+}
 
 function stubDeps(overrides?: {
 	executeCommand?: (command: string, cwd: string) => Promise<Result<string, ExecutionError>>;
@@ -18,6 +26,7 @@ function stubDeps(overrides?: {
 		Result<{ readonly data: Uint8Array; readonly mediaType: string | undefined }, ExecutionError>
 	>;
 	scanGlob?: (pattern: string, cwd: string) => Promise<Result<readonly string[], ExecutionError>>;
+	logger?: ReturnType<typeof createSpyLogger>;
 }) {
 	return {
 		executeCommand: overrides?.executeCommand ?? (async () => ok("")),
@@ -25,6 +34,7 @@ function stubDeps(overrides?: {
 		fetchBinary:
 			overrides?.fetchBinary ?? (async () => ok({ data: new Uint8Array(), mediaType: undefined })),
 		scanGlob: overrides?.scanGlob ?? (async () => ok([] as readonly string[])),
+		logger: overrides?.logger ?? createSpyLogger(),
 	};
 }
 
@@ -147,11 +157,36 @@ describe("ContextCollector", () => {
 			expect(result.error.message).toBe("glob scan failed");
 		});
 
-		it("includes progress counter in error for unreadable file", async () => {
+		it("returns successful results and warns on partial failure", async () => {
 			await writeFile(join(tempDir, "a.md"), "aaa");
+			const logger = createSpyLogger();
 			const collector = createContextCollector(
 				stubDeps({
-					scanGlob: async () => ok(["a.md", "missing.md", "c.md"]),
+					scanGlob: async () => ok(["a.md", "missing.md"]),
+					logger,
+				}),
+			);
+			const sources: ContextSource[] = [{ type: "glob", pattern: "*.md" }];
+
+			const result = await collector.collect(sources, tempDir);
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value).toHaveLength(1);
+			expect(result.value[0]).toEqual({
+				kind: "text",
+				source: { type: "glob", pattern: "*.md" },
+				content: "aaa",
+			});
+			expect(logger.warn).toHaveBeenCalledOnce();
+			expect(logger.warn.mock.calls[0][0]).toContain("1 of 2 glob matches failed");
+			expect(logger.warn.mock.calls[0][0]).toContain("missing.md");
+		});
+
+		it("returns error when all glob matches fail", async () => {
+			const collector = createContextCollector(
+				stubDeps({
+					scanGlob: async () => ok(["missing1.md", "missing2.md"]),
 				}),
 			);
 			const sources: ContextSource[] = [{ type: "glob", pattern: "*.md" }];
@@ -161,8 +196,9 @@ describe("ContextCollector", () => {
 			expect(result.ok).toBe(false);
 			if (result.ok) return;
 			expect(result.error.type).toBe("EXECUTION_ERROR");
-			expect(result.error.message).toContain("Failed to read glob match (2/3):");
-			expect(result.error.message).toContain("missing.md");
+			expect(result.error.message).toContain('All glob matches failed for "*.md"');
+			expect(result.error.message).toContain("missing1.md");
+			expect(result.error.message).toContain("missing2.md");
 		});
 	});
 

@@ -3,6 +3,7 @@ import { execa } from "execa";
 import { z } from "zod";
 import { validateCommand } from "./command-validator";
 import { zodToJsonSchema } from "./schema-helper";
+import { DEFAULT_TOOL_TIMEOUT_MS } from "./tool-constants";
 import { type ToolResult, toolFailure, toolSuccess } from "./tool-output";
 
 export const bashParams = z.object({
@@ -29,7 +30,7 @@ export const bashTool: Tool<BashInput, ToolResult<BashData>> = {
 			const result = await execa(command, {
 				shell: true,
 				cwd: cwd ?? process.cwd(),
-				timeout: timeout ?? 30_000,
+				timeout: timeout ?? DEFAULT_TOOL_TIMEOUT_MS,
 				reject: false,
 			});
 			return toolSuccess({
