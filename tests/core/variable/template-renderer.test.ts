@@ -142,6 +142,16 @@ describe("renderTemplate", () => {
 			expect(result).toEqual({ ok: true, value: "YES" });
 		});
 
+		it("treats empty string as falsy", () => {
+			const result = renderTemplate("{{#if val}}YES{{else}}NO{{/if}}", { val: "" }, RESERVED);
+			expect(result).toEqual({ ok: true, value: "NO" });
+		});
+
+		it('treats "false" string as falsy (confirm type)', () => {
+			const result = renderTemplate("{{#if val}}YES{{else}}NO{{/if}}", { val: "false" }, RESERVED);
+			expect(result).toEqual({ ok: true, value: "NO" });
+		});
+
 		it("works with multiline content in branches", () => {
 			const template = `{{#if verbose}}
 Line 1

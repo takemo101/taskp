@@ -71,9 +71,9 @@ function resolveVariable(
 	return variables[name];
 }
 
-// confirm 型は "true"/"false"、required: false は空文字になるため、
-// 両方を自然に扱えるよう空文字と "false" を falsy とする
-function isTruthy(value: string): boolean {
+// テンプレート変数の文字列値を真偽値にパースする。
+// confirm 型の "false" と未入力の空文字を false として扱う。
+function parseBooleanLike(value: string): boolean {
 	return value !== "" && value !== "false";
 }
 
@@ -108,7 +108,7 @@ function expandConditionals(
 				undefinedConditionVars.push(name);
 				return "";
 			}
-			return isTruthy(value) ? ifBlock : (elseBlock ?? "");
+			return parseBooleanLike(value) ? ifBlock : (elseBlock ?? "");
 		},
 	);
 
