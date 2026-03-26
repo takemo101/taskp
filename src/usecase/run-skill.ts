@@ -1,4 +1,3 @@
-import { dirname } from "node:path";
 import { resolveActionConfig } from "../core/skill/action";
 import type { Skill } from "../core/skill/skill";
 import type { CodeBlock } from "../core/skill/skill-body";
@@ -7,7 +6,7 @@ import { type DomainError, domainErrorMessage, executionError } from "../core/ty
 import type { Result } from "../core/types/result";
 import { err, ok } from "../core/types/result";
 import type { ReservedVars } from "../core/variable/template-renderer";
-import { renderTemplate } from "../core/variable/template-renderer";
+import { buildReservedVars, renderTemplate } from "../core/variable/template-renderer";
 import { type HooksConfig, runHooks } from "./hook-runner";
 import type { CommandExecutor, ExecResult } from "./port/command-executor";
 import type { HookExecutorPort } from "./port/hook-executor";
@@ -117,15 +116,6 @@ function resolveSkillExecution(
 		codeBlocks: skill.body.extractActionCodeBlocks(action, "bash"),
 		timeout: config.timeout,
 	});
-}
-
-function buildReservedVars(skillLocation: string): ReservedVars {
-	return {
-		cwd: process.cwd(),
-		skillDir: dirname(skillLocation),
-		date: new Date().toISOString().split("T")[0],
-		timestamp: new Date().toISOString(),
-	};
 }
 
 async function executeSkill(

@@ -1,3 +1,4 @@
+import { dirname } from "node:path";
 import { type RenderError, renderError } from "../types/errors";
 import { err, ok, type Result } from "../types/result";
 
@@ -7,6 +8,15 @@ export type ReservedVars = {
 	readonly date: string;
 	readonly timestamp: string;
 };
+
+export function buildReservedVars(skillLocation: string): ReservedVars {
+	return {
+		cwd: process.cwd(),
+		skillDir: dirname(skillLocation),
+		date: new Date().toISOString().split("T")[0],
+		timestamp: new Date().toISOString(),
+	};
+}
 
 const VARIABLE_PATTERN = /\{\{(\w+)\}\}/g;
 

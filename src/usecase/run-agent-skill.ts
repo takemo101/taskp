@@ -1,4 +1,3 @@
-import { dirname } from "node:path";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { buildTaskpRunDescription } from "../core/execution/agent-tools";
 import type { ContentPart } from "../core/execution/content-part";
@@ -14,7 +13,7 @@ import { type DomainError, domainErrorMessage, executionError } from "../core/ty
 import type { Result } from "../core/types/result";
 import { err, ok } from "../core/types/result";
 import type { ReservedVars } from "../core/variable/template-renderer";
-import { renderTemplate } from "../core/variable/template-renderer";
+import { buildReservedVars, renderTemplate } from "../core/variable/template-renderer";
 import { type HooksConfig, runHooks } from "./hook-runner";
 import type { AgentExecutorPort, AgentExecutorResult } from "./port/agent-executor";
 import type { CollectedContext, ContextCollectorPort } from "./port/context-collector";
@@ -79,12 +78,7 @@ export async function runAgentSkill(
 
 	progress.writeInputs(inputs, variables);
 
-	const reserved: ReservedVars = {
-		cwd: process.cwd(),
-		skillDir: dirname(skill.location),
-		date: new Date().toISOString().split("T")[0],
-		timestamp: new Date().toISOString(),
-	};
+	const reserved = buildReservedVars(skill.location);
 
 	const rawContent = resolved?.sectionContent ?? skill.body.content;
 	const renderResult = renderTemplate(rawContent, variables, reserved);
