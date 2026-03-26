@@ -1,10 +1,12 @@
-import { resolveActionConfig } from "../core/skill/action";
 import type { Skill } from "../core/skill/skill";
 import type { CodeBlock } from "../core/skill/skill-body";
-import type { SkillInput } from "../core/skill/skill-input";
-import { type DomainError, domainErrorMessage, executionError } from "../core/types/errors";
+import {
+	resolveTemplateExecution,
+	type TemplateExecutionConfig,
+} from "../core/skill/skill-execution-resolver";
+import { type DomainError, domainErrorMessage } from "../core/types/errors";
 import type { Result } from "../core/types/result";
-import { err, ok } from "../core/types/result";
+import { ok } from "../core/types/result";
 import type { ReservedVars } from "../core/variable/template-renderer";
 import { buildReservedVars, renderTemplate } from "../core/variable/template-renderer";
 import { type HooksConfig, runHooks } from "./hook-runner";
@@ -45,13 +47,6 @@ export type RunSkillDeps = {
 	readonly hooksConfig?: HooksConfig;
 };
 
-type SkillExecutionConfig = {
-	readonly inputs: readonly SkillInput[];
-	readonly content: string;
-	readonly codeBlocks: readonly CodeBlock[];
-	readonly timeout: number | undefined;
-};
-
 export async function runSkill(
 	input: RunSkillInput,
 	deps: RunSkillDeps,
@@ -62,7 +57,7 @@ export async function runSkill(
 	}
 
 	const skill = findResult.value;
-	const configResult = resolveSkillExecution(skill, input.action);
+	const configResult = resolveTemplateExecution(skill, input.action);
 	if (!configResult.ok) {
 		return configResult;
 	}
@@ -70,57 +65,9 @@ export async function runSkill(
 	return executeSkill(skill, configResult.value, input, deps);
 }
 
-function resolveSkillExecution(
-	skill: Skill,
-	action: string | undefined,
-): Result<SkillExecutionConfig, DomainError> {
-	const hasActions = skill.metadata.actions !== undefined;
-
-	if (hasActions && !action) {
-		return err(
-			executionError(
-				`Skill "${skill.metadata.name}" has actions defined. Specify an action to run.`,
-			),
-		);
-	}
-
-	if (!action) {
-		return ok({
-			inputs: skill.metadata.inputs,
-			content: skill.body.content,
-			codeBlocks: skill.body.extractCodeBlocks("bash"),
-			timeout: skill.metadata.timeout,
-		});
-	}
-
-	const actions = skill.metadata.actions;
-	if (!actions) {
-		return err(executionError(`Skill "${skill.metadata.name}" does not define actions.`));
-	}
-
-	const actionDef = actions[action];
-	if (!actionDef) {
-		return err(executionError(`Action "${action}" not found in skill "${skill.metadata.name}".`));
-	}
-
-	const config = resolveActionConfig(actionDef, skill.metadata);
-
-	const sectionContent = skill.body.extractActionSection(action);
-	if (!sectionContent) {
-		return err(executionError(`Action section "action:${action}" not found in skill body.`));
-	}
-
-	return ok({
-		inputs: config.inputs,
-		content: sectionContent,
-		codeBlocks: skill.body.extractActionCodeBlocks(action, "bash"),
-		timeout: config.timeout,
-	});
-}
-
 async function executeSkill(
 	skill: Skill,
-	config: SkillExecutionConfig,
+	config: TemplateExecutionConfig,
 	input: RunSkillInput,
 	deps: RunSkillDeps,
 ): Promise<Result<RunOutput, DomainError>> {
