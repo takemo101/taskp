@@ -5,7 +5,11 @@ export type FileSystemPort = {
 	readonly mkdir: (path: string, options?: { readonly recursive?: boolean }) => Promise<void>;
 	readonly readdir: (path: string, options: { readonly withFileTypes: true }) => Promise<Dirent[]>;
 	readonly stat: (path: string) => Promise<{ readonly isDirectory: () => boolean }>;
-	readonly symlink: (target: string, path: string, type: "dir" | "file") => Promise<void>;
+	readonly symlink: (
+		target: string,
+		path: string,
+		type: "dir" | "file" | "junction",
+	) => Promise<void>;
 	readonly writeFile: (path: string, content: string, encoding: BufferEncoding) => Promise<void>;
 };
 

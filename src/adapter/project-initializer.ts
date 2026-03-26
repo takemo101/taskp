@@ -154,6 +154,18 @@ type LinkBundledSkillsResult = {
 	readonly failed: readonly FailedLink[];
 };
 
+/**
+ * Windows では 'junction' を使用（管理者権限・デベロッパーモード不要）。
+ * @see https://nodejs.org/api/fs.html#fssymlinktarget-path-type-callback
+ */
+const DIR_SYMLINK_TYPE: "dir" | "junction" = process.platform === "win32" ? "junction" : "dir";
+
+/**
+ * バンドルスキルへのシンボリックリンクを作成する。
+ *
+ * 相対パスを使用し、npm update でパッケージパスが変わっても追従可能。
+ * Windows では junction を使用するため管理者権限不要。
+ */
 async function linkBundledSkills(
 	fs: FileSystemPort,
 	skillsDir: string,
@@ -174,7 +186,7 @@ async function linkBundledSkills(
 		}
 		const relTarget = relative(dirname(linkPath), join(bundledSkillsDir, entry.name));
 		try {
-			await fs.symlink(relTarget, linkPath, "dir");
+			await fs.symlink(relTarget, linkPath, DIR_SYMLINK_TYPE);
 			linked.push(entry.name);
 		} catch (e) {
 			failed.push({
