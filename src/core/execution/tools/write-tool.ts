@@ -1,6 +1,8 @@
 import { writeFile } from "node:fs/promises";
 import type { Tool } from "ai";
 import { z } from "zod";
+import { type ExecutionError, executionError } from "../../types/errors";
+import { err, ok, type Result } from "../../types/result";
 import { zodToJsonSchema } from "./schema-helper";
 
 export const writeParams = z.object({
@@ -10,15 +12,15 @@ export const writeParams = z.object({
 
 type WriteInput = z.infer<typeof writeParams>;
 
-export const writeTool: Tool<WriteInput, string> = {
+export const writeTool: Tool<WriteInput, Result<string, ExecutionError>> = {
 	description: "Write content to a file",
 	inputSchema: zodToJsonSchema(writeParams),
-	execute: async ({ path, content }) => {
+	execute: async ({ path, content }): Promise<Result<string, ExecutionError>> => {
 		try {
 			await writeFile(path, content, "utf-8");
-			return `Written to ${path}`;
-		} catch (error) {
-			throw new Error(`Failed to write file: ${path}`, { cause: error });
+			return ok(`Written to ${path}`);
+		} catch {
+			return err(executionError(`Failed to write file: ${path}`));
 		}
 	},
 };
