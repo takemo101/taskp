@@ -1,17 +1,15 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { buildTaskpRunDescription } from "../core/execution/agent-tools";
 import type { ContentPart } from "../core/execution/content-part";
-import { resolveActionConfig } from "../core/skill";
 import {
 	type ContextSource,
 	getContextSourceValue,
 	withResolvedValue,
 } from "../core/skill/context-source";
-import type { Skill } from "../core/skill/skill";
-import type { SkillInput } from "../core/skill/skill-input";
-import { type DomainError, domainErrorMessage, executionError } from "../core/types/errors";
+import { resolveAgentExecution } from "../core/skill/skill-execution-resolver";
+import { type DomainError, domainErrorMessage } from "../core/types/errors";
 import type { Result } from "../core/types/result";
-import { err, ok } from "../core/types/result";
+import { ok } from "../core/types/result";
 import type { ReservedVars } from "../core/variable/template-renderer";
 import { buildReservedVars, renderTemplate } from "../core/variable/template-renderer";
 import { type HooksConfig, runHooks } from "./hook-runner";
@@ -60,13 +58,12 @@ export async function runAgentSkill(
 
 	const skill = findResult.value;
 
-	const actionConfig = input.action ? resolveActionForAgent(skill, input.action) : undefined;
-	if (actionConfig !== undefined && !actionConfig.ok) {
-		return actionConfig;
+	const executionConfig = resolveAgentExecution(skill, input.action);
+	if (!executionConfig.ok) {
+		return executionConfig;
 	}
-	const resolved = actionConfig?.value;
+	const { inputs, tools: toolNames, context: contextSources, content } = executionConfig.value;
 
-	const inputs: readonly SkillInput[] = resolved?.inputs ?? skill.metadata.inputs;
 	const collectResult = await deps.promptCollector.collect(inputs, input.presets, {
 		noInput: input.noInput,
 	});
@@ -80,15 +77,12 @@ export async function runAgentSkill(
 
 	const reserved = buildReservedVars(skill.location);
 
-	const rawContent = resolved?.sectionContent ?? skill.body.content;
-	const renderResult = renderTemplate(rawContent, variables, reserved);
+	const renderResult = renderTemplate(content, variables, reserved);
 	if (!renderResult.ok) {
 		return renderResult;
 	}
 
 	const skillPrompt = renderResult.value;
-
-	const toolNames: readonly string[] = resolved?.tools ?? skill.metadata.tools;
 
 	// system prompt: SystemPromptResolver が SYSTEM.md の探索とフォールバックを一元管理
 	const systemPrompt = await deps.systemPromptResolver.resolve({
@@ -100,8 +94,6 @@ export async function runAgentSkill(
 	// prompt: SKILL.md 本文（タスク指示）を先頭に、context ソース出力（データ）を続けて配置
 	// system = 「どう振る舞うか」、contentParts = 「何をするか」の分離
 	const contentParts: ContentPart[] = [{ type: "text", text: skillPrompt }];
-
-	const contextSources: readonly ContextSource[] = resolved?.context ?? skill.metadata.context;
 
 	if (contextSources.length > 0) {
 		progress.writeContextSources(contextSources);
@@ -171,43 +163,6 @@ export async function runAgentSkill(
 	return ok({
 		skillName: skill.metadata.name,
 		result: executeResult.value,
-	});
-}
-
-type ResolvedAction = {
-	readonly inputs: readonly SkillInput[];
-	readonly tools: readonly string[];
-	readonly context: readonly ContextSource[];
-	readonly sectionContent: string;
-};
-
-function resolveActionForAgent(
-	skill: Skill,
-	actionName: string,
-): Result<ResolvedAction, DomainError> {
-	const actions = skill.metadata.actions;
-	if (!actions?.[actionName]) {
-		return err(
-			executionError(`Action "${actionName}" is not defined in skill "${skill.metadata.name}"`),
-		);
-	}
-
-	const config = resolveActionConfig(actions[actionName], skill.metadata);
-
-	const sectionContent = skill.body.extractActionSection(actionName);
-	if (!sectionContent) {
-		return err(
-			executionError(
-				`Action section "## action:${actionName}" not found in skill "${skill.metadata.name}"`,
-			),
-		);
-	}
-
-	return ok({
-		inputs: config.inputs,
-		tools: config.tools,
-		context: config.context,
-		sectionContent,
 	});
 }
 
