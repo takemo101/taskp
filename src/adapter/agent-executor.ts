@@ -29,7 +29,7 @@ async function executeAgentLoop(
 	logger: Logger,
 ): ReturnType<AgentExecutorPort["execute"]> {
 	const startTime = Date.now();
-	const toolsResult = buildTools(input.toolNames, input.buildToolsOptions);
+	const toolsResult = buildTools(input.toolNames, input.taskpRunDeps, input.toolDescriptions);
 	if (!toolsResult.ok) {
 		return toolsResult;
 	}

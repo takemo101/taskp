@@ -616,20 +616,16 @@ describe("fetch tool execute", () => {
 	});
 });
 
-describe("buildTools with descriptionOverrides", () => {
+describe("buildTools with toolDescriptions", () => {
 	it("指定したツールの description を上書きする", () => {
-		const result = buildTools(["bash"], {
-			descriptionOverrides: { bash: "Custom bash description" },
-		});
+		const result = buildTools(["bash"], undefined, { bash: "Custom bash description" });
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.value.bash.description).toBe("Custom bash description");
 	});
 
 	it("上書き対象外のツールは元の description を維持する", () => {
-		const result = buildTools(["bash", "read"], {
-			descriptionOverrides: { bash: "Overridden" },
-		});
+		const result = buildTools(["bash", "read"], undefined, { bash: "Overridden" });
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.value.bash.description).toBe("Overridden");

@@ -139,7 +139,7 @@ function createDeps(skills: readonly Skill[], callStack?: readonly string[]): Ta
 }
 
 function unwrapTaskpRun(deps: TaskpRunDeps) {
-	const result = buildTools(["taskp_run"], { taskpRunDeps: deps });
+	const result = buildTools(["taskp_run"], deps);
 	if (!result.ok) throw new Error(`buildTools failed: ${result.error.message}`);
 	return result.value.taskp_run;
 }
@@ -162,7 +162,7 @@ describe("buildTools with taskp_run", () => {
 
 	it("taskpRunDeps ありで taskp_run を構築できる", () => {
 		const deps = createDeps([]);
-		const result = buildTools(["taskp_run"], { taskpRunDeps: deps });
+		const result = buildTools(["taskp_run"], deps);
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.value.taskp_run).toBeDefined();
@@ -171,7 +171,7 @@ describe("buildTools with taskp_run", () => {
 
 	it("taskp_run と他のツールを同時に構築できる", () => {
 		const deps = createDeps([]);
-		const result = buildTools(["bash", "taskp_run"], { taskpRunDeps: deps });
+		const result = buildTools(["bash", "taskp_run"], deps);
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(Object.keys(result.value)).toEqual(["bash", "taskp_run"]);

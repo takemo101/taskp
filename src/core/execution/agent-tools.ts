@@ -82,32 +82,28 @@ export function getPrimaryArgKey(toolName: string): string | undefined {
 	return PRIMARY_ARG_KEYS[toolName as ToolName];
 }
 
-export type DescriptionOverrides = Readonly<Record<string, string>>;
-
-export type BuildToolsOptions = {
-	readonly taskpRunDeps?: TaskpRunDeps;
-	readonly descriptionOverrides?: DescriptionOverrides;
-};
+export type ToolDescriptions = Readonly<Record<string, string>>;
 
 export function buildTools(
 	toolNames: readonly string[],
-	options?: BuildToolsOptions,
+	taskpRunDeps?: TaskpRunDeps,
+	toolDescriptions?: ToolDescriptions,
 ): Result<ToolSet, ExecutionError> {
 	const tools: ToolSet = {};
 	for (const name of toolNames) {
 		if (name === "taskp_run") {
-			if (!options?.taskpRunDeps) {
-				return err(executionError("taskp_run requires taskpRunDeps in BuildToolsOptions"));
+			if (!taskpRunDeps) {
+				return err(executionError("taskp_run requires taskpRunDeps"));
 			}
-			const description = options.descriptionOverrides?.taskp_run ?? TASKP_RUN_DEFAULT_DESCRIPTION;
-			tools[name] = createTaskpRunTool(options.taskpRunDeps, description);
+			const description = toolDescriptions?.taskp_run ?? TASKP_RUN_DEFAULT_DESCRIPTION;
+			tools[name] = createTaskpRunTool(taskpRunDeps, description);
 			continue;
 		}
 		const t = staticTools[name];
 		if (t === undefined) {
 			return err(executionError(`Unknown tool: ${name}`));
 		}
-		const override = options?.descriptionOverrides?.[name];
+		const override = toolDescriptions?.[name];
 		tools[name] = override ? { ...t, description: override } : t;
 	}
 	return ok(tools);
