@@ -26,7 +26,14 @@ export async function runHooks(params: RunHooksParams): Promise<Result<void, Exe
 	}
 
 	try {
-		await params.hookExecutor.execute(commands, params.context);
+		const results = await params.hookExecutor.execute(commands, params.context);
+		const failures = results.filter((r) => !r.success);
+		if (failures.length > 0) {
+			const details = failures
+				.map((f) => `"${f.command}": ${f.error ?? "unknown error"}`)
+				.join(", ");
+			return err(executionError(`Hook partially failed: ${details}`));
+		}
 		return ok(undefined);
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
