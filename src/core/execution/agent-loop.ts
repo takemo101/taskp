@@ -2,7 +2,7 @@ import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { stepCountIs, streamText } from "ai";
 import { type ExecutionError, executionError } from "../types/errors";
 import { err, ok, type Result } from "../types/result";
-import type { BuildToolsOptions } from "./agent-tools";
+import type { TaskpRunDeps, ToolDescriptions } from "./agent-tools";
 import { buildTools } from "./agent-tools";
 
 // エージェントの無限ループを防ぐための安全装置。
@@ -19,7 +19,8 @@ export type AgentLoopInput = {
 	readonly systemPrompt: string;
 	readonly context: string;
 	readonly toolNames: readonly string[];
-	readonly buildToolsOptions?: BuildToolsOptions;
+	readonly taskpRunDeps?: TaskpRunDeps;
+	readonly toolDescriptions?: ToolDescriptions;
 };
 
 export function createAgentLoop() {
@@ -32,7 +33,7 @@ export function createAgentLoop() {
 async function executeAgentLoop(
 	input: AgentLoopInput,
 ): Promise<Result<AgentLoopResult, ExecutionError>> {
-	const toolsResult = buildTools(input.toolNames, input.buildToolsOptions);
+	const toolsResult = buildTools(input.toolNames, input.taskpRunDeps, input.toolDescriptions);
 	if (!toolsResult.ok) {
 		return toolsResult;
 	}

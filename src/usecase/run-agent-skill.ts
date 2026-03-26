@@ -123,7 +123,7 @@ export async function runAgentSkill(
 	// （コンテキスト収集時間は含めない — hooks に渡す情報として実行コストを正確に反映するため）
 	const startTime = Date.now();
 
-	const descriptionOverrides = await buildDescriptionOverrides(
+	const toolDescriptions = await buildToolDescriptions(
 		toolNames,
 		deps.skillRepository,
 		skill.metadata.name,
@@ -135,7 +135,7 @@ export async function runAgentSkill(
 		contentParts,
 		toolNames,
 		maxSteps: MAX_STEPS,
-		buildToolsOptions: descriptionOverrides ? { descriptionOverrides } : undefined,
+		toolDescriptions,
 	});
 
 	const durationMs = Date.now() - startTime;
@@ -247,7 +247,7 @@ function toContentParts(contexts: readonly CollectedContext[]): readonly Content
 	return contexts.map(toContentPart);
 }
 
-async function buildDescriptionOverrides(
+async function buildToolDescriptions(
 	toolNames: readonly string[],
 	skillRepository: SkillRepository,
 	currentSkillName: string,
