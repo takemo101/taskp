@@ -1,4 +1,3 @@
-import { mkdir, readdir, stat, symlink, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -11,6 +10,7 @@ import type {
 } from "../usecase/port/project-initializer";
 import { configSchema } from "./config-loader";
 import { tryCatch } from "./error-handler-utils";
+import type { FileSystemPort } from "./file-system-port";
 
 const TASKP_DIR = ".taskp";
 const CONFIG_FILE = "config.toml";
@@ -74,9 +74,9 @@ function generateJsonSchema(): string {
 	return `${JSON.stringify(jsonSchema, null, 2)}\n`;
 }
 
-async function fileExists(path: string): Promise<boolean> {
+async function fileExists(fs: FileSystemPort, path: string): Promise<boolean> {
 	try {
-		await stat(path);
+		await fs.stat(path);
 		return true;
 	} catch {
 		return false;
@@ -93,6 +93,7 @@ type DirEntry = {
 };
 
 async function writeFileIfNeeded(
+	fs: FileSystemPort,
 	entry: FileEntry,
 	force: boolean,
 	baseDir: string,
@@ -100,21 +101,22 @@ async function writeFileIfNeeded(
 	skipped: string[],
 ): Promise<void> {
 	const displayPath = relative(baseDir, entry.path);
-	if (!force && (await fileExists(entry.path))) {
+	if (!force && (await fileExists(fs, entry.path))) {
 		skipped.push(displayPath);
 		return;
 	}
-	await writeFile(entry.path, entry.content, "utf-8");
+	await fs.writeFile(entry.path, entry.content, "utf-8");
 	created.push(displayPath);
 }
 
 async function createDirIfNeeded(
+	fs: FileSystemPort,
 	entry: DirEntry,
 	baseDir: string,
 	created: string[],
 ): Promise<void> {
-	const existed = await fileExists(entry.path);
-	await mkdir(entry.path, { recursive: true });
+	const existed = await fileExists(fs, entry.path);
+	await fs.mkdir(entry.path, { recursive: true });
 	if (!existed) {
 		created.push(relative(baseDir, entry.path));
 	}
@@ -135,9 +137,12 @@ function getBundledSkillsDirCandidates(): readonly string[] {
 	return [resolve(currentDir, "..", "skills"), resolve(currentDir, "..", "..", "skills")];
 }
 
-async function resolveBundledSkillsDir(candidates: readonly string[]): Promise<string | undefined> {
+async function resolveBundledSkillsDir(
+	fs: FileSystemPort,
+	candidates: readonly string[],
+): Promise<string | undefined> {
 	for (const candidate of candidates) {
-		if (await fileExists(candidate)) {
+		if (await fileExists(fs, candidate)) {
 			return candidate;
 		}
 	}
@@ -150,26 +155,26 @@ type LinkBundledSkillsResult = {
 };
 
 async function linkBundledSkills(
+	fs: FileSystemPort,
 	skillsDir: string,
 	bundledSkillsDir: string,
 ): Promise<LinkBundledSkillsResult> {
-	if (!(await fileExists(bundledSkillsDir))) {
+	if (!(await fileExists(fs, bundledSkillsDir))) {
 		return { linked: [], failed: [] };
 	}
 
-	const entries = await readdir(bundledSkillsDir, { withFileTypes: true });
+	const entries = await fs.readdir(bundledSkillsDir, { withFileTypes: true });
 	const linked: string[] = [];
 	const failed: FailedLink[] = [];
 
 	for (const entry of entries.filter((e) => e.isDirectory())) {
 		const linkPath = join(skillsDir, entry.name);
-		if (await fileExists(linkPath)) {
+		if (await fileExists(fs, linkPath)) {
 			continue;
 		}
-		// 相対パスでシンボリックリンクを作成（npm update でパスが変わっても追従可能）
 		const relTarget = relative(dirname(linkPath), join(bundledSkillsDir, entry.name));
 		try {
-			await symlink(relTarget, linkPath, "dir");
+			await fs.symlink(relTarget, linkPath, "dir");
 			linked.push(entry.name);
 		} catch (e) {
 			failed.push({
@@ -182,10 +187,11 @@ async function linkBundledSkills(
 	return { linked, failed };
 }
 
-type ProjectInitializerDeps = {
+export type ProjectInitializerDeps = {
 	readonly baseDir: string;
 	readonly location: SetupLocation;
 	readonly bundledSkillsDir?: string;
+	readonly fs: FileSystemPort;
 };
 
 export function createProjectInitializer(deps: ProjectInitializerDeps): ProjectInitializer {
@@ -200,20 +206,19 @@ export function createProjectInitializer(deps: ProjectInitializerDeps): ProjectI
 					const created: string[] = [];
 					const skipped: string[] = [];
 
-					await createDirIfNeeded({ path: taskpDir }, deps.baseDir, created);
+					await createDirIfNeeded(deps.fs, { path: taskpDir }, deps.baseDir, created);
 
-					// .taskp/skills/ が未作成の場合のみ、ディレクトリ作成 + バンドルスキルのシンボリックリンクを行う
-					const skillsDirExisted = await fileExists(skillsDir);
-					await createDirIfNeeded({ path: skillsDir }, deps.baseDir, created);
+					const skillsDirExisted = await fileExists(deps.fs, skillsDir);
+					await createDirIfNeeded(deps.fs, { path: skillsDir }, deps.baseDir, created);
 
 					let linked: readonly string[] = [];
 					let failedLinks: readonly FailedLink[] = [];
 					if (!skillsDirExisted) {
 						const bundledDir =
 							deps.bundledSkillsDir ??
-							(await resolveBundledSkillsDir(getBundledSkillsDirCandidates()));
+							(await resolveBundledSkillsDir(deps.fs, getBundledSkillsDirCandidates()));
 						if (bundledDir) {
-							const linkResult = await linkBundledSkills(skillsDir, bundledDir);
+							const linkResult = await linkBundledSkills(deps.fs, skillsDir, bundledDir);
 							linked = linkResult.linked;
 							failedLinks = linkResult.failed;
 						}
@@ -222,6 +227,7 @@ export function createProjectInitializer(deps: ProjectInitializerDeps): ProjectI
 					const configPath = join(taskpDir, CONFIG_FILE);
 					const configContent = isGlobal ? GLOBAL_CONFIG_TEMPLATE : CONFIG_TEMPLATE;
 					await writeFileIfNeeded(
+						deps.fs,
 						{ path: configPath, content: configContent },
 						options.force,
 						deps.baseDir,
@@ -232,6 +238,7 @@ export function createProjectInitializer(deps: ProjectInitializerDeps): ProjectI
 					if (!isGlobal) {
 						const schemaPath = join(taskpDir, SCHEMA_FILE);
 						await writeFileIfNeeded(
+							deps.fs,
 							{ path: schemaPath, content: generateJsonSchema() },
 							options.force,
 							deps.baseDir,
@@ -241,6 +248,7 @@ export function createProjectInitializer(deps: ProjectInitializerDeps): ProjectI
 
 						const taploPath = join(deps.baseDir, TAPLO_FILE);
 						await writeFileIfNeeded(
+							deps.fs,
 							{ path: taploPath, content: TAPLO_CONTENT },
 							options.force,
 							deps.baseDir,
