@@ -10,8 +10,15 @@ export interface CodeBlock {
 
 export interface SkillBody {
 	readonly content: string;
+	/**
+	 * @param lang - Code language filter (defaults to "bash")
+	 */
 	readonly extractCodeBlocks: (lang?: string) => readonly CodeBlock[];
 	readonly extractActionSection: (name: string) => string | undefined;
+	/**
+	 * @param name - Action name
+	 * @param lang - Code language filter (defaults to "bash")
+	 */
 	readonly extractActionCodeBlocks: (name: string, lang?: string) => readonly CodeBlock[];
 }
 
