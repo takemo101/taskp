@@ -59,6 +59,8 @@ const RESERVED_VAR_MAP: Record<string, keyof ReservedVars> = {
 	__timestamp__: "timestamp",
 };
 
+type VariableMap = (name: string) => string | undefined;
+
 function resolveVariable(
 	name: string,
 	variables: Record<string, string>,
@@ -69,6 +71,10 @@ function resolveVariable(
 		return reserved[reservedKey];
 	}
 	return variables[name];
+}
+
+function createVariableMap(variables: Record<string, string>, reserved: ReservedVars): VariableMap {
+	return (name: string) => resolveVariable(name, variables, reserved);
 }
 
 // confirm 型は "true"/"false"、required: false は空文字になるため、
@@ -88,11 +94,7 @@ function checkForNestedIfs(template: string): RenderError | undefined {
 	return undefined;
 }
 
-function expandConditionals(
-	template: string,
-	variables: Record<string, string>,
-	reserved: ReservedVars,
-): Result<string, RenderError> {
+function expandConditionals(template: string, varMap: VariableMap): Result<string, RenderError> {
 	const nestedError = checkForNestedIfs(template);
 	if (nestedError !== undefined) {
 		return err(nestedError);
@@ -103,7 +105,7 @@ function expandConditionals(
 	const expanded = template.replace(
 		CONDITIONAL_PATTERN,
 		(_match, name: string, ifBlock: string, elseBlock: string | undefined) => {
-			const value = resolveVariable(name, variables, reserved);
+			const value = varMap(name);
 			if (value === undefined) {
 				undefinedConditionVars.push(name);
 				return "";
@@ -120,15 +122,11 @@ function expandConditionals(
 	return ok(expanded);
 }
 
-function findUndefinedVariables(
-	template: string,
-	variables: Record<string, string>,
-	reserved: ReservedVars,
-): readonly string[] {
+function findUndefinedVariables(template: string, varMap: VariableMap): readonly string[] {
 	const undefined_: string[] = [];
 	for (const match of template.matchAll(VARIABLE_PATTERN)) {
 		const name = match[1];
-		if (resolveVariable(name, variables, reserved) === undefined) {
+		if (varMap(name) === undefined) {
 			undefined_.push(name);
 		}
 	}
@@ -147,7 +145,8 @@ export function renderTemplate(
 	}
 
 	// 2. 条件ブロックを展開し、選択されなかった分岐内の変数を除外する
-	const conditionalResult = expandConditionals(template, variables, reserved);
+	const varMap = createVariableMap(variables, reserved);
+	const conditionalResult = expandConditionals(template, varMap);
 	if (!conditionalResult.ok) {
 		return conditionalResult;
 	}
@@ -155,13 +154,13 @@ export function renderTemplate(
 
 	// 3. 残りの変数で未定義チェック
 	// （Parse, Don't Validate の原則: docs/arch/design-principles.md）
-	const undefinedVars = findUndefinedVariables(expanded, variables, reserved);
+	const undefinedVars = findUndefinedVariables(expanded, varMap);
 	if (undefinedVars.length > 0) {
 		return err(renderError(`Undefined variables: ${undefinedVars.join(", ")}`));
 	}
 
 	const rendered = expanded.replace(VARIABLE_PATTERN, (_, name: string) => {
-		const value = resolveVariable(name, variables, reserved);
+		const value = varMap(name);
 		if (value === undefined) {
 			throw new Error(`unreachable: variable '${name}' was validated but is undefined`);
 		}
