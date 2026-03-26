@@ -48,21 +48,17 @@ async function executeAgentLoop(
 			stopWhen: stepCountIs(MAX_STEPS),
 		});
 
-		const chunks: string[] = [];
 		for await (const chunk of result.textStream) {
-			chunks.push(chunk);
 			process.stdout.write(chunk);
 		}
 
-		const finalResult = await result;
-		const steps = await finalResult.steps;
-		const stepCount = steps.length;
+		const [output, steps] = await Promise.all([result.text, result.steps]);
 
 		if (isMaxStepsExceeded(steps)) {
 			return err(executionError(`Agent loop exceeded maximum steps (${MAX_STEPS}). Aborting.`));
 		}
 
-		return ok({ output: chunks.join(""), steps: stepCount });
+		return ok({ output, steps: steps.length });
 	} catch (error) {
 		return err(
 			executionError(
