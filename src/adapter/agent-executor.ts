@@ -4,6 +4,7 @@ import { buildTools } from "../core/execution/agent-tools";
 import type { ContentPart } from "../core/execution/content-part";
 import { executionError } from "../core/types/errors";
 import { err, ok } from "../core/types/result";
+import { isRecord } from "../core/types/type-guards";
 import type {
 	AgentExecutorInput,
 	AgentExecutorPort,
@@ -12,10 +13,6 @@ import type {
 import type { Logger } from "../usecase/port/logger";
 import { classifyAgentError, toExecutionError } from "./agent-error-handler";
 import type { StreamWriter } from "./stream-writer";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 export function createAgentExecutor(writer: StreamWriter, logger: Logger): AgentExecutorPort {
 	return {
