@@ -1,6 +1,7 @@
 import type { Tool } from "ai";
 import { execa } from "execa";
 import { z } from "zod";
+import { validateCommand } from "./command-validator";
 import { zodToJsonSchema } from "./schema-helper";
 import { type ToolResult, toolFailure, toolSuccess } from "./tool-output";
 
@@ -19,6 +20,11 @@ export const bashTool: Tool<BashInput, ToolResult<BashData>> = {
 	description: "Run a shell command and return stdout/stderr",
 	inputSchema: zodToJsonSchema(bashParams),
 	execute: async ({ command, cwd, timeout }): Promise<ToolResult<BashData>> => {
+		const validationError = validateCommand(command);
+		if (validationError) {
+			return toolFailure(validationError);
+		}
+
 		try {
 			const result = await execa(command, {
 				shell: true,
