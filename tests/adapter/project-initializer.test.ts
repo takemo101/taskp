@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, readlinkSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createNodeFileSystem } from "../../src/adapter/file-system-port";
 import { createProjectInitializer } from "../../src/adapter/project-initializer";
 
 describe("createProjectInitializer", () => {
@@ -25,6 +26,7 @@ describe("createProjectInitializer", () => {
 				baseDir,
 				location: "project",
 				bundledSkillsDir: bundledDir,
+				fs: createNodeFileSystem(),
 			});
 
 			const result = await initializer.setup({ force: false });
@@ -44,6 +46,7 @@ describe("createProjectInitializer", () => {
 				baseDir,
 				location: "project",
 				bundledSkillsDir: bundledDir,
+				fs: createNodeFileSystem(),
 			});
 
 			const result = await initializer.setup({ force: false });
@@ -63,15 +66,16 @@ describe("createProjectInitializer", () => {
 				baseDir,
 				location: "project",
 				bundledSkillsDir: bundledDir,
+				fs: createNodeFileSystem(),
 			});
 
 			await initializer.setup({ force: false });
 
-			// skills ディレクトリを残して再度 setup（skillsDir が既存なので linking スキップ）
 			const initializer2 = createProjectInitializer({
 				baseDir,
 				location: "project",
 				bundledSkillsDir: bundledDir,
+				fs: createNodeFileSystem(),
 			});
 			const result = await initializer2.setup({ force: false });
 
@@ -85,7 +89,6 @@ describe("createProjectInitializer", () => {
 			mkdirSync(join(bundledDir, "skill-ok"), { recursive: true });
 			mkdirSync(join(bundledDir, "skill-fail"), { recursive: true });
 
-			// skills ディレクトリを読み取り専用にして symlink を失敗させる
 			const skillsDir = join(baseDir, ".taskp", "skills");
 			mkdirSync(skillsDir, { recursive: true });
 			rmSync(skillsDir, { recursive: true });
@@ -94,6 +97,7 @@ describe("createProjectInitializer", () => {
 				baseDir,
 				location: "project",
 				bundledSkillsDir: bundledDir,
+				fs: createNodeFileSystem(),
 			});
 
 			const result = await initializer.setup({ force: false });
@@ -111,6 +115,7 @@ describe("createProjectInitializer", () => {
 				baseDir,
 				location: "project",
 				bundledSkillsDir: nonExistentDir,
+				fs: createNodeFileSystem(),
 			});
 
 			const result = await initializer.setup({ force: false });
@@ -130,15 +135,14 @@ describe("createProjectInitializer", () => {
 				baseDir,
 				location: "project",
 				bundledSkillsDir: bundledDir,
+				fs: createNodeFileSystem(),
 			});
 
 			const result = await initializer.setup({ force: false });
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) return;
-			// 正常にリンクされたスキルが含まれる
 			expect(result.value.linked.length + result.value.failedLinks.length).toBeGreaterThan(0);
-			// 失敗があれば name と error が設定されている
 			for (const failed of result.value.failedLinks) {
 				expect(failed.name).toBeTruthy();
 				expect(failed.error).toBeTruthy();
