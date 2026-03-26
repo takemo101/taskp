@@ -1,4 +1,4 @@
-import type { ToolSet } from "ai";
+import type { Tool, ToolSet } from "ai";
 import { type ExecutionError, executionError } from "../types/errors";
 import { err, ok, type Result } from "../types/result";
 import { askUserTool } from "./tools/ask-user-tool";
@@ -37,29 +37,40 @@ const TOOL_NAMES = [
 type ToolName = (typeof TOOL_NAMES)[number];
 
 // Tool<I, O> のジェネリクスが共変でないため、異なる I/O を持つツールを
-// 1つの Record にまとめるには Vercel AI SDK の ToolSet 値型を使う
+// 1つの Record にまとめるには Vercel AI SDK の ToolSet 値型へ安全に変換する
 type ToolSetEntry = ToolSet[string];
+type StaticToolName = Exclude<ToolName, "taskp_run">;
 
-const staticTools: Record<string, ToolSetEntry> = {
-	bash: bashTool as ToolSetEntry,
-	read: readTool as ToolSetEntry,
-	write: writeTool as ToolSetEntry,
-	edit: editTool as ToolSetEntry,
-	glob: globTool as ToolSetEntry,
-	grep: grepTool as ToolSetEntry,
-	fetch: fetchTool as ToolSetEntry,
-	ask_user: askUserTool as ToolSetEntry,
+/** Tool<I, O> を ToolSetEntry へ型安全に変換する。非 Tool 値はコンパイルエラーになる。 */
+function toToolSetEntry<I, O>(tool: Tool<I, O>): ToolSetEntry {
+	return tool as ToolSetEntry;
+}
+
+const staticTools: Readonly<Record<StaticToolName, ToolSetEntry>> = {
+	bash: toToolSetEntry(bashTool),
+	read: toToolSetEntry(readTool),
+	write: toToolSetEntry(writeTool),
+	edit: toToolSetEntry(editTool),
+	glob: toToolSetEntry(globTool),
+	grep: toToolSetEntry(grepTool),
+	fetch: toToolSetEntry(fetchTool),
+	ask_user: toToolSetEntry(askUserTool),
 };
 
 const TASKP_RUN_DEFAULT_DESCRIPTION =
 	"Run another taskp skill (template mode only). Use to invoke predefined skills with variable inputs.";
+
+function isStaticToolName(name: string): name is StaticToolName {
+	return name in staticTools;
+}
 
 /** ツール名からその description を返す。未知のツール名は undefined を返す。 */
 export function getToolDescription(name: string): string | undefined {
 	if (name === "taskp_run") {
 		return TASKP_RUN_DEFAULT_DESCRIPTION;
 	}
-	return staticTools[name]?.description;
+	if (!isStaticToolName(name)) return undefined;
+	return staticTools[name].description;
 }
 
 /**
@@ -100,10 +111,10 @@ export function buildTools(
 			tools[name] = createTaskpRunTool(taskpRunDeps, description);
 			continue;
 		}
-		const t = staticTools[name];
-		if (t === undefined) {
+		if (!isStaticToolName(name)) {
 			return err(executionError(`Unknown tool: ${name}`));
 		}
+		const t = staticTools[name];
 		const override = toolDescriptions?.[name];
 		tools[name] = override ? { ...t, description: override } : t;
 	}
