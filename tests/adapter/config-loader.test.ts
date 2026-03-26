@@ -531,4 +531,16 @@ describe("mergeCliConfig", () => {
 
 		expect(result.command_timeout_ms).toBe(30000);
 	});
+
+	it("project max_agent_steps overrides global", () => {
+		const result = mergeCliConfig({ max_agent_steps: 50 }, { max_agent_steps: 100 });
+
+		expect(result.max_agent_steps).toBe(100);
+	});
+
+	it("falls back to global max_agent_steps when project is undefined", () => {
+		const result = mergeCliConfig({ max_agent_steps: 50 }, {});
+
+		expect(result.max_agent_steps).toBe(50);
+	});
 });
