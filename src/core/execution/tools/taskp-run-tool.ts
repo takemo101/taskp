@@ -13,6 +13,7 @@ import { parseSkillRef } from "../../skill/skill-ref";
 import { domainErrorMessage } from "../../types/errors";
 import { err, ok, type Result } from "../../types/result";
 import { zodToJsonSchema } from "./schema-helper";
+import { type ToolResult, toolFailure, toolSuccess } from "./tool-output";
 
 export const MAX_NESTING_DEPTH = 3;
 
@@ -26,11 +27,11 @@ export const taskpRunParams = z.object({
 
 type TaskpRunInput = z.infer<typeof taskpRunParams>;
 
-export type TaskpRunResult = {
-	readonly status: "success" | "failed";
+type TaskpRunData = {
 	readonly output: string;
-	readonly error?: string;
 };
+
+export type TaskpRunResult = ToolResult<TaskpRunData>;
 
 export type TaskpRunDeps = {
 	readonly skillRepository: SkillRepository;
@@ -74,7 +75,7 @@ export function resolveSkillMode(skill: Skill, actionName?: string): "template" 
 }
 
 function failedResult(error: string): TaskpRunResult {
-	return { status: "failed", output: "", error };
+	return toolFailure(error);
 }
 
 async function executeTaskpRun(
@@ -125,7 +126,7 @@ async function executeTaskpRun(
 
 	if (!result.ok) return failedResult(domainErrorMessage(result.error));
 
-	return { status: "success", output: buildTaskpRunOutput(result.value) };
+	return toolSuccess({ output: buildTaskpRunOutput(result.value) });
 }
 
 export function createTaskpRunTool(deps: TaskpRunDeps, description: string): ToolSetEntry {

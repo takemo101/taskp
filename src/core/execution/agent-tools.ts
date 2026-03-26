@@ -19,6 +19,7 @@ export {
 	resolveSkillMode,
 	validateTaskpRunCall,
 } from "./tools/taskp-run-tool";
+export type { ToolError, ToolOutput, ToolResult } from "./tools/tool-output";
 
 export type { TaskpRunDeps, TaskpRunResult };
 

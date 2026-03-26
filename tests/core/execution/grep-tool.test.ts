@@ -13,18 +13,22 @@ afterEach(async () => {
 	await rm(TEST_DIR, { recursive: true, force: true });
 });
 
-type GrepResult = {
+type GrepData = {
 	readonly matches: string;
 	readonly count: number;
 	readonly truncated: boolean;
 	readonly skipped: readonly { readonly file: string; readonly reason: string }[];
 };
 
+type GrepToolResult =
+	| { readonly success: true; readonly data: GrepData }
+	| { readonly success: false; readonly error: string };
+
 async function execute(args: {
 	pattern: string;
 	path?: string;
 	include?: string;
-}): Promise<GrepResult> {
+}): Promise<GrepData> {
 	const originalCwd = process.cwd;
 	process.cwd = () => TEST_DIR;
 	try {
@@ -36,7 +40,11 @@ async function execute(args: {
 		if (!result || Symbol.asyncIterator in Object(result)) {
 			throw new Error("Unexpected result type");
 		}
-		return result as GrepResult;
+		const typed = result as GrepToolResult;
+		if (!typed.success) {
+			throw new Error(typed.error);
+		}
+		return typed.data;
 	} finally {
 		process.cwd = originalCwd;
 	}
@@ -81,9 +89,9 @@ describe("grepTool", () => {
 		expect(allHaveReasons).toBe(true);
 	});
 
-	test("throws when path does not exist", async () => {
+	test("returns error when path does not exist", async () => {
 		await expect(execute({ pattern: "foo", path: "nonexistent" })).rejects.toThrow(
-			"Path not found: nonexistent",
+			"Failed to search path: nonexistent",
 		);
 	});
 

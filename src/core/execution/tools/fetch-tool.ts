@@ -1,6 +1,7 @@
 import type { Tool } from "ai";
 import { z } from "zod";
 import { zodToJsonSchema } from "./schema-helper";
+import { type ToolResult, toolFailure, toolSuccess } from "./tool-output";
 
 export const MAX_FETCH_LENGTH = 50_000;
 const FETCH_TIMEOUT_MS = 30_000;
@@ -49,11 +50,13 @@ export const fetchParams = z.object({
 
 type FetchInput = z.infer<typeof fetchParams>;
 
-type FetchResult = {
+type FetchData = {
 	readonly content: string;
 	readonly truncated: boolean;
 	readonly length: number;
 };
+
+export type { FetchData };
 
 /** @internal テスト用に export */
 export function isTextContentType(contentType: string): boolean {
@@ -67,25 +70,34 @@ export function isTextContentType(contentType: string): boolean {
 	);
 }
 
-export const fetchTool: Tool<FetchInput, FetchResult> = {
+export const fetchTool: Tool<FetchInput, ToolResult<FetchData>> = {
 	description:
 		"Fetch text content from a URL (http/https only). Useful for reading documentation, API references, or web pages.",
 	inputSchema: zodToJsonSchema(fetchParams),
-	execute: async ({ url, maxLength }) => {
-		validateFetchUrl(url);
+	execute: async ({ url, maxLength }): Promise<ToolResult<FetchData>> => {
+		try {
+			validateFetchUrl(url);
+		} catch (e) {
+			return toolFailure(e instanceof Error ? e.message : String(e));
+		}
 
-		const response = await fetch(url, {
-			signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-			redirect: "error",
-		});
+		let response: Response;
+		try {
+			response = await fetch(url, {
+				signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+				redirect: "error",
+			});
+		} catch {
+			return toolFailure(`Failed to fetch: ${url}`);
+		}
 
 		if (!response.ok) {
-			throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+			return toolFailure(`HTTP ${response.status}: ${response.statusText}`);
 		}
 
 		const contentType = response.headers.get("content-type") ?? "";
 		if (!isTextContentType(contentType)) {
-			throw new Error(`Non-text content type: ${contentType}. Only text content is supported.`);
+			return toolFailure(`Non-text content type: ${contentType}. Only text content is supported.`);
 		}
 
 		const text = await response.text();
@@ -93,6 +105,6 @@ export const fetchTool: Tool<FetchInput, FetchResult> = {
 		const truncated = text.length > limit;
 		const content = truncated ? text.slice(0, limit) : text;
 
-		return { content, truncated, length: text.length };
+		return toolSuccess({ content, truncated, length: text.length });
 	},
 };
