@@ -237,37 +237,32 @@ describe("SkillLoader", () => {
 			externalDirs.length = 0;
 		});
 
-		it("シンボリックリンクされたスキルディレクトリを読み込める", async () => {
-			const externalDir = mkdtempSync(join(tmpdir(), "taskp-external-"));
-			externalDirs.push(externalDir);
-			const externalSkillDir = join(externalDir, "my-skill");
-			mkdirSync(externalSkillDir, { recursive: true });
-			writeFileSync(join(externalSkillDir, "SKILL.md"), makeSkillMd("my-skill", "外部スキル"));
-
+		it("スキルルート内へのシンボリックリンクされたディレクトリを読み込める", async () => {
 			const skillsDir = join(localRoot, ".taskp", "skills");
 			mkdirSync(skillsDir, { recursive: true });
-			symlinkSync(externalSkillDir, join(skillsDir, "my-skill"));
+
+			const actualDir = join(skillsDir, "_source", "my-skill");
+			mkdirSync(actualDir, { recursive: true });
+			writeFileSync(join(actualDir, "SKILL.md"), makeSkillMd("my-skill", "内部スキル"));
+
+			symlinkSync(actualDir, join(skillsDir, "my-skill"));
 
 			const loader = createSkillLoader({ localRoot, globalRoot });
 			const { skills } = await loader.listLocal();
 
-			expect(skills).toHaveLength(1);
-			expect(skills[0].metadata.name).toBe("my-skill");
+			const mySkill = skills.find((s) => s.metadata.name === "my-skill");
+			expect(mySkill).toBeDefined();
 		});
 
-		it("シンボリックリンクされたスキルを findByName で検索できる", async () => {
-			const externalDir = mkdtempSync(join(tmpdir(), "taskp-external-"));
-			externalDirs.push(externalDir);
-			const externalSkillDir = join(externalDir, "linked-skill");
-			mkdirSync(externalSkillDir, { recursive: true });
-			writeFileSync(
-				join(externalSkillDir, "SKILL.md"),
-				makeSkillMd("linked-skill", "リンクスキル"),
-			);
-
+		it("スキルルート内へのシンボリックリンクを findByName で検索できる", async () => {
 			const skillsDir = join(globalRoot, ".taskp", "skills");
 			mkdirSync(skillsDir, { recursive: true });
-			symlinkSync(externalSkillDir, join(skillsDir, "linked-skill"));
+
+			const actualDir = join(skillsDir, "_source", "linked-skill");
+			mkdirSync(actualDir, { recursive: true });
+			writeFileSync(join(actualDir, "SKILL.md"), makeSkillMd("linked-skill", "リンクスキル"));
+
+			symlinkSync(actualDir, join(skillsDir, "linked-skill"));
 
 			const loader = createSkillLoader({ localRoot, globalRoot });
 			const result = await loader.findByName("linked-skill");
@@ -276,6 +271,25 @@ describe("SkillLoader", () => {
 			if (!result.ok) return;
 			expect(result.value.metadata.name).toBe("linked-skill");
 			expect(result.value.scope).toBe("global");
+		});
+
+		it("スキルルート外へのシンボリックリンクは findByName でスキップされる", async () => {
+			const externalDir = mkdtempSync(join(tmpdir(), "taskp-external-"));
+			externalDirs.push(externalDir);
+			const externalSkillDir = join(externalDir, "evil-skill");
+			mkdirSync(externalSkillDir, { recursive: true });
+			writeFileSync(join(externalSkillDir, "SKILL.md"), makeSkillMd("evil-skill", "外部スキル"));
+
+			const skillsDir = join(localRoot, ".taskp", "skills");
+			mkdirSync(skillsDir, { recursive: true });
+			symlinkSync(externalSkillDir, join(skillsDir, "evil-skill"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const result = await loader.findByName("evil-skill");
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("SKILL_NOT_FOUND");
 		});
 
 		it("壊れたシンボリックリンクはスキップされる", async () => {
@@ -290,7 +304,68 @@ describe("SkillLoader", () => {
 			expect(failures).toHaveLength(0);
 		});
 
-		it("ファイルへのシンボリックリンクは failures に記録される", async () => {
+		it("スキルルート外へのシンボリックリンクはスキップされる", async () => {
+			const externalDir = mkdtempSync(join(tmpdir(), "taskp-external-"));
+			externalDirs.push(externalDir);
+			const externalSkillDir = join(externalDir, "evil-skill");
+			mkdirSync(externalSkillDir, { recursive: true });
+			writeFileSync(
+				join(externalSkillDir, "SKILL.md"),
+				makeSkillMd("evil-skill", "スキルルート外"),
+			);
+
+			const skillsDir = join(localRoot, ".taskp", "skills");
+			mkdirSync(skillsDir, { recursive: true });
+			symlinkSync(externalSkillDir, join(skillsDir, "evil-skill"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const { skills, failures } = await loader.listLocal();
+
+			expect(skills).toHaveLength(0);
+			expect(failures).toHaveLength(0);
+		});
+
+		it("スキルルート外へのシンボリックリンクがあっても他のスキルは読み込める", async () => {
+			const externalDir = mkdtempSync(join(tmpdir(), "taskp-external-"));
+			externalDirs.push(externalDir);
+			const externalSkillDir = join(externalDir, "evil-skill");
+			mkdirSync(externalSkillDir, { recursive: true });
+			writeFileSync(
+				join(externalSkillDir, "SKILL.md"),
+				makeSkillMd("evil-skill", "スキルルート外"),
+			);
+
+			const skillsDir = join(localRoot, ".taskp", "skills");
+			mkdirSync(skillsDir, { recursive: true });
+			symlinkSync(externalSkillDir, join(skillsDir, "evil-skill"));
+			createSkillFile(localRoot, "valid-skill", makeSkillMd("valid-skill", "正常スキル"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const { skills, failures } = await loader.listLocal();
+
+			expect(skills).toHaveLength(1);
+			expect(skills[0].metadata.name).toBe("valid-skill");
+			expect(failures).toHaveLength(0);
+		});
+
+		it("スキルルート内のサブディレクトリへのシンボリックリンクは読み込める", async () => {
+			const skillsDir = join(localRoot, ".taskp", "skills");
+			mkdirSync(skillsDir, { recursive: true });
+
+			const innerDir = join(skillsDir, "_shared", "inner-skill");
+			mkdirSync(innerDir, { recursive: true });
+			writeFileSync(join(innerDir, "SKILL.md"), makeSkillMd("inner-skill", "内部リンク"));
+
+			symlinkSync(innerDir, join(skillsDir, "inner-skill"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const { skills } = await loader.listLocal();
+
+			const innerSkill = skills.find((s) => s.metadata.name === "inner-skill");
+			expect(innerSkill).toBeDefined();
+		});
+
+		it("スキルルート外のファイルへのシンボリックリンクはスキップされる", async () => {
 			const externalDir = mkdtempSync(join(tmpdir(), "taskp-external-"));
 			externalDirs.push(externalDir);
 			const externalFile = join(externalDir, "not-a-dir.md");
@@ -303,10 +378,8 @@ describe("SkillLoader", () => {
 			const loader = createSkillLoader({ localRoot, globalRoot });
 			const { skills, failures } = await loader.listLocal();
 
-			// ファイルへの symlink は file-link/SKILL.md を readFile → ENOTDIR で失敗する
 			expect(skills).toHaveLength(0);
-			expect(failures).toHaveLength(1);
-			expect(failures[0].path).toMatch(/file-link/);
+			expect(failures).toHaveLength(0);
 		});
 	});
 });
