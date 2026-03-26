@@ -1,2 +1,2 @@
 // Variable domain models
-export { type ReservedVars, renderTemplate } from "./template-renderer";
+export { buildReservedVars, type ReservedVars, renderTemplate } from "./template-renderer";
