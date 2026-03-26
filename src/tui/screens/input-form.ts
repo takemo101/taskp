@@ -2,7 +2,6 @@ import {
 	BoxRenderable,
 	type CliRenderer,
 	dim,
-	green,
 	InputRenderable,
 	InputRenderableEvents,
 	type KeyEvent,
@@ -19,86 +18,11 @@ import type { SkillInput } from "../../core/skill/skill-input";
 import { KeyHelp } from "../components/key-help";
 import { flatSelectStyle } from "../components/styles";
 import { clearScreen } from "./clear-screen";
+import { FormController } from "./form/form-controller";
+import type { FormElement } from "./form/form-element";
 
 const CONTAINER_ID = "form-container";
 const TEXTAREA_DEFAULT_HEIGHT = 5;
-
-type FormElement = {
-	readonly input: SkillInput;
-	readonly label: TextRenderable;
-	readonly element: InputRenderable | SelectRenderable | TextareaRenderable;
-};
-
-class FormController {
-	private focusIndex = 0;
-	private readonly values: Record<string, string> = {};
-	private elements: readonly FormElement[] = [];
-	private readonly onComplete: (result: Record<string, string>) => void;
-
-	constructor(onComplete: (result: Record<string, string>) => void) {
-		this.onComplete = onComplete;
-	}
-
-	setElements(elements: readonly FormElement[]): void {
-		this.elements = elements;
-	}
-
-	advanceFocus(): void {
-		if (this.focusIndex < this.elements.length - 1) {
-			this.focusIndex++;
-			this.applyFocus();
-		} else {
-			this.completeForm();
-		}
-	}
-
-	moveFocusForward(): void {
-		if (this.focusIndex >= this.elements.length - 1) return;
-		this.focusIndex++;
-		this.applyFocus();
-	}
-
-	retreatFocus(): void {
-		if (this.focusIndex <= 0) return;
-		this.focusIndex--;
-		this.applyFocus();
-	}
-
-	setValue(name: string, value: string): void {
-		this.values[name] = value;
-		const el = this.elements.find((e) => e.input.name === name);
-		if (el) {
-			el.label.content = t`${green("✔")} ${el.input.message}`;
-		}
-	}
-
-	applyFocus(): void {
-		for (let i = 0; i < this.elements.length; i++) {
-			const el = this.elements[i];
-			if (i === this.focusIndex) {
-				el.label.content = t`${green("?")} ${el.input.message}`;
-			} else if (el.input.name in this.values) {
-			} else {
-				el.label.content = t`${dim("○")} ${el.input.message}`;
-			}
-		}
-		this.elements[this.focusIndex].element.focus();
-	}
-
-	private completeForm(): void {
-		const result: Record<string, string> = {};
-		for (const { input } of this.elements) {
-			if (input.name in this.values) {
-				result[input.name] = this.values[input.name];
-			} else if (input.default !== undefined) {
-				result[input.name] = String(input.default);
-			} else {
-				result[input.name] = "";
-			}
-		}
-		this.onComplete(result);
-	}
-}
 
 function createFormElements(
 	renderer: CliRenderer,
