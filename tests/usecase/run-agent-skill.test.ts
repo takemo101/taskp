@@ -27,7 +27,10 @@ function createAgentSkill(overrides?: Partial<Skill["metadata"]>): Skill {
 		body: {
 			content: "You are a helpful assistant.",
 			extractCodeBlocks: () => [],
-			extractActionSection: () => undefined,
+			extractActionSection: () => ({
+				ok: false,
+				error: { type: "EXECUTION_ERROR" as const, message: "not found" },
+			}),
 			extractActionCodeBlocks: () => [],
 		},
 		location: "/tmp/test",
@@ -435,7 +438,13 @@ describe("runAgentSkill", () => {
 							review: "## action:review\n\nReview the code in {{target}}.",
 							analyze: "## action:analyze\n\nAnalyze the codebase.",
 						};
-						return sections[name];
+						const content = sections[name];
+						if (!content)
+							return {
+								ok: false as const,
+								error: { type: "EXECUTION_ERROR" as const, message: `not found: ${name}` },
+							};
+						return { ok: true as const, value: content };
 					},
 					extractActionCodeBlocks: () => [],
 				},
@@ -565,7 +574,10 @@ describe("runAgentSkill", () => {
 				body: {
 					content: "No action sections here.",
 					extractCodeBlocks: () => [],
-					extractActionSection: () => undefined,
+					extractActionSection: () => ({
+						ok: false,
+						error: { type: "EXECUTION_ERROR" as const, message: "not found" },
+					}),
 					extractActionCodeBlocks: () => [],
 				},
 				location: "/tmp/test",
@@ -629,7 +641,10 @@ describe("runAgentSkill", () => {
 				body: {
 					content: "# 画像分析\n\n提供された画像を分析してください。\n",
 					extractCodeBlocks: () => [],
-					extractActionSection: () => undefined,
+					extractActionSection: () => ({
+						ok: false,
+						error: { type: "EXECUTION_ERROR" as const, message: "not found" },
+					}),
 					extractActionCodeBlocks: () => [],
 				},
 				location: "/tmp/skills/analyze-image/SKILL.md",

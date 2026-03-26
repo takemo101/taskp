@@ -129,18 +129,20 @@ describe("extractCodeBlocks", () => {
 describe("extractActionSection", () => {
 	it("指定アクション名のセクション内容を返す", () => {
 		const body = createSkillBody(withActionSections());
-		const content = body.extractActionSection("add");
+		const result = body.extractActionSection("add");
 
-		expect(content).toBeDefined();
-		expect(content).toContain("Add something.");
-		expect(content).toContain("echo add");
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toContain("Add something.");
+			expect(result.value).toContain("echo add");
+		}
 	});
 
-	it("存在しないアクション名は undefined を返す", () => {
+	it("存在しないアクション名はエラーを返す", () => {
 		const body = createSkillBody(withActionSections());
-		const content = body.extractActionSection("nonexistent");
+		const result = body.extractActionSection("nonexistent");
 
-		expect(content).toBeUndefined();
+		expect(result.ok).toBe(false);
 	});
 });
 

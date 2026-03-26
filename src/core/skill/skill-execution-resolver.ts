@@ -48,20 +48,16 @@ export function resolveAgentExecution(
 
 	const config = resolveActionConfig(actions[actionName], skill.metadata);
 
-	const sectionContent = skill.body.extractActionSection(actionName);
-	if (!sectionContent) {
-		return err(
-			executionError(
-				`Action section "## action:${actionName}" not found in skill "${skill.metadata.name}"`,
-			),
-		);
+	const sectionResult = skill.body.extractActionSection(actionName);
+	if (!sectionResult.ok) {
+		return sectionResult;
 	}
 
 	return ok({
 		inputs: config.inputs,
 		tools: config.tools,
 		context: config.context,
-		content: sectionContent,
+		content: sectionResult.value,
 	});
 }
 
@@ -106,14 +102,14 @@ export function resolveTemplateExecution(
 
 	const config = resolveActionConfig(actionDef, skill.metadata);
 
-	const sectionContent = skill.body.extractActionSection(actionName);
-	if (!sectionContent) {
-		return err(executionError(`Action section "action:${actionName}" not found in skill body.`));
+	const sectionResult = skill.body.extractActionSection(actionName);
+	if (!sectionResult.ok) {
+		return sectionResult;
 	}
 
 	return ok({
 		inputs: config.inputs,
-		content: sectionContent,
+		content: sectionResult.value,
 		codeBlocks: skill.body.extractActionCodeBlocks(actionName, "bash"),
 		timeout: config.timeout,
 	});

@@ -18,7 +18,10 @@ function createSkill(name: string, scope: SkillScope): Skill {
 		body: {
 			content: `# ${name}`,
 			extractCodeBlocks: () => [],
-			extractActionSection: () => undefined,
+			extractActionSection: () => ({
+				ok: false,
+				error: { type: "EXECUTION_ERROR" as const, message: "not found" },
+			}),
 			extractActionCodeBlocks: () => [],
 		},
 		location:
