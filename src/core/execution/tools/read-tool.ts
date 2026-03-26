@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import type { Tool } from "ai";
 import { z } from "zod";
+import { type ExecutionError, executionError } from "../../types/errors";
+import { err, ok, type Result } from "../../types/result";
 import { zodToJsonSchema } from "./schema-helper";
 
 export const readParams = z.object({
@@ -10,14 +12,15 @@ export const readParams = z.object({
 
 type ReadInput = z.infer<typeof readParams>;
 
-export const readTool: Tool<ReadInput, string> = {
+export const readTool: Tool<ReadInput, Result<string, ExecutionError>> = {
 	description: "Read the contents of a file",
 	inputSchema: zodToJsonSchema(readParams),
-	execute: async ({ path }) => {
+	execute: async ({ path }): Promise<Result<string, ExecutionError>> => {
 		try {
-			return await readFile(path, "utf-8");
-		} catch (error) {
-			throw new Error(`Failed to read file: ${path}`, { cause: error });
+			const content = await readFile(path, "utf-8");
+			return ok(content);
+		} catch {
+			return err(executionError(`Failed to read file: ${path}`));
 		}
 	},
 };

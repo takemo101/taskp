@@ -74,7 +74,7 @@ describe("bash tool", () => {
 			{ command: "echo hello" },
 			{ toolCallId: "1", messages: [], abortSignal: AbortSignal.timeout(5000) },
 		);
-		expect(result).toEqual({ stdout: "hello", stderr: "", exitCode: 0 });
+		expect(result).toEqual({ ok: true, value: { stdout: "hello", stderr: "", exitCode: 0 } });
 	});
 
 	it("失敗したコマンドの exitCode と stderr を返す", async () => {
@@ -82,30 +82,37 @@ describe("bash tool", () => {
 		const result = (await tools.bash.execute?.(
 			{ command: "echo err >&2 && exit 1" },
 			{ toolCallId: "2", messages: [], abortSignal: AbortSignal.timeout(5000) },
-		)) as { stdout: string; stderr: string; exitCode: number };
-		expect(result.exitCode).toBe(1);
-		expect(result.stderr).toBe("err");
+		)) as { ok: true; value: { stdout: string; stderr: string; exitCode: number } };
+		expect(result.ok).toBe(true);
+		expect(result.value.exitCode).toBe(1);
+		expect(result.value.stderr).toBe("err");
 	});
 });
 
 describe("read tool", () => {
 	it("ファイルの内容を読み込む", async () => {
 		const tools = unwrapTools(["read"]);
-		const result = await tools.read.execute?.(
+		const result = (await tools.read.execute?.(
 			{ path: join(__dirname, "agent-tools.test.ts") },
 			{ toolCallId: "3", messages: [], abortSignal: AbortSignal.timeout(5000) },
-		);
-		expect(result).toContain("describe");
+		)) as { ok: true; value: string };
+		expect(result.ok).toBe(true);
+		expect(result.value).toContain("describe");
 	});
 
-	it("存在しないファイルでエラーを投げる", async () => {
+	it("存在しないファイルで err を返す", async () => {
 		const tools = unwrapTools(["read"]);
-		await expect(
-			tools.read.execute?.(
-				{ path: "/nonexistent/path/file.txt" },
-				{ toolCallId: "3", messages: [], abortSignal: AbortSignal.timeout(5000) },
-			),
-		).rejects.toThrow("Failed to read file: /nonexistent/path/file.txt");
+		const result = await tools.read.execute?.(
+			{ path: "/nonexistent/path/file.txt" },
+			{ toolCallId: "3", messages: [], abortSignal: AbortSignal.timeout(5000) },
+		);
+		expect(result).toEqual({
+			ok: false,
+			error: {
+				type: "EXECUTION_ERROR",
+				message: "Failed to read file: /nonexistent/path/file.txt",
+			},
+		});
 	});
 });
 
@@ -119,7 +126,7 @@ describe("write tool", () => {
 				{ path: filePath, content: "hello world" },
 				{ toolCallId: "4", messages: [], abortSignal: AbortSignal.timeout(5000) },
 			);
-			expect(result).toBe(`Written to ${filePath}`);
+			expect(result).toEqual({ ok: true, value: `Written to ${filePath}` });
 			const written = await readFile(filePath, "utf-8");
 			expect(written).toBe("hello world");
 		} finally {
@@ -127,15 +134,17 @@ describe("write tool", () => {
 		}
 	});
 
-	it("存在しないディレクトリへの書き込みでエラーを投げる", async () => {
+	it("存在しないディレクトリへの書き込みで err を返す", async () => {
 		const tools = unwrapTools(["write"]);
 		const invalidPath = "/nonexistent/dir/file.txt";
-		await expect(
-			tools.write.execute?.(
-				{ path: invalidPath, content: "test" },
-				{ toolCallId: "4", messages: [], abortSignal: AbortSignal.timeout(5000) },
-			),
-		).rejects.toThrow(`Failed to write file: ${invalidPath}`);
+		const result = await tools.write.execute?.(
+			{ path: invalidPath, content: "test" },
+			{ toolCallId: "4", messages: [], abortSignal: AbortSignal.timeout(5000) },
+		);
+		expect(result).toEqual({
+			ok: false,
+			error: { type: "EXECUTION_ERROR", message: `Failed to write file: ${invalidPath}` },
+		});
 	});
 });
 
@@ -145,8 +154,9 @@ describe("glob tool", () => {
 		const result = (await tools.glob.execute?.(
 			{ pattern: "tests/core/execution/*.test.ts" },
 			{ toolCallId: "5", messages: [], abortSignal: AbortSignal.timeout(5000) },
-		)) as string[];
-		expect(result).toContain("tests/core/execution/agent-tools.test.ts");
+		)) as { ok: true; value: readonly string[] };
+		expect(result.ok).toBe(true);
+		expect(result.value).toContain("tests/core/execution/agent-tools.test.ts");
 	});
 });
 
@@ -161,7 +171,7 @@ describe("edit tool", () => {
 				{ path: filePath, oldString: "world", newString: "universe" },
 				{ toolCallId: "e1", messages: [], abortSignal: AbortSignal.timeout(5000) },
 			);
-			expect(result).toBe(`Edited ${filePath}`);
+			expect(result).toEqual({ ok: true, value: `Edited ${filePath}` });
 			const content = await readFile(filePath, "utf-8");
 			expect(content).toBe("hello universe foo bar");
 		} finally {
@@ -169,49 +179,58 @@ describe("edit tool", () => {
 		}
 	});
 
-	it("oldString が見つからない場合エラーを投げる", async () => {
+	it("oldString が見つからない場合 err を返す", async () => {
 		const dir = await mkdtemp(join(tmpdir(), "agent-tools-test-"));
 		const filePath = join(dir, "test.txt");
 		try {
 			await writeFile(filePath, "hello world", "utf-8");
 			const tools = unwrapTools(["edit"]);
-			await expect(
-				tools.edit.execute?.(
-					{ path: filePath, oldString: "nonexistent", newString: "replaced" },
-					{ toolCallId: "e2", messages: [], abortSignal: AbortSignal.timeout(5000) },
-				),
-			).rejects.toThrow(`String not found in ${filePath}`);
+			const result = await tools.edit.execute?.(
+				{ path: filePath, oldString: "nonexistent", newString: "replaced" },
+				{ toolCallId: "e2", messages: [], abortSignal: AbortSignal.timeout(5000) },
+			);
+			expect(result).toEqual({
+				ok: false,
+				error: { type: "EXECUTION_ERROR", message: `String not found in ${filePath}` },
+			});
 		} finally {
 			await rm(dir, { recursive: true });
 		}
 	});
 
-	it("複数マッチ時にエラーを投げる", async () => {
+	it("複数マッチ時に err を返す", async () => {
 		const dir = await mkdtemp(join(tmpdir(), "agent-tools-test-"));
 		const filePath = join(dir, "test.txt");
 		try {
 			await writeFile(filePath, "hello hello hello", "utf-8");
 			const tools = unwrapTools(["edit"]);
-			await expect(
-				tools.edit.execute?.(
-					{ path: filePath, oldString: "hello", newString: "hi" },
-					{ toolCallId: "e3", messages: [], abortSignal: AbortSignal.timeout(5000) },
-				),
-			).rejects.toThrow(`Multiple matches found in ${filePath}`);
+			const result = await tools.edit.execute?.(
+				{ path: filePath, oldString: "hello", newString: "hi" },
+				{ toolCallId: "e3", messages: [], abortSignal: AbortSignal.timeout(5000) },
+			);
+			expect(result).toEqual({
+				ok: false,
+				error: {
+					type: "EXECUTION_ERROR",
+					message: `Multiple matches found in ${filePath}. Provide more context in oldString to uniquely identify the location.`,
+				},
+			});
 		} finally {
 			await rm(dir, { recursive: true });
 		}
 	});
 
-	it("存在しないファイルでエラーを投げる", async () => {
+	it("存在しないファイルで err を返す", async () => {
 		const tools = unwrapTools(["edit"]);
 		const invalidPath = "/nonexistent/path/file.txt";
-		await expect(
-			tools.edit.execute?.(
-				{ path: invalidPath, oldString: "old", newString: "new" },
-				{ toolCallId: "e4", messages: [], abortSignal: AbortSignal.timeout(5000) },
-			),
-		).rejects.toThrow(`Failed to read file: ${invalidPath}`);
+		const result = await tools.edit.execute?.(
+			{ path: invalidPath, oldString: "old", newString: "new" },
+			{ toolCallId: "e4", messages: [], abortSignal: AbortSignal.timeout(5000) },
+		);
+		expect(result).toEqual({
+			ok: false,
+			error: { type: "EXECUTION_ERROR", message: `Failed to read file: ${invalidPath}` },
+		});
 	});
 
 	it("oldString と newString が同一の場合は書き込みをスキップする", async () => {
@@ -225,7 +244,7 @@ describe("edit tool", () => {
 				{ path: filePath, oldString: "world", newString: "world" },
 				{ toolCallId: "e5", messages: [], abortSignal: AbortSignal.timeout(5000) },
 			);
-			expect(result).toBe(`No changes needed in ${filePath}`);
+			expect(result).toEqual({ ok: true, value: `No changes needed in ${filePath}` });
 			const { mtimeMs: mtimeAfter } = await stat(filePath);
 			expect(mtimeAfter).toBe(mtimeBefore);
 		} finally {
