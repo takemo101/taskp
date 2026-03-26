@@ -1,5 +1,6 @@
 // Use cases
 
+export { collectSkillContext, resolveContextSources } from "./collect-skill-context";
 export type { InitOutput, InitSkillInput } from "./init-skill";
 export { initSkill } from "./init-skill";
 export type { ListOutput, ListSkillsFilter, ListSkillsUseCase } from "./list-skills";

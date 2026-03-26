@@ -1,17 +1,12 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { buildTaskpRunDescription } from "../core/execution/agent-tools";
 import type { ContentPart } from "../core/execution/content-part";
-import {
-	type ContextSource,
-	getContextSourceValue,
-	withResolvedValue,
-} from "../core/skill/context-source";
 import { resolveAgentExecution } from "../core/skill/skill-execution-resolver";
 import { type DomainError, domainErrorMessage } from "../core/types/errors";
 import type { Result } from "../core/types/result";
 import { ok } from "../core/types/result";
-import type { ReservedVars } from "../core/variable/template-renderer";
 import { buildReservedVars, renderTemplate } from "../core/variable/template-renderer";
+import { collectSkillContext } from "./collect-skill-context";
 import { type HooksConfig, runHooks } from "./hook-runner";
 import type { AgentExecutorPort, AgentExecutorResult } from "./port/agent-executor";
 import type { CollectedContext, ContextCollectorPort } from "./port/context-collector";
@@ -98,13 +93,13 @@ export async function runAgentSkill(
 	if (contextSources.length > 0) {
 		progress.writeContextSources(contextSources);
 
-		// context ソース内の変数（{{__skill_dir__}} 等）を展開してからコレクタに渡す
-		// （SKILL-SPEC.md「展開タイミング」ステップ3: context のパス内の変数を展開）
-		const resolvedSources = resolveContextSources(contextSources, variables, reserved);
-		if (!resolvedSources.ok) {
-			return resolvedSources;
-		}
-		const contextResult = await deps.contextCollector.collect(resolvedSources.value, process.cwd());
+		const contextResult = await collectSkillContext(
+			contextSources,
+			variables,
+			reserved,
+			deps.contextCollector,
+			process.cwd(),
+		);
 		if (!contextResult.ok) {
 			return contextResult;
 		}
@@ -164,29 +159,6 @@ export async function runAgentSkill(
 		skillName: skill.metadata.name,
 		result: executeResult.value,
 	});
-}
-
-/**
- * context ソース内の変数（パス・コマンド等）を展開する。
- * 例: `{{__skill_dir__}}/fetch.sh` → `/abs/path/to/skill/fetch.sh`
- */
-function resolveContextSources(
-	sources: readonly ContextSource[],
-	variables: Record<string, string>,
-	reserved: ReservedVars,
-): Result<readonly ContextSource[], DomainError> {
-	const resolved: ContextSource[] = [];
-
-	for (const source of sources) {
-		const raw = getContextSourceValue(source);
-		const renderResult = renderTemplate(raw, variables, reserved);
-		if (!renderResult.ok) {
-			return renderResult;
-		}
-		resolved.push(withResolvedValue(source, renderResult.value));
-	}
-
-	return ok(resolved);
 }
 
 function toContentPart(ctx: CollectedContext): ContentPart {
