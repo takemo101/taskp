@@ -155,26 +155,29 @@ export function mergeProviders(
 	return merged;
 }
 
+function mergeByProjectPriority<T extends Record<string, unknown>>(global: T, project: T): T {
+	const result = { ...global };
+	for (const key of Object.keys(project) as (keyof T)[]) {
+		if (project[key] !== undefined) {
+			result[key] = project[key];
+		}
+	}
+	return result;
+}
+
 export function mergeAiConfig(global: AiConfig, project: AiConfig): AiConfig {
 	return {
-		default_provider: project.default_provider ?? global.default_provider,
-		default_model: project.default_model ?? global.default_model,
+		...mergeByProjectPriority(global, project),
 		providers: mergeOptional(global.providers, project.providers, mergeProviders),
 	};
 }
 
 export function mergeHooksConfig(global: HooksConfig, project: HooksConfig): HooksConfig {
-	return {
-		on_success: project.on_success ?? global.on_success,
-		on_failure: project.on_failure ?? global.on_failure,
-	};
+	return mergeByProjectPriority(global, project);
 }
 
 export function mergeCliConfig(global: CliConfig, project: CliConfig): CliConfig {
-	return {
-		command_timeout_ms: project.command_timeout_ms ?? global.command_timeout_ms,
-		max_agent_steps: project.max_agent_steps ?? global.max_agent_steps,
-	};
+	return mergeByProjectPriority(global, project);
 }
 
 function mergeConfigs(global: Config, project: Config): Config {
