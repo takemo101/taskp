@@ -9,6 +9,8 @@ export { parseContextSource } from "./context-source";
 export type { Skill, SkillLogger, SkillScope } from "./skill";
 export { parseSkill } from "./skill";
 export type { SkillBody } from "./skill-body";
+export type { AgentExecutionConfig, TemplateExecutionConfig } from "./skill-execution-resolver";
+export { resolveAgentExecution, resolveTemplateExecution } from "./skill-execution-resolver";
 export type { InputType, SkillInput } from "./skill-input";
 export { parseSkillInput } from "./skill-input";
 export type { SkillMetadata, SkillMode } from "./skill-metadata";
