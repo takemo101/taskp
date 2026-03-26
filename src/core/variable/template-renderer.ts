@@ -123,14 +123,14 @@ function expandConditionals(template: string, varMap: VariableMap): Result<strin
 }
 
 function findUndefinedVariables(template: string, varMap: VariableMap): readonly string[] {
-	const undefined_: string[] = [];
+	const undefinedVars: string[] = [];
 	for (const match of template.matchAll(VARIABLE_PATTERN)) {
 		const name = match[1];
 		if (varMap(name) === undefined) {
-			undefined_.push(name);
+			undefinedVars.push(name);
 		}
 	}
-	return [...new Set(undefined_)];
+	return [...new Set(undefinedVars)];
 }
 
 export function renderTemplate(

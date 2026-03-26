@@ -35,7 +35,7 @@ function resolveActionConfig(action: Action, skill: SkillMetadata): ResolvedActi
 		description: action.description,
 		mode: action.mode ?? skill.mode ?? "template",
 		model: action.model ?? skill.model ?? undefined,
-		inputs: action.inputs ?? [],
+		inputs: action.inputs ?? skill.inputs,
 		context: action.context ?? skill.context ?? [],
 		tools: action.tools ?? skill.tools ?? [...DEFAULT_TOOLS],
 		timeout: action.timeout ?? skill.timeout ?? undefined,

@@ -80,7 +80,7 @@ describe("resolveActionConfig", () => {
 		expect(resolved.timeout).toBeUndefined();
 	});
 
-	it("inputs はスキルから継承しない", () => {
+	it("アクション未指定の inputs はスキルから継承される", () => {
 		const skill = baseSkill({
 			inputs: [{ name: "target", type: "text", message: "Target?" }],
 		});
@@ -88,7 +88,7 @@ describe("resolveActionConfig", () => {
 
 		const resolved = resolveActionConfig(action, skill);
 
-		expect(resolved.inputs).toStrictEqual([]);
+		expect(resolved.inputs).toStrictEqual([{ name: "target", type: "text", message: "Target?" }]);
 	});
 
 	it("アクション固有の inputs が使用される", () => {
