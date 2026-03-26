@@ -16,28 +16,80 @@ export type ClassifiedError = {
 	readonly retryable: boolean;
 };
 
-// エラーをカテゴリ分類することで、リトライ可否の判定と
-// ユーザーへの具体的な対処法メッセージの出し分けを実現する
-export function classifyAgentError(error: unknown, provider: string): ClassifiedError {
-	if (APICallError.isInstance(error)) {
-		return classifyApiCallError(error, provider);
-	}
+// 各分類器は自身が処理できるエラーに対して ClassifiedError を返し、
+// 処理できない場合は undefined を返して次の分類器に委譲する
+export type ErrorClassifier = (error: unknown, provider: string) => ClassifiedError | undefined;
 
-	if (isNetworkError(error)) {
-		if (provider === "ollama") {
-			return {
-				category: "ollama_not_running",
-				message: ErrorMessages.OLLAMA_NOT_RUNNING,
-				retryable: false,
-			};
-		}
-		return {
-			category: "network",
-			message: ErrorMessages.NETWORK_ERROR,
-			retryable: true,
-		};
-	}
+function classifyApiKeyError(error: unknown, provider: string): ClassifiedError | undefined {
+	if (!APICallError.isInstance(error)) return undefined;
+	const status = error.statusCode;
+	if (status !== 401 && status !== 403) return undefined;
 
+	return {
+		category: "api_key_missing",
+		message: buildApiKeyMessage(provider),
+		retryable: false,
+	};
+}
+
+function classifyRateLimitError(error: unknown): ClassifiedError | undefined {
+	if (!APICallError.isInstance(error)) return undefined;
+	if (error.statusCode !== 429) return undefined;
+
+	return {
+		category: "rate_limit",
+		message: ErrorMessages.RATE_LIMITED,
+		retryable: true,
+	};
+}
+
+function classifyOllamaModelMissing(error: unknown, provider: string): ClassifiedError | undefined {
+	if (provider !== "ollama") return undefined;
+	if (!APICallError.isInstance(error)) return undefined;
+	if (error.statusCode !== 404) return undefined;
+
+	const model = extractOllamaModelFromError(error);
+	return {
+		category: "ollama_model_missing",
+		message: ErrorMessages.ollamaModelMissing(model),
+		retryable: false,
+	};
+}
+
+function classifyServerError(error: unknown): ClassifiedError | undefined {
+	if (!APICallError.isInstance(error)) return undefined;
+	const status = error.statusCode;
+	if (status === undefined || status < 500) return undefined;
+
+	return {
+		category: "network",
+		message: ErrorMessages.serverError(status),
+		retryable: true,
+	};
+}
+
+function classifyOllamaNotRunning(error: unknown, provider: string): ClassifiedError | undefined {
+	if (provider !== "ollama") return undefined;
+	if (!isNetworkError(error)) return undefined;
+
+	return {
+		category: "ollama_not_running",
+		message: ErrorMessages.OLLAMA_NOT_RUNNING,
+		retryable: false,
+	};
+}
+
+function classifyNetworkError(error: unknown): ClassifiedError | undefined {
+	if (!isNetworkError(error)) return undefined;
+
+	return {
+		category: "network",
+		message: ErrorMessages.NETWORK_ERROR,
+		retryable: true,
+	};
+}
+
+function classifyFatalError(error: unknown): ClassifiedError {
 	return {
 		category: "fatal",
 		message: error instanceof Error ? error.message : String(error),
@@ -45,47 +97,27 @@ export function classifyAgentError(error: unknown, provider: string): Classified
 	};
 }
 
-function classifyApiCallError(error: APICallError, provider: string): ClassifiedError {
-	const status = error.statusCode;
+// 分類器チェーン: 先頭から順に試行し、最初にマッチした結果を返す
+// 新しいエラー型の追加はこの配列に分類器を追加するだけでよい
+const classifierChain: readonly ErrorClassifier[] = [
+	classifyApiKeyError,
+	classifyRateLimitError,
+	classifyOllamaModelMissing,
+	classifyServerError,
+	classifyOllamaNotRunning,
+	classifyNetworkError,
+];
 
-	if (status === 401 || status === 403) {
-		return {
-			category: "api_key_missing",
-			message: buildApiKeyMessage(provider),
-			retryable: false,
-		};
+// エラーをカテゴリ分類することで、リトライ可否の判定と
+// ユーザーへの具体的な対処法メッセージの出し分けを実現する
+export function classifyAgentError(error: unknown, provider: string): ClassifiedError {
+	for (const classifier of classifierChain) {
+		const result = classifier(error, provider);
+		if (result !== undefined) {
+			return result;
+		}
 	}
-
-	if (status === 429) {
-		return {
-			category: "rate_limit",
-			message: ErrorMessages.RATE_LIMITED,
-			retryable: true,
-		};
-	}
-
-	if (provider === "ollama" && status === 404) {
-		const model = extractOllamaModelFromError(error);
-		return {
-			category: "ollama_model_missing",
-			message: ErrorMessages.ollamaModelMissing(model),
-			retryable: false,
-		};
-	}
-
-	if (status !== undefined && status >= 500) {
-		return {
-			category: "network",
-			message: ErrorMessages.serverError(status),
-			retryable: true,
-		};
-	}
-
-	return {
-		category: "fatal",
-		message: error.message,
-		retryable: false,
-	};
+	return classifyFatalError(error);
 }
 
 function isNetworkError(error: unknown): boolean {
