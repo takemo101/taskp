@@ -125,14 +125,14 @@ function findUndefinedVariables(
 	variables: Record<string, string>,
 	reserved: ReservedVars,
 ): readonly string[] {
-	const undefined_: string[] = [];
+	const undefinedVars: string[] = [];
 	for (const match of template.matchAll(VARIABLE_PATTERN)) {
 		const name = match[1];
 		if (resolveVariable(name, variables, reserved) === undefined) {
-			undefined_.push(name);
+			undefinedVars.push(name);
 		}
 	}
-	return [...new Set(undefined_)];
+	return [...new Set(undefinedVars)];
 }
 
 export function renderTemplate(
