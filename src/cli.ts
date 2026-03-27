@@ -161,7 +161,7 @@ const cli = Cli.create("taskp", {
 			const ref = exitOnError(parseSkillRef(c.args.skill));
 
 			const presets = parsePresets(c.options.set ?? []);
-			const skillRepository = createDefaultSkillLoader(process.cwd());
+			const skillRepository = await createDefaultSkillLoader(process.cwd());
 			const promptCollector = createPromptRunner();
 
 			const skill = exitOnError(await skillRepository.findByName(ref.name));
@@ -228,7 +228,7 @@ const cli = Cli.create("taskp", {
 		}),
 		async run(c) {
 			const scope = resolveScope(c.options.global, c.options.local);
-			const repository = createDefaultSkillLoader(process.cwd());
+			const repository = await createDefaultSkillLoader(process.cwd());
 			const usecase = createListSkillsUseCase(repository);
 			const { skills } = await usecase.execute({ scope });
 
@@ -263,7 +263,7 @@ const cli = Cli.create("taskp", {
 				? c.options.actions.split(",").map((a) => a.trim())
 				: undefined;
 
-			const skillRepository = createDefaultSkillLoader(process.cwd());
+			const skillRepository = await createDefaultSkillLoader(process.cwd());
 			const skillInitializer = createSkillInitializer({ baseDir });
 
 			const result = await initSkill(
@@ -282,7 +282,7 @@ const cli = Cli.create("taskp", {
 		async run(c) {
 			const ref = exitOnError(parseSkillRef(c.args.skill));
 
-			const repository = createDefaultSkillLoader(process.cwd());
+			const repository = await createDefaultSkillLoader(process.cwd());
 			const result = await showSkill(ref.name, repository, ref.action);
 
 			console.log(formatShowOutput(exitOnError(result)));
@@ -348,7 +348,7 @@ type RunCommandContext = {
 async function runAgentMode(
 	c: RunCommandContext,
 	presets: Readonly<Record<string, string>>,
-	skillRepository: ReturnType<typeof createDefaultSkillLoader>,
+	skillRepository: Awaited<ReturnType<typeof createDefaultSkillLoader>>,
 	promptCollector: ReturnType<typeof createPromptRunner>,
 ): Promise<void> {
 	const configLoader = createDefaultConfigLoader(process.cwd());

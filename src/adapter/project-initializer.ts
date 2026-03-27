@@ -1,5 +1,4 @@
-import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join, relative } from "node:path";
 import { z } from "zod";
 import type { Result } from "../core/types/result";
 import type {
@@ -8,6 +7,7 @@ import type {
 	SetupLocation,
 	SetupResult,
 } from "../usecase/port/project-initializer";
+import { getBundledSkillsDirCandidates } from "./bundled-skills-dir";
 import { configSchema } from "./config-loader";
 import { tryCatch } from "./error-handler-utils";
 import type { FileSystemPort } from "./file-system-port";
@@ -120,21 +120,6 @@ async function createDirIfNeeded(
 	if (!existed) {
 		created.push(relative(baseDir, entry.path));
 	}
-}
-
-/**
- * taskp パッケージに同梱されたデフォルトスキルのディレクトリ候補を返す。
- * 呼び出し元で非同期に存在確認を行う。
- *
- * - 開発時: src/adapter/ → ../../skills
- * - ビルド後: dist/ → ../skills
- */
-function getBundledSkillsDirCandidates(): readonly string[] {
-	const currentDir =
-		typeof import.meta.dirname === "string"
-			? import.meta.dirname
-			: dirname(fileURLToPath(import.meta.url));
-	return [resolve(currentDir, "..", "skills"), resolve(currentDir, "..", "..", "skills")];
 }
 
 async function resolveBundledSkillsDir(

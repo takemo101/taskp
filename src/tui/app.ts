@@ -40,7 +40,7 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 			}
 		});
 
-		const skillRepository = createDefaultSkillLoader(process.cwd());
+		const skillRepository = await createDefaultSkillLoader(process.cwd());
 		const { skills } = await skillRepository.listAll();
 
 		if (skills.length === 0) {

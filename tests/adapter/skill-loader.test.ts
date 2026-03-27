@@ -382,4 +382,116 @@ describe("SkillLoader", () => {
 			expect(failures).toHaveLength(0);
 		});
 	});
+
+	describe("allowedRoots", () => {
+		const externalDirs: string[] = [];
+
+		afterEach(() => {
+			for (const dir of externalDirs) {
+				rmSync(dir, { recursive: true, force: true });
+			}
+			externalDirs.length = 0;
+		});
+
+		it("allowedRoots に含まれる外部ディレクトリへのシンボリックリンクは読み込める", async () => {
+			const bundledDir = mkdtempSync(join(tmpdir(), "taskp-bundled-"));
+			externalDirs.push(bundledDir);
+			const bundledSkillDir = join(bundledDir, "analyze-image");
+			mkdirSync(bundledSkillDir, { recursive: true });
+			writeFileSync(
+				join(bundledSkillDir, "SKILL.md"),
+				makeSkillMd("analyze-image", "バンドルスキル"),
+			);
+
+			const skillsDir = join(globalRoot, ".taskp", "skills");
+			mkdirSync(skillsDir, { recursive: true });
+			symlinkSync(bundledSkillDir, join(skillsDir, "analyze-image"));
+
+			const loader = createSkillLoader({
+				localRoot,
+				globalRoot,
+				allowedRoots: [bundledDir],
+			});
+			const { skills } = await loader.listGlobal();
+
+			expect(skills).toHaveLength(1);
+			expect(skills[0].metadata.name).toBe("analyze-image");
+		});
+
+		it("allowedRoots に含まれる外部ディレクトリへのシンボリックリンクを findByName で検索できる", async () => {
+			const bundledDir = mkdtempSync(join(tmpdir(), "taskp-bundled-"));
+			externalDirs.push(bundledDir);
+			const bundledSkillDir = join(bundledDir, "web-search");
+			mkdirSync(bundledSkillDir, { recursive: true });
+			writeFileSync(
+				join(bundledSkillDir, "SKILL.md"),
+				makeSkillMd("web-search", "ウェブ検索スキル"),
+			);
+
+			const skillsDir = join(globalRoot, ".taskp", "skills");
+			mkdirSync(skillsDir, { recursive: true });
+			symlinkSync(bundledSkillDir, join(skillsDir, "web-search"));
+
+			const loader = createSkillLoader({
+				localRoot,
+				globalRoot,
+				allowedRoots: [bundledDir],
+			});
+			const result = await loader.findByName("web-search");
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.metadata.name).toBe("web-search");
+			expect(result.value.scope).toBe("global");
+		});
+
+		it("allowedRoots に含まれない外部ディレクトリへのシンボリックリンクは引き続きスキップされる", async () => {
+			const bundledDir = mkdtempSync(join(tmpdir(), "taskp-bundled-"));
+			externalDirs.push(bundledDir);
+			const evilDir = mkdtempSync(join(tmpdir(), "taskp-evil-"));
+			externalDirs.push(evilDir);
+
+			const evilSkillDir = join(evilDir, "evil-skill");
+			mkdirSync(evilSkillDir, { recursive: true });
+			writeFileSync(join(evilSkillDir, "SKILL.md"), makeSkillMd("evil-skill", "悪意のあるスキル"));
+
+			const skillsDir = join(globalRoot, ".taskp", "skills");
+			mkdirSync(skillsDir, { recursive: true });
+			symlinkSync(evilSkillDir, join(skillsDir, "evil-skill"));
+
+			const loader = createSkillLoader({
+				localRoot,
+				globalRoot,
+				allowedRoots: [bundledDir],
+			});
+			const { skills } = await loader.listGlobal();
+
+			expect(skills).toHaveLength(0);
+		});
+
+		it("allowedRoots と通常のスキルルート内リンクが共存できる", async () => {
+			const bundledDir = mkdtempSync(join(tmpdir(), "taskp-bundled-"));
+			externalDirs.push(bundledDir);
+			const bundledSkillDir = join(bundledDir, "bundled-skill");
+			mkdirSync(bundledSkillDir, { recursive: true });
+			writeFileSync(join(bundledSkillDir, "SKILL.md"), makeSkillMd("bundled-skill", "バンドル"));
+
+			const skillsDir = join(globalRoot, ".taskp", "skills");
+			mkdirSync(skillsDir, { recursive: true });
+			symlinkSync(bundledSkillDir, join(skillsDir, "bundled-skill"));
+			createSkillFile(globalRoot, "normal-skill", makeSkillMd("normal-skill", "通常スキル"));
+
+			const loader = createSkillLoader({
+				localRoot,
+				globalRoot,
+				allowedRoots: [bundledDir],
+			});
+			const { skills } = await loader.listGlobal();
+
+			expect(skills).toHaveLength(2);
+			const names = skills.map((s) => s.metadata.name);
+			expect(names).toContain("bundled-skill");
+			expect(names).toContain("normal-skill");
+		});
+	});
 });
