@@ -77,9 +77,10 @@ function createVariableMap(variables: Record<string, string>, reserved: Reserved
 	return (name: string) => resolveVariable(name, variables, reserved);
 }
 
-// confirm 型は "true"/"false"、required: false は空文字になるため、
-// 両方を自然に扱えるよう空文字と "false" を falsy とする
-function isTruthy(value: string): boolean {
+// confirm 型の入力値が取りうる falsy 表現
+type BooleanLike = string;
+
+function parseBoolean(value: BooleanLike): boolean {
 	return value !== "" && value !== "false";
 }
 
@@ -110,7 +111,7 @@ function expandConditionals(template: string, varMap: VariableMap): Result<strin
 				undefinedConditionVars.push(name);
 				return "";
 			}
-			return isTruthy(value) ? ifBlock : (elseBlock ?? "");
+			return parseBoolean(value) ? ifBlock : (elseBlock ?? "");
 		},
 	);
 
