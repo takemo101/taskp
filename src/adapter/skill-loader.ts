@@ -1,4 +1,4 @@
-import { lstat, readdir, readFile, realpath } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { Skill, SkillLogger, SkillScope } from "../core/skill/skill";
@@ -8,7 +8,6 @@ import { parseError, type SkillNotFoundError, skillNotFoundError } from "../core
 import type { Result } from "../core/types/result";
 import { err } from "../core/types/result";
 import type { SkillLoadResult, SkillRepository } from "../usecase/port/skill-repository";
-import { getBundledSkillsDirCandidates, resolveBundledSkillsDir } from "./bundled-skills-dir";
 
 const SKILL_DIR_NAME = ".taskp/skills";
 const SKILL_FILE_NAME = "SKILL.md";
@@ -24,7 +23,6 @@ type SkillLoaderDeps = {
 	readonly localRoot: string;
 	readonly globalRoot: string;
 	readonly logger?: SkillLogger;
-	readonly allowedRoots?: readonly string[];
 };
 
 export function createSkillLoader(deps: SkillLoaderDeps): SkillRepository {
@@ -32,22 +30,18 @@ export function createSkillLoader(deps: SkillLoaderDeps): SkillRepository {
 	const globalSkillsDir = resolve(deps.globalRoot, SKILL_DIR_NAME);
 
 	const { logger } = deps;
-	const allowedRoots = deps.allowedRoots ?? [];
 	return {
-		findByName: (name) => findByName(name, localSkillsDir, globalSkillsDir, allowedRoots, logger),
-		listAll: () => listAll(localSkillsDir, globalSkillsDir, allowedRoots, logger),
-		listLocal: () => scanDirectory(localSkillsDir, "local", allowedRoots, logger),
-		listGlobal: () => scanDirectory(globalSkillsDir, "global", allowedRoots, logger),
+		findByName: (name) => findByName(name, localSkillsDir, globalSkillsDir, logger),
+		listAll: () => listAll(localSkillsDir, globalSkillsDir, logger),
+		listLocal: () => scanDirectory(localSkillsDir, "local", logger),
+		listGlobal: () => scanDirectory(globalSkillsDir, "global", logger),
 	};
 }
 
 export async function createDefaultSkillLoader(projectRoot: string): Promise<SkillRepository> {
-	const bundledSkillsDir = await resolveBundledSkillsDir(getBundledSkillsDirCandidates());
-	const allowedRoots = bundledSkillsDir ? [bundledSkillsDir] : [];
 	return createSkillLoader({
 		localRoot: projectRoot,
 		globalRoot: homedir(),
-		allowedRoots,
 	});
 }
 
@@ -55,29 +49,24 @@ async function findByName(
 	name: string,
 	localSkillsDir: string,
 	globalSkillsDir: string,
-	allowedRoots: readonly string[],
 	logger?: SkillLogger,
 ): Promise<Result<Skill, SkillNotFoundError>> {
-	const localDir = join(localSkillsDir, name);
-	if (await isSymlinkOutsideRoot(localDir, localSkillsDir, allowedRoots)) {
-		logger?.warn(`Skipping symlink outside skills root: ${localDir}`);
-	} else {
-		const localPath = join(localDir, SKILL_FILE_NAME);
-		const localResult = await tryLoadSkill(localPath, "local", logger);
-		if (localResult.type === "found") {
-			return localResult;
-		}
+	const localPath = join(localSkillsDir, name, SKILL_FILE_NAME);
+	const localResult = await tryLoadSkill(localPath, "local", logger);
+	if (localResult.type === "found") {
+		return localResult;
+	}
+	if (localResult.type === "error") {
+		logger?.warn(`Failed to load skill "${name}" from local: ${localResult.error.message}`);
 	}
 
-	const globalDir = join(globalSkillsDir, name);
-	if (await isSymlinkOutsideRoot(globalDir, globalSkillsDir, allowedRoots)) {
-		logger?.warn(`Skipping symlink outside skills root: ${globalDir}`);
-	} else {
-		const globalPath = join(globalDir, SKILL_FILE_NAME);
-		const globalResult = await tryLoadSkill(globalPath, "global", logger);
-		if (globalResult.type === "found") {
-			return globalResult;
-		}
+	const globalPath = join(globalSkillsDir, name, SKILL_FILE_NAME);
+	const globalResult = await tryLoadSkill(globalPath, "global", logger);
+	if (globalResult.type === "found") {
+		return globalResult;
+	}
+	if (globalResult.type === "error") {
+		logger?.warn(`Failed to load skill "${name}" from global: ${globalResult.error.message}`);
 	}
 
 	return err(skillNotFoundError(name));
@@ -86,12 +75,11 @@ async function findByName(
 async function listAll(
 	localSkillsDir: string,
 	globalSkillsDir: string,
-	allowedRoots: readonly string[],
 	logger?: SkillLogger,
 ): Promise<SkillLoadResult> {
 	const [localResult, globalResult] = await Promise.all([
-		scanDirectory(localSkillsDir, "local", allowedRoots, logger),
-		scanDirectory(globalSkillsDir, "global", allowedRoots, logger),
+		scanDirectory(localSkillsDir, "local", logger),
+		scanDirectory(globalSkillsDir, "global", logger),
 	]);
 
 	const localNames = new Set(localResult.skills.map((s) => s.metadata.name));
@@ -106,7 +94,6 @@ async function listAll(
 async function scanDirectory(
 	skillsDir: string,
 	scope: SkillScope,
-	allowedRoots: readonly string[],
 	logger?: SkillLogger,
 ): Promise<SkillLoadResult> {
 	const entries = await readdir(skillsDir, { withFileTypes: true }).catch(() => []);
@@ -120,11 +107,15 @@ async function scanDirectory(
 	for (const entry of entries.filter((e) => e.isDirectory() || e.isSymbolicLink())) {
 		if (entry.isSymbolicLink()) {
 			const entryPath = join(skillsDir, entry.name);
-			const withinRoot = await isWithinRoot(entryPath, skillsDir, allowedRoots);
-			if (!withinRoot) {
-				logger?.warn(`Skipping symlink outside skills root: ${entryPath}`);
-				continue;
-			}
+			const isDir = await stat(entryPath)
+				.then((s) => s.isDirectory())
+				.catch((e: unknown) => {
+					if (!isFileNotFound(e)) {
+						logger?.warn(`Failed to stat symlink: ${entryPath}`);
+					}
+					return false;
+				});
+			if (!isDir) continue;
 		}
 
 		const skillPath = join(skillsDir, entry.name, SKILL_FILE_NAME);
@@ -166,43 +157,4 @@ async function tryLoadSkill(
 
 function isFileNotFound(e: unknown): boolean {
 	return e instanceof Error && "code" in e && e.code === FILE_NOT_FOUND_CODE;
-}
-
-async function isWithinRoot(
-	symlinkPath: string,
-	rootDir: string,
-	allowedRoots: readonly string[],
-): Promise<boolean> {
-	try {
-		const resolved = await realpath(symlinkPath);
-		const normalizedRoot = await realpath(rootDir);
-		if (resolved.startsWith(`${normalizedRoot}/`)) {
-			return true;
-		}
-		for (const allowed of allowedRoots) {
-			const normalizedAllowed = await realpath(allowed);
-			if (resolved.startsWith(`${normalizedAllowed}/`)) {
-				return true;
-			}
-		}
-		return false;
-	} catch {
-		return false;
-	}
-}
-
-async function isSymlinkOutsideRoot(
-	path: string,
-	rootDir: string,
-	allowedRoots: readonly string[],
-): Promise<boolean> {
-	try {
-		const stat = await lstat(path);
-		if (!stat.isSymbolicLink()) {
-			return false;
-		}
-		return !(await isWithinRoot(path, rootDir, allowedRoots));
-	} catch {
-		return false;
-	}
 }
