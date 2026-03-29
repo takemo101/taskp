@@ -395,6 +395,7 @@ async function runAgentMode(
 			contextCollector,
 			agentExecutor,
 			systemPromptResolver: createSystemPromptResolver(process.cwd()),
+			commandExecutor,
 			progressWriter: createCliProgressWriter(process.stdout),
 			hookExecutor,
 			hooksConfig,

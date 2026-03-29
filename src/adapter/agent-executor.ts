@@ -1,6 +1,5 @@
 import type { TextPart as AiSdkTextPart, ToolCallRepairFunction, ToolSet, UserContent } from "ai";
 import { stepCountIs, streamText } from "ai";
-import { buildTools } from "../core/execution/agent-tools";
 import type { ContentPart } from "../core/execution/content-part";
 import { executionError } from "../core/types/errors";
 import { err, ok } from "../core/types/result";
@@ -26,18 +25,13 @@ async function executeAgentLoop(
 	logger: Logger,
 ): ReturnType<AgentExecutorPort["execute"]> {
 	const startTime = Date.now();
-	const toolsResult = buildTools(input.toolNames, input.taskpRunDeps, input.toolDescriptions);
-	if (!toolsResult.ok) {
-		return toolsResult;
-	}
-	const tools = toolsResult.value;
 
 	try {
 		const result = streamText({
 			model: input.model,
 			system: input.systemPrompt,
 			messages: [{ role: "user", content: toAiSdkContent(input.contentParts) }],
-			tools,
+			tools: input.tools,
 			stopWhen: stepCountIs(input.maxSteps),
 			experimental_repairToolCall: createRepairToolCall(logger),
 		});

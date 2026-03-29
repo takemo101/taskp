@@ -119,6 +119,7 @@ async function executeAgentMode(
 			promptCollector: deps.promptCollectorFactory(variables),
 			contextCollector,
 			agentExecutor,
+			commandExecutor: deps.commandExecutor,
 			progressWriter,
 			hookExecutor: deps.hookExecutor,
 			hooksConfig: deps.hooksConfig,
