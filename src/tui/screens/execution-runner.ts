@@ -1,5 +1,6 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { createAgentExecutor } from "../../adapter/agent-executor";
+import type { McpServerConfig } from "../../adapter/config-loader";
 import { createConsoleLogger } from "../../adapter/console-logger";
 import { createContextCollector } from "../../adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "../../adapter/context-collector-deps";
@@ -34,6 +35,7 @@ export type ExecutionDeps = {
 	readonly promptCollectorFactory: PromptCollectorFactory;
 	readonly systemPromptResolver: SystemPromptResolver;
 	readonly maxAgentSteps?: number;
+	readonly mcpServerConfigs?: Readonly<Record<string, McpServerConfig>>;
 };
 
 export async function runExecution(
@@ -106,6 +108,13 @@ async function executeAgentMode(
 	const contextCollectorDeps = await createDefaultContextCollectorDeps();
 	const contextCollector = createContextCollector({ ...contextCollectorDeps, logger });
 
+	const mcpToolResolver = deps.mcpServerConfigs
+		? (await import("../../adapter/mcp-tool-resolver")).createMcpToolResolver(
+				deps.mcpServerConfigs,
+				logger,
+			)
+		: undefined;
+
 	const result = await runAgentSkill(
 		{
 			name: skill.metadata.name,
@@ -124,6 +133,8 @@ async function executeAgentMode(
 			hookExecutor: deps.hookExecutor,
 			hooksConfig: deps.hooksConfig,
 			systemPromptResolver: deps.systemPromptResolver,
+			mcpToolResolver,
+			logger,
 		},
 	);
 
