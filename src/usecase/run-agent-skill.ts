@@ -1,6 +1,7 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { DEFAULT_MAX_AGENT_STEPS } from "../core/constants";
-import { buildTaskpRunDescription } from "../core/execution/agent-tools";
+import type { TaskpRunDeps } from "../core/execution/agent-tools";
+import { buildTaskpRunDescription, buildTools } from "../core/execution/agent-tools";
 import type { ContentPart } from "../core/execution/content-part";
 import { resolveAgentExecution } from "../core/skill/skill-execution-resolver";
 import { type DomainError, domainErrorMessage } from "../core/types/errors";
@@ -10,6 +11,7 @@ import { buildReservedVars, renderTemplate } from "../core/variable/template-ren
 import { collectSkillContext } from "./collect-skill-context";
 import { type HooksConfig, runHooks } from "./hook-runner";
 import type { AgentExecutorPort, AgentExecutorResult } from "./port/agent-executor";
+import type { CommandExecutor } from "./port/command-executor";
 import type { CollectedContext, ContextCollectorPort } from "./port/context-collector";
 import type { HookExecutorPort } from "./port/hook-executor";
 import { createNoopProgressWriter, type ProgressWriter } from "./port/progress-writer";
@@ -37,6 +39,7 @@ export type RunAgentSkillDeps = {
 	readonly contextCollector: ContextCollectorPort;
 	readonly agentExecutor: AgentExecutorPort;
 	readonly systemPromptResolver: SystemPromptResolver;
+	readonly commandExecutor: CommandExecutor;
 	readonly progressWriter?: ProgressWriter;
 	readonly hookExecutor?: HookExecutorPort;
 	readonly hooksConfig?: HooksConfig;
@@ -116,13 +119,24 @@ export async function runAgentSkill(
 		skill.metadata.name,
 	);
 
+	const taskpRunDeps: TaskpRunDeps = {
+		skillRepository: deps.skillRepository,
+		commandExecutor: deps.commandExecutor,
+		promptCollector: deps.promptCollector,
+		callerSkillName: skill.metadata.name,
+		hookExecutor: deps.hookExecutor,
+		hooksConfig: deps.hooksConfig,
+	};
+
+	const toolsResult = buildTools(toolNames, taskpRunDeps, toolDescriptions);
+	if (!toolsResult.ok) return toolsResult;
+
 	const executeResult = await deps.agentExecutor.execute({
 		model: input.model,
 		systemPrompt,
 		contentParts,
-		toolNames,
+		tools: toolsResult.value,
 		maxSteps: input.maxAgentSteps ?? DEFAULT_MAX_AGENT_STEPS,
-		toolDescriptions,
 	});
 
 	const durationMs = Date.now() - startTime;
