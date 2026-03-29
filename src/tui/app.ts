@@ -2,7 +2,7 @@ import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { createCliRenderer } from "@opentui/core";
 import { createLanguageModel, type ModelSpec, resolveModelSpec } from "../adapter/ai-provider";
 import { createCommandRunner } from "../adapter/command-runner";
-import { createDefaultConfigLoader } from "../adapter/config-loader";
+import { createDefaultConfigLoader, type McpServerConfig } from "../adapter/config-loader";
 import { createConsoleLogger } from "../adapter/console-logger";
 import { createHookExecutor } from "../adapter/hook-executor";
 import { createDefaultSkillLoader } from "../adapter/skill-loader";
@@ -48,7 +48,7 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 			return;
 		}
 
-		const { model, modelSpec, hooksConfig, commandTimeoutMs, maxAgentSteps } =
+		const { model, modelSpec, hooksConfig, commandTimeoutMs, maxAgentSteps, mcpServerConfigs } =
 			await resolveModelAndConfig(options);
 
 		const commandExecutor = createCommandRunner({ defaultTimeoutMs: commandTimeoutMs });
@@ -62,6 +62,7 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 			promptCollectorFactory: createPresetPromptCollector,
 			systemPromptResolver: createSystemPromptResolver(process.cwd()),
 			maxAgentSteps,
+			mcpServerConfigs,
 		};
 
 		while (true) {
@@ -92,6 +93,7 @@ type ModelAndConfig = {
 	readonly hooksConfig: HooksConfig | undefined;
 	readonly commandTimeoutMs: number | undefined;
 	readonly maxAgentSteps: number | undefined;
+	readonly mcpServerConfigs: Readonly<Record<string, McpServerConfig>> | undefined;
 };
 
 // config.toml からデフォルトの LLM モデルとフック設定を解決する。
@@ -106,11 +108,13 @@ async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConf
 			hooksConfig: undefined,
 			commandTimeoutMs: undefined,
 			maxAgentSteps: undefined,
+			mcpServerConfigs: undefined,
 		};
 
 	const hooksConfig = configResult.value.hooks;
 	const commandTimeoutMs = configResult.value.cli?.command_timeout_ms;
 	const maxAgentSteps = configResult.value.cli?.max_agent_steps;
+	const mcpServerConfigs = configResult.value.mcp?.servers;
 
 	const aiConfig = configResult.value.ai ?? {};
 	const specResult = resolveModelSpec({
@@ -118,11 +122,25 @@ async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConf
 		config: aiConfig,
 	});
 	if (!specResult.ok)
-		return { model: null, modelSpec: null, hooksConfig, commandTimeoutMs, maxAgentSteps };
+		return {
+			model: null,
+			modelSpec: null,
+			hooksConfig,
+			commandTimeoutMs,
+			maxAgentSteps,
+			mcpServerConfigs,
+		};
 
 	const modelResult = createLanguageModel(specResult.value, aiConfig);
 	if (!modelResult.ok)
-		return { model: null, modelSpec: null, hooksConfig, commandTimeoutMs, maxAgentSteps };
+		return {
+			model: null,
+			modelSpec: null,
+			hooksConfig,
+			commandTimeoutMs,
+			maxAgentSteps,
+			mcpServerConfigs,
+		};
 
 	return {
 		model: modelResult.value,
@@ -130,6 +148,7 @@ async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConf
 		hooksConfig,
 		commandTimeoutMs,
 		maxAgentSteps,
+		mcpServerConfigs,
 	};
 }
 

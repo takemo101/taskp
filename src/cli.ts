@@ -380,6 +380,13 @@ async function runAgentMode(
 	const hookExecutor = createHookExecutor(commandExecutor, logger);
 	const hooksConfig = config.hooks;
 
+	const mcpToolResolver = config.mcp?.servers
+		? (await import("./adapter/mcp-tool-resolver")).createMcpToolResolver(
+				config.mcp.servers,
+				logger,
+			)
+		: undefined;
+
 	const result = await runAgentSkill(
 		{
 			name: c.args.skill,
@@ -399,6 +406,8 @@ async function runAgentMode(
 			progressWriter: createCliProgressWriter(process.stdout),
 			hookExecutor,
 			hooksConfig,
+			mcpToolResolver,
+			logger,
 		},
 	);
 	exitOnError(result);
