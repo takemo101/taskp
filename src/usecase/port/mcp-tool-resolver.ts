@@ -12,5 +12,6 @@ export type McpToolResolverPort = {
 	readonly resolveTools: (
 		refs: readonly McpToolRef[],
 	) => Promise<Result<readonly ResolvedMcpToolSet[], DomainError>>;
+
 	readonly closeAll: () => Promise<void>;
 };

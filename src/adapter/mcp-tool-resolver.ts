@@ -41,10 +41,9 @@ export function createMcpToolResolver(
 
 			const toolSets = await Promise.all(
 				serverNames.map(async (name) => {
-					const client = clients.get(name);
-					if (!client) {
-						throw new Error(`MCP client not found for server "${name}"`);
-					}
+					const client = clients.get(name) as MCPClient;
+					// McpToolSet<'automatic'> → ToolSet: MCP SDK のツールは AI SDK ToolSet と
+					// ランタイム互換だが、ジェネリクスの variance で型が合わない
 					const allTools = (await client.tools()) as ToolSet;
 					return { server: name, tools: filterTools(allTools, refs, name) };
 				}),
@@ -94,7 +93,8 @@ function connectByTransport(config: McpServerConfig, logger: Logger): Promise<MC
 function resolveEnvMap(
 	envMap: Record<string, string> | undefined,
 ): Record<string, string> | undefined {
-	if (!envMap) return undefined;
+	if (envMap === undefined) return undefined;
+
 	const resolved: Record<string, string> = {};
 	for (const [key, envVarName] of Object.entries(envMap)) {
 		const value = process.env[envVarName];
@@ -108,7 +108,8 @@ function resolveEnvMap(
 function resolveHeadersEnv(
 	headersEnv: Record<string, string> | undefined,
 ): Record<string, string> | undefined {
-	if (!headersEnv) return undefined;
+	if (headersEnv === undefined) return undefined;
+
 	const resolved: Record<string, string> = {};
 	for (const [header, envVarName] of Object.entries(headersEnv)) {
 		const value = process.env[envVarName];
@@ -120,15 +121,18 @@ function resolveHeadersEnv(
 }
 
 function filterTools(allTools: ToolSet, refs: readonly McpToolRef[], serverName: string): ToolSet {
-	const specificRefs = refs.filter(
-		(r): r is Extract<McpToolRef, { type: "specific" }> =>
-			r.type === "specific" && r.server === serverName,
+	const serverRefs = refs.filter((r) => r.server === serverName);
+	const hasAll = serverRefs.some((r) => r.type === "all");
+
+	if (hasAll) return allTools;
+
+	const specificNames = new Set(
+		serverRefs
+			.filter((r): r is Extract<McpToolRef, { type: "specific" }> => r.type === "specific")
+			.map((r) => r.tool),
 	);
 
-	if (specificRefs.length === 0) return allTools;
-
-	const allowed = new Set(specificRefs.map((r) => r.tool));
-	return Object.fromEntries(Object.entries(allTools).filter(([k]) => allowed.has(k)));
+	return Object.fromEntries(Object.entries(allTools).filter(([name]) => specificNames.has(name)));
 }
 
 async function closeAllClients(clients: Map<string, MCPClient>): Promise<void> {
