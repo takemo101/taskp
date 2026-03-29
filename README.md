@@ -11,6 +11,7 @@ A CLI tool that runs skills (task procedures) defined in Markdown — collecting
 - **Multi-action skills** — Group related operations (add/delete/list) into a single skill
 - **Multi-provider support** — Anthropic / OpenAI / Google / Ollama
 - **MCP server** — Usable from AI tools like Claude Code and pi
+- **MCP client** — Use external MCP server tools (GitHub, Slack, etc.) in agent mode
 
 ## Installation
 
@@ -400,6 +401,8 @@ In agent mode, the following built-in tools are available:
 | `glob` | Find files by glob pattern |
 | `ask_user` | Prompt the user for input during execution |
 | `taskp_run` | Invoke another template-mode skill |
+| `mcp:<server>` | All tools from an MCP server |
+| `mcp:<server>/<tool>` | A specific tool from an MCP server |
 
 Specify the tools you need in the `tools` field:
 
@@ -409,6 +412,27 @@ tools:
   - read
   - grep
   - fetch
+```
+
+#### MCP Tools
+
+In agent mode, you can also use tools provided by external MCP servers. Define MCP server connections in `config.toml`, then reference them with the `mcp:` prefix:
+
+```yaml
+tools:
+  - bash
+  - read
+  - mcp:github              # All tools from the "github" MCP server
+  - mcp:slack/post_message   # Only the "post_message" tool from "slack"
+```
+
+```toml
+# .taskp/config.toml
+[mcp.servers.github]
+transport = "stdio"
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+env = { GITHUB_TOKEN = "GITHUB_TOKEN" }
 ```
 
 #### `taskp_run`
@@ -490,6 +514,10 @@ default_provider = "ollama"
 default_model = "qwen2.5-coder:14b"
 ```
 
+## Using MCP Tools (Client)
+
+taskp can connect to external MCP servers as a client, allowing LLMs to use tools like GitHub, Slack, and other APIs during agent execution. See [MCP Client Spec](docs/MCP-SPEC.md) for details.
+
 ## Using as an MCP Server
 
 taskp can run as an MCP (Model Context Protocol) server, making it accessible from AI tools like Claude Code and pi.
@@ -514,6 +542,8 @@ See the `docs/` directory for detailed specifications.
 - [Skill Spec](docs/SKILL-SPEC.md)
 - [CLI Spec](docs/CLI-SPEC.md)
 - [AI Integration Spec](docs/AI-SPEC.md)
+- [Config Spec](docs/CONFIG-SPEC.md)
+- [MCP Client Spec](docs/MCP-SPEC.md)
 
 ## License
 

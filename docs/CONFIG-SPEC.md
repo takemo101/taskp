@@ -176,6 +176,67 @@ max_agent_steps = 100
 - `command_timeout_ms`: 長時間実行するコマンド（大規模データ処理など）がタイムアウトする場合に増やす。
 - `max_agent_steps`: 複雑なタスクでエージェントのステップ数が不足する場合に増やす。上限は 200。
 
+## `[mcp]` — MCP サーバー設定
+
+外部 MCP サーバーの接続情報を定義する。agent モードで `mcp:` プレフィックス付きのツールを使用する際に必要。
+
+### `[mcp.servers.<name>]` — サーバー定義
+
+transport の値によって必要なフィールドが異なる（discriminated union）。
+
+#### stdio トランスポート
+
+| フィールド | 型 | 必須 | 説明 |
+|-----------|-----|:---:|------|
+| `transport` | `"stdio"` | ✅ | トランスポート種別 |
+| `command` | `string` | ✅ | 実行コマンド |
+| `args` | `string[]` | - | コマンド引数 |
+| `env` | `Record<string, string>` | - | 環境変数名のマップ（値は環境変数名、実行時に `process.env[値]` で解決） |
+
+#### http トランスポート
+
+| フィールド | 型 | 必須 | 説明 |
+|-----------|-----|:---:|------|
+| `transport` | `"http"` | ✅ | トランスポート種別 |
+| `url` | `string` (URL) | ✅ | HTTP エンドポイント URL |
+| `headers_env` | `Record<string, string>` | - | HTTP ヘッダーの環境変数名マップ（値は環境変数名、実行時に解決） |
+
+#### sse トランスポート
+
+| フィールド | 型 | 必須 | 説明 |
+|-----------|-----|:---:|------|
+| `transport` | `"sse"` | ✅ | トランスポート種別 |
+| `url` | `string` (URL) | ✅ | SSE エンドポイント URL |
+| `headers_env` | `Record<string, string>` | - | HTTP ヘッダーの環境変数名マップ |
+
+### マージ戦略
+
+同名サーバーはプロジェクト側が**丸ごと上書き**する（フィールド単位マージなし）。transport 自体が変わりうるため。
+
+### 設定例
+
+```toml
+# stdio: ローカルコマンドで MCP サーバーを起動
+[mcp.servers.github]
+transport = "stdio"
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+env = { GITHUB_TOKEN = "GITHUB_TOKEN" }
+
+# http: リモート MCP サーバーに接続
+[mcp.servers.remote-api]
+transport = "http"
+url = "https://mcp.example.com/mcp"
+headers_env = { Authorization = "MCP_API_TOKEN" }
+
+# sse: SSE エンドポイントに接続
+[mcp.servers.local-db]
+transport = "sse"
+url = "http://localhost:3001/sse"
+```
+
+詳細は [MCP クライアント仕様](MCP-SPEC.md) を参照。
+
 ## `[hooks]` — ライフサイクルフック設定
 
 | フィールド | 型 | 必須 | デフォルト | 説明 |

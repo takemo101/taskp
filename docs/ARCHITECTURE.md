@@ -10,6 +10,7 @@
 | バリデーション | Zod (incur 内蔵) | 入力スキーマ定義 |
 | Markdown パース | gray-matter + unified/remark | フロントマター抽出 + AST 解析 |
 | LLM 連携 | Vercel AI SDK | マルチプロバイダ対応 |
+| MCP クライアント | @ai-sdk/mcp, @modelcontextprotocol/sdk | 外部 MCP サーバーのツール統合 |
 | コマンド実行 | execa | シェルコマンド実行 |
 | リンター/フォーマッター | Biome | Lint + Format |
 | テスト | Vitest | ユニット・ユースケーステスト |
@@ -37,14 +38,16 @@ taskp/
 │       │   │   ├── execution/      ← 実行関連
 │       │   │   │   ├── execution-mode.ts     ← template | agent
 │       │   │   │   ├── template-executor.ts  ← テンプレート実行
-│       │   │   │   └── agent-executor.ts     ← LLM エージェント実行
+│       │   │   │   ├── agent-executor.ts     ← LLM エージェント実行
+│       │   │   │   └── mcp-tool-ref.ts       ← MCP ツール参照の型・パーサー
 │       │   │   └── variable/       ← 変数展開
 │       │   │       └── template-renderer.ts  ← {{var}} 展開
 │       │   ├── adapter/            ← インターフェースアダプタ
 │       │   │   ├── skill-loader.ts           ← ファイルシステムからスキル読み込み
 │       │   │   ├── prompt-runner.ts          ← インタラクティブ質問の実行
 │       │   │   ├── command-runner.ts         ← シェルコマンド実行
-│       │   │   └── ai-provider.ts            ← LLM プロバイダ管理
+│       │   │   ├── ai-provider.ts            ← LLM プロバイダ管理
+│       │   │   └── mcp-tool-resolver.ts     ← MCP サーバー接続・ツール解決
 │       │   ├── usecase/            ← ユースケース
 │       │   │   ├── run-skill.ts              ← スキル実行
 │       │   │   ├── list-skills.ts            ← スキル一覧
@@ -87,16 +90,17 @@ taskp/
 │  incur コマンド定義 → MCP サーバー兼用      │
 ├────────────────────────────────────────────┤
 │  Use Cases (usecase/)                      │
-│  RunSkill, ListSkills, InitSkill           │
+│  RunSkill, RunAgentSkill, ListSkills       │
+│  Port: McpToolResolverPort                 │
 │  ※ Repository Interface もここに配置       │
 ├────────────────────────────────────────────┤
 │  Domain (core/)                            │
 │  Skill, SkillInput, ExecutionMode          │
-│  TemplateRenderer, TemplateExecutor        │
+│  TemplateRenderer, McpToolRef              │
 ├────────────────────────────────────────────┤
 │  Adapters (adapter/)                       │
 │  SkillLoader, PromptRunner, CommandRunner  │
-│  AiProvider                                │
+│  AiProvider, McpToolResolver               │
 └────────────────────────────────────────────┘
 ```
 
