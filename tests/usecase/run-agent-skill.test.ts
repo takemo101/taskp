@@ -1,11 +1,14 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { ToolSet } from "ai";
 import { describe, expect, it, vi } from "vitest";
 import type { Skill } from "../../src/core/skill/skill";
-import { ok } from "../../src/core/types/result";
+import { err, ok } from "../../src/core/types/result";
 import type { AgentExecutorPort } from "../../src/usecase/port/agent-executor";
 import type { CommandExecutor } from "../../src/usecase/port/command-executor";
 import type { ContextCollectorPort } from "../../src/usecase/port/context-collector";
 import type { HookContext, HookExecutorPort } from "../../src/usecase/port/hook-executor";
+import type { Logger } from "../../src/usecase/port/logger";
+import type { McpToolResolverPort } from "../../src/usecase/port/mcp-tool-resolver";
 import type { PromptCollector } from "../../src/usecase/port/prompt-collector";
 import type { SkillRepository } from "../../src/usecase/port/skill-repository";
 import type { SystemPromptResolver } from "../../src/usecase/port/system-prompt-resolver";
@@ -800,5 +803,189 @@ describe("runAgentSkill", () => {
 			expect.anything(),
 			{ noInput: true },
 		);
+	});
+
+	describe("MCP tool integration", () => {
+		function createMcpSkill(tools: string[]): Skill {
+			return createAgentSkill({ tools });
+		}
+
+		function createMockMcpResolver(
+			toolSets: { server: string; tools: ToolSet }[] = [],
+		): McpToolResolverPort {
+			return {
+				resolveTools: vi.fn().mockResolvedValue(ok(toolSets)),
+				closeAll: vi.fn().mockResolvedValue(undefined),
+			};
+		}
+
+		function createMockLogger(): Logger {
+			return {
+				debug: vi.fn(),
+				warn: vi.fn(),
+				error: vi.fn(),
+			};
+		}
+
+		it("does not use mcpToolResolver when no MCP references exist", async () => {
+			const skill = createMcpSkill(["bash", "read"]);
+			const mcpToolResolver = createMockMcpResolver();
+			const deps = {
+				...createMockDeps(skill),
+				mcpToolResolver,
+			};
+
+			const result = await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel },
+				deps,
+			);
+
+			expect(result.ok).toBe(true);
+			expect(mcpToolResolver.resolveTools).not.toHaveBeenCalled();
+			expect(mcpToolResolver.closeAll).toHaveBeenCalledOnce();
+		});
+
+		it("resolves MCP tools and integrates them with builtin tools", async () => {
+			const skill = createMcpSkill(["bash", "mcp:my-server"]);
+			const mcpTool = { description: "MCP tool", execute: vi.fn() } as unknown as ToolSet[string];
+			const mcpToolResolver = createMockMcpResolver([
+				{ server: "my-server", tools: { remote_tool: mcpTool } },
+			]);
+			const deps = {
+				...createMockDeps(skill),
+				mcpToolResolver,
+			};
+
+			const result = await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel },
+				deps,
+			);
+
+			expect(result.ok).toBe(true);
+			expect(mcpToolResolver.resolveTools).toHaveBeenCalledWith([
+				{ type: "all", server: "my-server" },
+			]);
+
+			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
+				.calls[0][0];
+			expect(executorCall.tools).toBeDefined();
+			expect(executorCall.tools.remote_tool).toBe(mcpTool);
+			expect(executorCall.tools.bash).toBeDefined();
+		});
+
+		it("skips conflicting MCP tool names and logs a warning", async () => {
+			const skill = createMcpSkill(["bash", "mcp:my-server"]);
+			const conflictingTool = {
+				description: "conflicting",
+				execute: vi.fn(),
+			} as unknown as ToolSet[string];
+			const mcpToolResolver = createMockMcpResolver([
+				{ server: "my-server", tools: { bash: conflictingTool } },
+			]);
+			const logger = createMockLogger();
+			const deps = {
+				...createMockDeps(skill),
+				mcpToolResolver,
+				logger,
+			};
+
+			const result = await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel },
+				deps,
+			);
+
+			expect(result.ok).toBe(true);
+			expect(logger.warn).toHaveBeenCalledWith(
+				expect.stringContaining("conflicts with existing tool"),
+			);
+
+			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
+				.calls[0][0];
+			expect(executorCall.tools.bash).not.toBe(conflictingTool);
+		});
+
+		it("returns ConfigError when MCP references exist but mcpToolResolver is not set", async () => {
+			const skill = createMcpSkill(["bash", "mcp:my-server"]);
+			const deps = createMockDeps(skill);
+
+			const result = await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel },
+				deps,
+			);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("CONFIG_ERROR");
+		});
+
+		it("propagates resolveTools error", async () => {
+			const skill = createMcpSkill(["bash", "mcp:my-server"]);
+			const mcpToolResolver: McpToolResolverPort = {
+				resolveTools: vi
+					.fn()
+					.mockResolvedValue(
+						err({ type: "EXECUTION_ERROR" as const, message: "MCP connection failed" }),
+					),
+				closeAll: vi.fn().mockResolvedValue(undefined),
+			};
+			const deps = {
+				...createMockDeps(skill),
+				mcpToolResolver,
+			};
+
+			const result = await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel },
+				deps,
+			);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			expect(result.error.type).toBe("EXECUTION_ERROR");
+		});
+
+		it("calls closeAll on success", async () => {
+			const skill = createMcpSkill(["bash", "mcp:my-server"]);
+			const mcpToolResolver = createMockMcpResolver([
+				{
+					server: "my-server",
+					tools: { remote: { description: "r", execute: vi.fn() } as unknown as ToolSet[string] },
+				},
+			]);
+			const deps = {
+				...createMockDeps(skill),
+				mcpToolResolver,
+			};
+
+			await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+
+			expect(mcpToolResolver.closeAll).toHaveBeenCalledOnce();
+		});
+
+		it("calls closeAll even when agent execution fails", async () => {
+			const skill = createMcpSkill(["bash", "mcp:my-server"]);
+			const mcpToolResolver = createMockMcpResolver([
+				{
+					server: "my-server",
+					tools: { remote: { description: "r", execute: vi.fn() } as unknown as ToolSet[string] },
+				},
+			]);
+			const deps = {
+				...createMockDeps(skill),
+				mcpToolResolver,
+				agentExecutor: {
+					execute: vi
+						.fn()
+						.mockResolvedValue(err({ type: "EXECUTION_ERROR" as const, message: "Agent crashed" })),
+				} as unknown as AgentExecutorPort,
+			};
+
+			const result = await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel },
+				deps,
+			);
+
+			expect(result.ok).toBe(false);
+			expect(mcpToolResolver.closeAll).toHaveBeenCalledOnce();
+		});
 	});
 });

@@ -1,12 +1,14 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { ToolSet } from "ai";
 import { DEFAULT_MAX_AGENT_STEPS } from "../core/constants";
 import type { TaskpRunDeps } from "../core/execution/agent-tools";
 import { buildTaskpRunDescription, buildTools } from "../core/execution/agent-tools";
 import type { ContentPart } from "../core/execution/content-part";
+import { partitionToolRefs } from "../core/execution/mcp-tool-ref";
 import { resolveAgentExecution } from "../core/skill/skill-execution-resolver";
-import { type DomainError, domainErrorMessage } from "../core/types/errors";
+import { configError, type DomainError, domainErrorMessage } from "../core/types/errors";
 import type { Result } from "../core/types/result";
-import { ok } from "../core/types/result";
+import { err, ok } from "../core/types/result";
 import { buildReservedVars, renderTemplate } from "../core/variable/template-renderer";
 import { collectSkillContext } from "./collect-skill-context";
 import { type HooksConfig, runHooks } from "./hook-runner";
@@ -14,6 +16,8 @@ import type { AgentExecutorPort, AgentExecutorResult } from "./port/agent-execut
 import type { CommandExecutor } from "./port/command-executor";
 import type { CollectedContext, ContextCollectorPort } from "./port/context-collector";
 import type { HookExecutorPort } from "./port/hook-executor";
+import type { Logger } from "./port/logger";
+import type { McpToolResolverPort, ResolvedMcpToolSet } from "./port/mcp-tool-resolver";
 import { createNoopProgressWriter, type ProgressWriter } from "./port/progress-writer";
 import type { PromptCollector } from "./port/prompt-collector";
 import type { SkillRepository } from "./port/skill-repository";
@@ -43,6 +47,8 @@ export type RunAgentSkillDeps = {
 	readonly progressWriter?: ProgressWriter;
 	readonly hookExecutor?: HookExecutorPort;
 	readonly hooksConfig?: HooksConfig;
+	readonly mcpToolResolver?: McpToolResolverPort;
+	readonly logger?: Logger;
 };
 
 export async function runAgentSkill(
@@ -109,12 +115,14 @@ export async function runAgentSkill(
 		contentParts.push(...toContentParts(contextResult.value));
 	}
 
-	// durationMs は LLM エージェントの実行時間のみを測定する
-	// （コンテキスト収集時間は含めない — hooks に渡す情報として実行コストを正確に反映するため）
-	const startTime = Date.now();
+	const partitionResult = partitionToolRefs(toolNames);
+	if (!partitionResult.ok) {
+		return partitionResult;
+	}
+	const { builtins, mcpRefs } = partitionResult.value;
 
 	const toolDescriptions = await buildToolDescriptions(
-		toolNames,
+		builtins,
 		deps.skillRepository,
 		skill.metadata.name,
 	);
@@ -128,20 +136,59 @@ export async function runAgentSkill(
 		hooksConfig: deps.hooksConfig,
 	};
 
-	const toolsResult = buildTools(toolNames, taskpRunDeps, toolDescriptions);
-	if (!toolsResult.ok) return toolsResult;
+	const builtinToolsResult = buildTools(builtins, taskpRunDeps, toolDescriptions);
+	if (!builtinToolsResult.ok) {
+		return builtinToolsResult;
+	}
 
-	const executeResult = await deps.agentExecutor.execute({
-		model: input.model,
-		systemPrompt,
-		contentParts,
-		tools: toolsResult.value,
-		maxSteps: input.maxAgentSteps ?? DEFAULT_MAX_AGENT_STEPS,
-	});
+	if (mcpRefs.length > 0 && !deps.mcpToolResolver) {
+		return err(configError("MCP tool references found but mcpToolResolver is not configured"));
+	}
 
-	const durationMs = Date.now() - startTime;
+	try {
+		let toolSet: ToolSet;
 
-	if (!executeResult.ok) {
+		if (mcpRefs.length > 0 && deps.mcpToolResolver) {
+			const resolveResult = await deps.mcpToolResolver.resolveTools(mcpRefs);
+			if (!resolveResult.ok) {
+				return resolveResult;
+			}
+
+			toolSet = mergeToolSets(builtinToolsResult.value, resolveResult.value, deps.logger);
+		} else {
+			toolSet = builtinToolsResult.value;
+		}
+
+		// durationMs は LLM エージェントの実行時間のみを測定する
+		// （コンテキスト収集時間は含めない — hooks に渡す情報として実行コストを正確に反映するため）
+		const startTime = Date.now();
+
+		const executeResult = await deps.agentExecutor.execute({
+			model: input.model,
+			systemPrompt,
+			contentParts,
+			tools: toolSet,
+			maxSteps: input.maxAgentSteps ?? DEFAULT_MAX_AGENT_STEPS,
+		});
+
+		const durationMs = Date.now() - startTime;
+
+		if (!executeResult.ok) {
+			await runHooks({
+				hookExecutor: deps.hookExecutor,
+				hooksConfig: deps.hooksConfig,
+				context: {
+					skillName: skill.metadata.name,
+					actionName: input.action,
+					mode: "agent",
+					status: "failed",
+					durationMs,
+					error: domainErrorMessage(executeResult.error),
+				},
+			});
+			return executeResult;
+		}
+
 		await runHooks({
 			hookExecutor: deps.hookExecutor,
 			hooksConfig: deps.hooksConfig,
@@ -149,30 +196,38 @@ export async function runAgentSkill(
 				skillName: skill.metadata.name,
 				actionName: input.action,
 				mode: "agent",
-				status: "failed",
+				status: "success",
 				durationMs,
-				error: domainErrorMessage(executeResult.error),
 			},
 		});
-		return executeResult;
-	}
 
-	await runHooks({
-		hookExecutor: deps.hookExecutor,
-		hooksConfig: deps.hooksConfig,
-		context: {
+		return ok({
 			skillName: skill.metadata.name,
-			actionName: input.action,
-			mode: "agent",
-			status: "success",
-			durationMs,
-		},
-	});
+			result: executeResult.value,
+		});
+	} finally {
+		await deps.mcpToolResolver?.closeAll();
+	}
+}
 
-	return ok({
-		skillName: skill.metadata.name,
-		result: executeResult.value,
-	});
+function mergeToolSets(
+	builtinTools: ToolSet,
+	mcpToolSets: readonly ResolvedMcpToolSet[],
+	logger: Logger | undefined,
+): ToolSet {
+	const merged: ToolSet = { ...builtinTools };
+	for (const { server, tools } of mcpToolSets) {
+		for (const [name, tool] of Object.entries(tools)) {
+			if (name in merged) {
+				logger?.warn(
+					`MCP tool "${name}" from server "${server}" conflicts with existing tool, skipped`,
+				);
+				continue;
+			}
+			merged[name] = tool;
+		}
+	}
+	return merged;
 }
 
 function toContentPart(ctx: CollectedContext): ContentPart {
