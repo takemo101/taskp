@@ -134,6 +134,45 @@ agent モードで LLM に提供するツール。
 | `ask_user` | ユーザーに質問する | ❌ |
 | `taskp_run` | 別の taskp スキルを実行する（template モードのみ） | ❌ |
 
+### MCP ツール
+
+組み込みツールに加えて、外部 MCP サーバーが提供するツールも LLM に渡すことができる。`tools` フィールドで `mcp:` プレフィックスを使用する。
+
+```yaml
+tools:
+  - bash
+  - read
+  - mcp:github              # github サーバーの全ツールを有効化
+  - mcp:slack/post_message   # slack サーバーの特定ツールのみ有効化
+```
+
+MCP サーバーの接続情報は `config.toml` の `[mcp.servers]` セクションで定義する。詳細は [MCP クライアント仕様](MCP-SPEC.md) および [設定ファイル仕様](CONFIG-SPEC.md) を参照。
+
+#### ツール統合フロー
+
+```
+SKILL.md の tools フィールド
+  ↓
+partitionToolRefs() — 組み込み名と MCP 参照に分離
+  ↓
+┌─────────────────┐  ┌──────────────────────┐
+│ buildTools()    │  │ mcpToolResolver      │
+│ 組み込みツール構築│  │ .resolveTools(refs)  │
+└────────┬────────┘  └──────────┬───────────┘
+         │                      │
+         └──────────┬───────────┘
+                    ↓
+          mergeToolSets() — 組み込み優先でマージ
+                    ↓
+          AgentExecutorInput.tools: ToolSet
+```
+
+#### ツール名衝突の解決
+
+- 組み込みツール名が常に優先される
+- MCP ツールが組み込みと同名の場合: 警告ログを出力し、MCP 側をスキップ
+- 複数 MCP サーバー間で同名の場合: `tools` フィールドの記述順で先に登場した方が優先
+
 ### taskp_run ツール
 
 agent モードの LLM が別のスキル（またはアクション）を呼び出せる組み込みツール。
