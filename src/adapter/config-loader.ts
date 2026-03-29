@@ -39,6 +39,44 @@ export const hooksConfigSchema = z.object({
 	on_failure: z.array(z.string().min(1)).optional().describe("Commands to run on skill failure"),
 });
 
+const stdioServerSchema = z.object({
+	transport: z.literal("stdio"),
+	command: z.string().min(1).describe("Command to execute"),
+	args: z.array(z.string()).optional().describe("Command arguments"),
+	env: z.record(z.string(), z.string()).optional().describe("Environment variable names to pass"),
+});
+
+const httpServerSchema = z.object({
+	transport: z.literal("http"),
+	url: z.string().url().describe("HTTP endpoint URL"),
+	headers_env: z
+		.record(z.string(), z.string())
+		.optional()
+		.describe("Environment variable names for HTTP headers"),
+});
+
+const sseServerSchema = z.object({
+	transport: z.literal("sse"),
+	url: z.string().url().describe("SSE endpoint URL"),
+	headers_env: z
+		.record(z.string(), z.string())
+		.optional()
+		.describe("Environment variable names for HTTP headers"),
+});
+
+export const mcpServerConfigSchema = z.discriminatedUnion("transport", [
+	stdioServerSchema,
+	httpServerSchema,
+	sseServerSchema,
+]);
+
+export const mcpConfigSchema = z.object({
+	servers: z
+		.record(z.string(), mcpServerConfigSchema)
+		.optional()
+		.describe("MCP server definitions keyed by server name"),
+});
+
 export const cliConfigSchema = z.object({
 	command_timeout_ms: z
 		.number()
@@ -59,12 +97,15 @@ export const configSchema = z.object({
 	ai: aiConfigSchema.optional().describe("AI/LLM settings"),
 	hooks: hooksConfigSchema.optional().describe("Lifecycle hooks"),
 	cli: cliConfigSchema.optional().describe("CLI behavior settings"),
+	mcp: mcpConfigSchema.optional().describe("MCP server settings"),
 });
 
 export type ProviderConfig = z.infer<typeof providerConfigSchema>;
 export type AiConfig = z.infer<typeof aiConfigSchema>;
 export type HooksConfig = z.infer<typeof hooksConfigSchema>;
 export type CliConfig = z.infer<typeof cliConfigSchema>;
+export type McpServerConfig = z.infer<typeof mcpServerConfigSchema>;
+export type McpConfig = z.infer<typeof mcpConfigSchema>;
 export type Config = z.infer<typeof configSchema>;
 
 type ConfigLoaderDeps = {
@@ -180,10 +221,18 @@ export function mergeCliConfig(global: CliConfig, project: CliConfig): CliConfig
 	return mergeByProjectPriority(global, project);
 }
 
+// 同名サーバーは project 側が丸ごと上書き（フィールド単位マージしない）
+export function mergeMcpConfig(global: McpConfig, project: McpConfig): McpConfig {
+	return {
+		servers: mergeOptional(global.servers, project.servers, (g, p) => ({ ...g, ...p })),
+	};
+}
+
 function mergeConfigs(global: Config, project: Config): Config {
 	return {
 		ai: mergeOptional(global.ai, project.ai, mergeAiConfig),
 		hooks: mergeOptional(global.hooks, project.hooks, mergeHooksConfig),
 		cli: mergeOptional(global.cli, project.cli, mergeCliConfig),
+		mcp: mergeOptional(global.mcp, project.mcp, mergeMcpConfig),
 	};
 }
