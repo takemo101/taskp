@@ -26,11 +26,17 @@ async function executeAgentLoop(
 	logger: Logger,
 ): ReturnType<AgentExecutorPort["execute"]> {
 	const startTime = Date.now();
-	const toolsResult = buildTools(input.toolNames, input.taskpRunDeps, input.toolDescriptions);
-	if (!toolsResult.ok) {
-		return toolsResult;
+
+	let tools: ToolSet;
+	if (input.toolSet) {
+		tools = input.toolSet;
+	} else {
+		const toolsResult = buildTools(input.toolNames, input.taskpRunDeps, input.toolDescriptions);
+		if (!toolsResult.ok) {
+			return toolsResult;
+		}
+		tools = toolsResult.value;
 	}
-	const tools = toolsResult.value;
 
 	try {
 		const result = streamText({

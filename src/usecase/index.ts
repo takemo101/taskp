@@ -16,7 +16,9 @@ export type {
 	ExecOptions,
 	ExecResult,
 	InitOptions,
+	McpToolResolverPort,
 	PromptCollector,
+	ResolvedMcpToolSet,
 	SkillInitializer,
 	SkillRepository,
 } from "./port";

@@ -13,6 +13,9 @@ export type {
 	SkillMode,
 } from "./core/skill/skill-metadata";
 export { parseSkillMetadata } from "./core/skill/skill-metadata";
+// MCP tool references
+export type { McpToolRef } from "./core/tool-ref";
+export { isMcpToolRef, parseMcpToolRef, partitionToolRefs } from "./core/tool-ref";
 // Error types
 export type {
 	ConfigError,
@@ -45,6 +48,10 @@ export type {
 } from "./usecase/port/agent-executor";
 export type { CommandExecutor, ExecOptions, ExecResult } from "./usecase/port/command-executor";
 export type { ContextCollectorPort } from "./usecase/port/context-collector";
+export type {
+	McpToolResolverPort,
+	ResolvedMcpToolSet,
+} from "./usecase/port/mcp-tool-resolver";
 export type { PromptCollector } from "./usecase/port/prompt-collector";
 export type { InitOptions, SkillInitializer } from "./usecase/port/skill-initializer";
 // Port interfaces

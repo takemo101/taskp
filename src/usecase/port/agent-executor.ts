@@ -1,4 +1,5 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { ToolSet } from "ai";
 import type { TaskpRunDeps, ToolDescriptions } from "../../core/execution/agent-tools";
 import type { ContentPart } from "../../core/execution/content-part";
 import type { ExecutionError } from "../../core/types/errors";
@@ -9,6 +10,7 @@ export type AgentExecutorInput = {
 	readonly systemPrompt: string;
 	readonly contentParts: readonly ContentPart[];
 	readonly toolNames: readonly string[];
+	readonly toolSet?: ToolSet;
 	readonly maxSteps: number;
 	readonly taskpRunDeps?: TaskpRunDeps;
 	readonly toolDescriptions?: ToolDescriptions;
