@@ -36,8 +36,10 @@
 	"dependencies": {
 		"@ai-sdk/anthropic": "^3.0.58",
 		"@ai-sdk/google": "^3.0.43",
+		"@ai-sdk/mcp": "^1.0.30",
 		"@ai-sdk/openai": "^3.0.41",
 		"@inquirer/prompts": "^8.3.2",
+		"@modelcontextprotocol/sdk": "^1.28.0",
 		"@opentui/core": "^0.1.88",
 		"ai": "^6.0.116",
 		"execa": "^9.6.1",
