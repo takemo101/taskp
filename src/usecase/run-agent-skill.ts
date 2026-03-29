@@ -1,10 +1,11 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import type { ToolSet } from "ai";
 import { DEFAULT_MAX_AGENT_STEPS } from "../core/constants";
+import type { TaskpRunDeps } from "../core/execution/agent-tools";
 import { buildTaskpRunDescription, buildTools } from "../core/execution/agent-tools";
 import type { ContentPart } from "../core/execution/content-part";
+import { partitionToolRefs } from "../core/execution/mcp-tool-ref";
 import { resolveAgentExecution } from "../core/skill/skill-execution-resolver";
-import { partitionToolRefs } from "../core/tool-ref";
 import { configError, type DomainError, domainErrorMessage } from "../core/types/errors";
 import type { Result } from "../core/types/result";
 import { err, ok } from "../core/types/result";
@@ -12,6 +13,7 @@ import { buildReservedVars, renderTemplate } from "../core/variable/template-ren
 import { collectSkillContext } from "./collect-skill-context";
 import { type HooksConfig, runHooks } from "./hook-runner";
 import type { AgentExecutorPort, AgentExecutorResult } from "./port/agent-executor";
+import type { CommandExecutor } from "./port/command-executor";
 import type { CollectedContext, ContextCollectorPort } from "./port/context-collector";
 import type { HookExecutorPort } from "./port/hook-executor";
 import type { Logger } from "./port/logger";
@@ -41,6 +43,7 @@ export type RunAgentSkillDeps = {
 	readonly contextCollector: ContextCollectorPort;
 	readonly agentExecutor: AgentExecutorPort;
 	readonly systemPromptResolver: SystemPromptResolver;
+	readonly commandExecutor: CommandExecutor;
 	readonly progressWriter?: ProgressWriter;
 	readonly hookExecutor?: HookExecutorPort;
 	readonly hooksConfig?: HooksConfig;
@@ -112,7 +115,11 @@ export async function runAgentSkill(
 		contentParts.push(...toContentParts(contextResult.value));
 	}
 
-	const { builtins, mcpRefs } = partitionToolRefs(toolNames);
+	const partitionResult = partitionToolRefs(toolNames);
+	if (!partitionResult.ok) {
+		return partitionResult;
+	}
+	const { builtins, mcpRefs } = partitionResult.value;
 
 	const toolDescriptions = await buildToolDescriptions(
 		builtins,
@@ -120,7 +127,16 @@ export async function runAgentSkill(
 		skill.metadata.name,
 	);
 
-	const builtinToolsResult = buildTools(builtins, undefined, toolDescriptions);
+	const taskpRunDeps: TaskpRunDeps = {
+		skillRepository: deps.skillRepository,
+		commandExecutor: deps.commandExecutor,
+		promptCollector: deps.promptCollector,
+		callerSkillName: skill.metadata.name,
+		hookExecutor: deps.hookExecutor,
+		hooksConfig: deps.hooksConfig,
+	};
+
+	const builtinToolsResult = buildTools(builtins, taskpRunDeps, toolDescriptions);
 	if (!builtinToolsResult.ok) {
 		return builtinToolsResult;
 	}
@@ -151,10 +167,8 @@ export async function runAgentSkill(
 			model: input.model,
 			systemPrompt,
 			contentParts,
-			toolNames: builtins,
-			toolSet,
+			tools: toolSet,
 			maxSteps: input.maxAgentSteps ?? DEFAULT_MAX_AGENT_STEPS,
-			toolDescriptions,
 		});
 
 		const durationMs = Date.now() - startTime;

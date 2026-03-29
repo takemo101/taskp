@@ -1,5 +1,8 @@
 // taskp public API
 
+// MCP tool references
+export type { McpToolRef } from "./core/execution/mcp-tool-ref";
+export { isMcpToolRef, parseMcpToolRef, partitionToolRefs } from "./core/execution/mcp-tool-ref";
 // Core domain types
 export type { Skill, SkillScope } from "./core/skill/skill";
 export { parseSkill } from "./core/skill/skill";
@@ -13,9 +16,6 @@ export type {
 	SkillMode,
 } from "./core/skill/skill-metadata";
 export { parseSkillMetadata } from "./core/skill/skill-metadata";
-// MCP tool references
-export type { McpToolRef } from "./core/tool-ref";
-export { isMcpToolRef, parseMcpToolRef, partitionToolRefs } from "./core/tool-ref";
 // Error types
 export type {
 	ConfigError,

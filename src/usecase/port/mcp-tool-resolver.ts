@@ -1,5 +1,5 @@
 import type { ToolSet } from "ai";
-import type { McpToolRef } from "../../core/tool-ref";
+import type { McpToolRef } from "../../core/execution/mcp-tool-ref";
 import type { DomainError } from "../../core/types/errors";
 import type { Result } from "../../core/types/result";
 

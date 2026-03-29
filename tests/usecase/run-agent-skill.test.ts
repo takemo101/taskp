@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Skill } from "../../src/core/skill/skill";
 import { err, ok } from "../../src/core/types/result";
 import type { AgentExecutorPort } from "../../src/usecase/port/agent-executor";
+import type { CommandExecutor } from "../../src/usecase/port/command-executor";
 import type { ContextCollectorPort } from "../../src/usecase/port/context-collector";
 import type { HookContext, HookExecutorPort } from "../../src/usecase/port/hook-executor";
 import type { Logger } from "../../src/usecase/port/logger";
@@ -73,12 +74,17 @@ function createMockDeps(skill: Skill) {
 		resolve: vi.fn().mockResolvedValue("You are a task execution agent for taskp."),
 	};
 
+	const commandExecutor: CommandExecutor = {
+		execute: vi.fn().mockResolvedValue(ok({ stdout: "", stderr: "", exitCode: 0 })),
+	};
+
 	return {
 		skillRepository,
 		promptCollector,
 		contextCollector,
 		agentExecutor,
 		systemPromptResolver,
+		commandExecutor,
 	};
 }
 
@@ -112,7 +118,7 @@ describe("runAgentSkill", () => {
 		expect(executorCall.contentParts).toEqual([
 			{ type: "text", text: expect.stringContaining("You are a helpful assistant.") },
 		]);
-		expect(executorCall.toolNames).toEqual(["bash", "read"]);
+		expect(Object.keys(executorCall.tools)).toEqual(["bash", "read"]);
 		expect(executorCall.maxSteps).toBe(50);
 	});
 
@@ -486,7 +492,7 @@ describe("runAgentSkill", () => {
 
 			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
 				.calls[0][0];
-			expect(executorCall.toolNames).toEqual(["bash", "read", "write"]);
+			expect(Object.keys(executorCall.tools)).toEqual(["bash", "read", "write"]);
 		});
 
 		it("uses action-specific inputs", async () => {
@@ -538,7 +544,7 @@ describe("runAgentSkill", () => {
 			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
 				.calls[0][0];
 			// analyze action has no tools override, falls back to skill-level
-			expect(executorCall.toolNames).toEqual(["bash", "read"]);
+			expect(Object.keys(executorCall.tools)).toEqual(["bash", "read"]);
 			// analyze action has no context override, falls back to skill-level
 			expect(deps.contextCollector.collect).toHaveBeenCalledWith(
 				[{ type: "file", path: "global.md" }],
@@ -856,13 +862,15 @@ describe("runAgentSkill", () => {
 			);
 
 			expect(result.ok).toBe(true);
-			expect(mcpToolResolver.resolveTools).toHaveBeenCalledWith([{ server: "my-server" }]);
+			expect(mcpToolResolver.resolveTools).toHaveBeenCalledWith([
+				{ type: "all", server: "my-server" },
+			]);
 
 			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
 				.calls[0][0];
-			expect(executorCall.toolSet).toBeDefined();
-			expect(executorCall.toolSet.remote_tool).toBe(mcpTool);
-			expect(executorCall.toolSet.bash).toBeDefined();
+			expect(executorCall.tools).toBeDefined();
+			expect(executorCall.tools.remote_tool).toBe(mcpTool);
+			expect(executorCall.tools.bash).toBeDefined();
 		});
 
 		it("skips conflicting MCP tool names and logs a warning", async () => {
@@ -893,7 +901,7 @@ describe("runAgentSkill", () => {
 
 			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
 				.calls[0][0];
-			expect(executorCall.toolSet.bash).not.toBe(conflictingTool);
+			expect(executorCall.tools.bash).not.toBe(conflictingTool);
 		});
 
 		it("returns ConfigError when MCP references exist but mcpToolResolver is not set", async () => {
