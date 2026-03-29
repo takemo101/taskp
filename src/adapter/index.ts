@@ -15,12 +15,13 @@ export {
 	resolveModelSpec,
 } from "./ai-provider";
 export { createCommandRunner } from "./command-runner";
-export type { AiConfig, CliConfig, Config, ProviderConfig } from "./config-loader";
+export type { AiConfig, CliConfig, Config, McpServerConfig, ProviderConfig } from "./config-loader";
 export { createConfigLoader, createDefaultConfigLoader } from "./config-loader";
 export { createConsoleLogger } from "./console-logger";
 export { createContextCollector } from "./context-collector";
 export type { FileSystemPort } from "./file-system-port";
 export { createNodeFileSystem } from "./file-system-port";
+export { createMcpToolResolver } from "./mcp-tool-resolver";
 export { createPromptRunner } from "./prompt-runner";
 export type { RetryConfig } from "./retry";
 export { calculateDelay, withRetry } from "./retry";
