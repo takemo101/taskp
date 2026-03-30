@@ -22,6 +22,7 @@ function buildSkillRef(skillName: string, actionName: string | undefined): strin
 function buildEnvVars(context: HookContext): Record<string, string> {
 	const errorValue = context.error ?? "";
 	return {
+		TASKP_SESSION_ID: context.sessionId,
 		TASKP_SKILL_NAME: context.skillName,
 		TASKP_ACTION_NAME: context.actionName ?? "",
 		TASKP_SKILL_REF: buildSkillRef(context.skillName, context.actionName),
@@ -30,7 +31,6 @@ function buildEnvVars(context: HookContext): Record<string, string> {
 		TASKP_DURATION_MS: String(context.durationMs),
 		TASKP_ERROR: errorValue.slice(0, MAX_ERROR_LENGTH),
 		TASKP_CALLER_SKILL: context.callerSkill ?? "",
-		TASKP_SESSION_ID: context.sessionId,
 	};
 }
 

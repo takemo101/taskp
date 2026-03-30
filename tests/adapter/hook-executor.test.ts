@@ -80,6 +80,7 @@ describe("HookExecutor", () => {
 
 		const env = executor.executedCommands[0].options?.env;
 		expect(env).toMatchObject({
+			TASKP_SESSION_ID: TEST_SESSION_ID,
 			TASKP_SKILL_NAME: "deploy",
 			TASKP_ACTION_NAME: "",
 			TASKP_SKILL_REF: "deploy",
@@ -89,6 +90,16 @@ describe("HookExecutor", () => {
 			TASKP_ERROR: "",
 			TASKP_CALLER_SKILL: "",
 		});
+	});
+
+	it("injects TASKP_SESSION_ID from context", async () => {
+		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
+
+		await hookExecutor.execute(["echo test"], successContext);
+
+		const env = executor.executedCommands[0].options?.env;
+		expect(env?.TASKP_SESSION_ID).toBe(TEST_SESSION_ID);
 	});
 
 	it("injects TASKP_ACTION_NAME when actionName is present", async () => {
