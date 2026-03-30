@@ -7,6 +7,7 @@ const RESERVED: ReservedVars = {
 	skillDir: "/home/user/.taskp/skills/deploy",
 	date: "2026-03-19",
 	timestamp: "2026-03-19T12:00:00.000Z",
+	sessionId: "tskp_test000001",
 };
 
 describe("renderTemplate", () => {
@@ -37,6 +38,11 @@ describe("renderTemplate", () => {
 			ok: true,
 			value: `cwd=${RESERVED.cwd} dir=${RESERVED.skillDir} date=${RESERVED.date} ts=${RESERVED.timestamp}`,
 		});
+	});
+
+	it("expands reserved variable {{__session_id__}}", () => {
+		const result = renderTemplate("session: {{__session_id__}}", {}, RESERVED);
+		expect(result).toEqual({ ok: true, value: "session: tskp_test000001" });
 	});
 
 	it("returns error for undefined variables", () => {

@@ -79,6 +79,7 @@ describe("Adapter Integration", () => {
 				skillDir: join(localRoot, ".taskp", "skills", "deploy"),
 				date: "2026-03-19",
 				timestamp: "1710000000",
+				sessionId: "",
 			};
 
 			const rendered = renderTemplate(
@@ -123,6 +124,7 @@ describe("Adapter Integration", () => {
 				skillDir,
 				date: "2026-03-19",
 				timestamp: "1710000000",
+				sessionId: "",
 			};
 
 			const rendered = renderTemplate(result.value.body.content, {}, reserved);
@@ -159,6 +161,7 @@ describe("Adapter Integration", () => {
 				skillDir: join(localRoot, ".taskp", "skills", "broken"),
 				date: "2026-03-19",
 				timestamp: "1710000000",
+				sessionId: "",
 			};
 
 			const rendered = renderTemplate(result.value.body.content, {}, reserved);

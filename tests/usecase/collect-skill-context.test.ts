@@ -18,6 +18,7 @@ const reserved: ReservedVars = {
 	skillDir: "/path/to/skill",
 	date: "2026-03-26",
 	timestamp: "2026-03-26T00:00:00.000Z",
+	sessionId: "",
 };
 
 describe("resolveContextSources", () => {

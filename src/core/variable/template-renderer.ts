@@ -1,4 +1,5 @@
 import { dirname } from "node:path";
+import type { SessionId } from "../execution/session";
 import { type RenderError, renderError } from "../types/errors";
 import { err, ok, type Result } from "../types/result";
 
@@ -7,14 +8,16 @@ export type ReservedVars = {
 	readonly skillDir: string;
 	readonly date: string;
 	readonly timestamp: string;
+	readonly sessionId: string;
 };
 
-export function buildReservedVars(skillLocation: string): ReservedVars {
+export function buildReservedVars(skillLocation: string, sessionId: SessionId): ReservedVars {
 	return {
 		cwd: process.cwd(),
 		skillDir: dirname(skillLocation),
 		date: new Date().toISOString().split("T")[0],
 		timestamp: new Date().toISOString(),
+		sessionId,
 	};
 }
 
@@ -57,6 +60,7 @@ const RESERVED_VAR_MAP: Record<string, keyof ReservedVars> = {
 	__skill_dir__: "skillDir",
 	__date__: "date",
 	__timestamp__: "timestamp",
+	__session_id__: "sessionId",
 };
 
 type VariableMap = (name: string) => string | undefined;

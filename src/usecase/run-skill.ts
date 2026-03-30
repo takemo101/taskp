@@ -1,3 +1,4 @@
+import type { SessionId } from "../core/execution/session";
 import type { Skill } from "../core/skill/skill";
 import type { CodeBlock } from "../core/skill/skill-body";
 import {
@@ -82,7 +83,7 @@ async function executeSkill(
 	const progress = deps.progressWriter ?? createNoopProgressWriter();
 	progress.writeInputs(config.inputs, variables);
 
-	const reserved = buildReservedVars(skill.location);
+	const reserved = buildReservedVars(skill.location, "" as SessionId);
 
 	const renderResult = renderTemplate(config.content, variables, reserved);
 	if (!renderResult.ok) {
