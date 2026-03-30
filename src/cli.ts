@@ -136,7 +136,7 @@ function exitOnError<T>(result: Result<T, DomainError>): T {
 }
 
 const cli = Cli.create("taskp", {
-	version: "0.1.12",
+	version: "0.1.13",
 	description:
 		"Markdown-defined skill runner with interactive argument collection and LLM execution",
 })
