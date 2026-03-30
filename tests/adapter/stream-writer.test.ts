@@ -1,6 +1,9 @@
 import { Writable } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { createStreamWriter } from "../../src/adapter/stream-writer";
+import type { SessionId } from "../../src/core/execution/session";
+
+const TEST_SESSION_ID = "tskp_abc123def456" as SessionId;
 
 function createTestOutput(): { output: Writable; getContent: () => string } {
 	const chunks: string[] = [];
@@ -14,10 +17,21 @@ function createTestOutput(): { output: Writable; getContent: () => string } {
 }
 
 describe("createStreamWriter", () => {
+	describe("writeHeader", () => {
+		it("outputs session ID header", () => {
+			const { output, getContent } = createTestOutput();
+			const writer = createStreamWriter({ verbose: false, output, sessionId: TEST_SESSION_ID });
+
+			writer.writeHeader();
+
+			expect(getContent()).toBe("[session: tskp_abc123def456]\n");
+		});
+	});
+
 	describe("writeText", () => {
 		it("writes text directly to output", () => {
 			const { output, getContent } = createTestOutput();
-			const writer = createStreamWriter({ verbose: false, output });
+			const writer = createStreamWriter({ verbose: false, output, sessionId: TEST_SESSION_ID });
 
 			writer.writeText("hello ");
 			writer.writeText("world");
@@ -29,7 +43,7 @@ describe("createStreamWriter", () => {
 	describe("writeToolCall", () => {
 		it("formats bash tool with command", () => {
 			const { output, getContent } = createTestOutput();
-			const writer = createStreamWriter({ verbose: false, output });
+			const writer = createStreamWriter({ verbose: false, output, sessionId: TEST_SESSION_ID });
 
 			writer.writeToolCall("bash", { command: "git diff --cached" });
 
@@ -38,7 +52,7 @@ describe("createStreamWriter", () => {
 
 		it("formats read tool with path", () => {
 			const { output, getContent } = createTestOutput();
-			const writer = createStreamWriter({ verbose: false, output });
+			const writer = createStreamWriter({ verbose: false, output, sessionId: TEST_SESSION_ID });
 
 			writer.writeToolCall("read", { path: "src/index.ts" });
 
@@ -47,7 +61,7 @@ describe("createStreamWriter", () => {
 
 		it("formats write tool with path", () => {
 			const { output, getContent } = createTestOutput();
-			const writer = createStreamWriter({ verbose: false, output });
+			const writer = createStreamWriter({ verbose: false, output, sessionId: TEST_SESSION_ID });
 
 			writer.writeToolCall("write", { path: "out.txt", content: "data" });
 
@@ -56,7 +70,7 @@ describe("createStreamWriter", () => {
 
 		it("formats glob tool with pattern", () => {
 			const { output, getContent } = createTestOutput();
-			const writer = createStreamWriter({ verbose: false, output });
+			const writer = createStreamWriter({ verbose: false, output, sessionId: TEST_SESSION_ID });
 
 			writer.writeToolCall("glob", { pattern: "src/**/*.ts" });
 
@@ -65,7 +79,7 @@ describe("createStreamWriter", () => {
 
 		it("formats ask_user tool with question", () => {
 			const { output, getContent } = createTestOutput();
-			const writer = createStreamWriter({ verbose: false, output });
+			const writer = createStreamWriter({ verbose: false, output, sessionId: TEST_SESSION_ID });
 
 			writer.writeToolCall("ask_user", { question: "Continue?" });
 
@@ -74,7 +88,7 @@ describe("createStreamWriter", () => {
 
 		it("formats unknown tool with JSON args", () => {
 			const { output, getContent } = createTestOutput();
-			const writer = createStreamWriter({ verbose: false, output });
+			const writer = createStreamWriter({ verbose: false, output, sessionId: TEST_SESSION_ID });
 
 			writer.writeToolCall("custom", { key: "value" });
 
@@ -85,7 +99,7 @@ describe("createStreamWriter", () => {
 	describe("writeToolResult", () => {
 		it("does not output in non-verbose mode", () => {
 			const { output, getContent } = createTestOutput();
-			const writer = createStreamWriter({ verbose: false, output });
+			const writer = createStreamWriter({ verbose: false, output, sessionId: TEST_SESSION_ID });
 
 			writer.writeToolResult("bash", { stdout: "output", stderr: "", exitCode: 0 });
 
@@ -94,7 +108,7 @@ describe("createStreamWriter", () => {
 
 		it("outputs result in verbose mode", () => {
 			const { output, getContent } = createTestOutput();
-			const writer = createStreamWriter({ verbose: true, output });
+			const writer = createStreamWriter({ verbose: true, output, sessionId: TEST_SESSION_ID });
 
 			writer.writeToolResult("bash", "command output");
 
@@ -103,7 +117,7 @@ describe("createStreamWriter", () => {
 
 		it("outputs JSON for non-string results in verbose mode", () => {
 			const { output, getContent } = createTestOutput();
-			const writer = createStreamWriter({ verbose: true, output });
+			const writer = createStreamWriter({ verbose: true, output, sessionId: TEST_SESSION_ID });
 
 			writer.writeToolResult("bash", { stdout: "ok", exitCode: 0 });
 
@@ -112,22 +126,22 @@ describe("createStreamWriter", () => {
 	});
 
 	describe("writeSummary", () => {
-		it("formats elapsed time and step count", () => {
+		it("formats elapsed time, step count, and session ID", () => {
 			const { output, getContent } = createTestOutput();
-			const writer = createStreamWriter({ verbose: false, output });
+			const writer = createStreamWriter({ verbose: false, output, sessionId: TEST_SESSION_ID });
 
 			writer.writeSummary(12300, 8);
 
-			expect(getContent()).toBe("\nDone in 12.3s (8 steps)\n");
+			expect(getContent()).toBe("\nDone in 12.3s (8 steps) [tskp_abc123def456]\n");
 		});
 
 		it("handles sub-second times", () => {
 			const { output, getContent } = createTestOutput();
-			const writer = createStreamWriter({ verbose: false, output });
+			const writer = createStreamWriter({ verbose: false, output, sessionId: TEST_SESSION_ID });
 
 			writer.writeSummary(500, 1);
 
-			expect(getContent()).toBe("\nDone in 0.5s (1 steps)\n");
+			expect(getContent()).toBe("\nDone in 0.5s (1 steps) [tskp_abc123def456]\n");
 		});
 	});
 });

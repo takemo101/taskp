@@ -31,6 +31,13 @@ describe("createTuiStreamWriter", () => {
 		vi.useRealTimers();
 	});
 
+	it("writeHeader does not output anything", () => {
+		const view = createMockView();
+		const writer = createTuiStreamWriter(view);
+		writer.writeHeader();
+		expect(view.calls).toEqual([]);
+	});
+
 	it("writeText buffers and flushes after interval", () => {
 		const view = createMockView();
 		const writer = createTuiStreamWriter(view);

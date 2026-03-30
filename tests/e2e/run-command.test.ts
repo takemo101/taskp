@@ -69,6 +69,18 @@ describe("taskp run (E2E)", () => {
 		expect(result.stdout).toContain("hello completed");
 	});
 
+	it("includes session ID with tskp_ prefix in run output", async () => {
+		createSkillFile(projectDir, "hello", NO_INPUT_SKILL);
+
+		const result = await execaCommand(`bun run ${CLI_PATH} run hello`, {
+			cwd: projectDir,
+			reject: false,
+		});
+
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout).toMatch(/\[tskp_[a-f0-9]{12}\]/);
+	});
+
 	it("shows rendered template with --dry-run", async () => {
 		createSkillFile(projectDir, "hello", NO_INPUT_SKILL);
 
