@@ -1,8 +1,20 @@
+import { resolveActionConfig } from "../core/skill/action";
+import type { Skill } from "../core/skill/skill";
 import type { SkillHooks } from "../core/skill/skill-metadata";
 import { type ExecutionError, executionError } from "../core/types/errors";
 import { err, ok, type Result } from "../core/types/result";
 import type { AfterHookContext, BeforeHookContext, HookExecutorPort } from "./port/hook-executor";
 import type { Logger } from "./port/logger";
+
+export function resolveSkillHooks(
+	skill: Skill,
+	actionName: string | undefined,
+): SkillHooks | undefined {
+	if (!actionName) return skill.metadata.hooks;
+	const action = skill.metadata.actions?.[actionName];
+	if (!action) return skill.metadata.hooks;
+	return resolveActionConfig(action, skill.metadata).hooks;
+}
 
 type RunBeforeHooksParams = {
 	readonly hookExecutor?: HookExecutorPort;

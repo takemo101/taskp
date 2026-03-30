@@ -3,3 +3,7 @@ export type Logger = {
 	readonly warn: (message: string) => void;
 	readonly error: (message: string) => void;
 };
+
+export function createNoopLogger(): Logger {
+	return { debug: () => {}, warn: () => {}, error: () => {} };
+}

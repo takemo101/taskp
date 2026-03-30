@@ -12,12 +12,18 @@ import type { ReservedVars } from "../core/variable/template-renderer";
 import { buildReservedVars, renderTemplate } from "../core/variable/template-renderer";
 import { type HooksConfig, runHooks } from "./hook-runner";
 import type { CommandExecutor, ExecResult } from "./port/command-executor";
-import type { HookExecutorPort } from "./port/hook-executor";
-import type { Logger } from "./port/logger";
+import type { AfterHookContext, BeforeHookContext, HookExecutorPort } from "./port/hook-executor";
+import { createNoopLogger, type Logger } from "./port/logger";
 import type { OutputFileStorePort } from "./port/output-file-store";
 import { createNoopProgressWriter, type ProgressWriter } from "./port/progress-writer";
 import type { PromptCollector } from "./port/prompt-collector";
 import type { SkillRepository } from "./port/skill-repository";
+import {
+	resolveSkillHooks,
+	runAfterHooks,
+	runBeforeHooks,
+	runOnFailureHooks,
+} from "./skill-hook-runner";
 
 export type RunSkillInput = {
 	readonly name: string;
@@ -120,6 +126,13 @@ async function executeSkill(
 	);
 }
 
+function buildTemplateOutput(commandResults: readonly CommandResult[]): string {
+	return commandResults
+		.map((cmd) => cmd.result.stdout)
+		.filter(Boolean)
+		.join("\n");
+}
+
 async function executeAndReport(
 	skill: Skill,
 	codeBlocks: readonly CodeBlock[],
@@ -130,19 +143,53 @@ async function executeAndReport(
 	rendered: string,
 	timeout: number | undefined,
 ): Promise<Result<RunOutput, DomainError>> {
-	const startTime = Date.now();
+	const hooks = resolveSkillHooks(skill, input.action);
+	const logger = deps.logger ?? createNoopLogger();
 
-	const commandResults = await executeCommands(
-		codeBlocks,
-		variables,
-		reserved,
-		deps.commandExecutor,
-		{ force: input.force, timeout },
-	);
+	// 出力ファイル準備（hooks がある場合のみ）
+	let outputFile = "";
+	if (hooks !== undefined && deps.outputFileStore !== undefined) {
+		outputFile = await deps.outputFileStore.prepare(input.sessionId);
+	}
 
-	const durationMs = Date.now() - startTime;
+	const beforeContext: BeforeHookContext = {
+		skillName: skill.metadata.name,
+		actionName: input.action,
+		mode: "template",
+		outputFile,
+		callerSkill: input.callerSkill,
+		sessionId: input.sessionId,
+	};
 
-	if (!commandResults.ok) {
+	// ① skill hooks.before
+	const beforeResult = await runBeforeHooks({
+		hookExecutor: deps.hookExecutor,
+		hooks,
+		context: beforeContext,
+		logger,
+	});
+
+	let finalResult: Result<RunOutput, DomainError>;
+
+	if (!beforeResult.ok) {
+		// before 失敗 → 本体スキップ
+		const afterContext: AfterHookContext = {
+			...beforeContext,
+			status: "failed",
+			durationMs: 0,
+			error: domainErrorMessage(beforeResult.error),
+		};
+
+		// ③ skill hooks.after（常に — リソース解放）
+		await runAfterHooks({ hookExecutor: deps.hookExecutor, hooks, context: afterContext, logger });
+		// ④ skill hooks.on_failure
+		await runOnFailureHooks({
+			hookExecutor: deps.hookExecutor,
+			hooks,
+			context: afterContext,
+			logger,
+		});
+		// ⑤ global hooks
 		await runHooks({
 			hookExecutor: deps.hookExecutor,
 			hooksConfig: deps.hooksConfig,
@@ -151,36 +198,88 @@ async function executeAndReport(
 				actionName: input.action,
 				mode: "template",
 				status: "failed",
-				durationMs,
-				error: domainErrorMessage(commandResults.error),
+				durationMs: 0,
+				error: domainErrorMessage(beforeResult.error),
 				callerSkill: input.callerSkill,
 				sessionId: input.sessionId,
 			},
 		});
-		return commandResults;
+
+		finalResult = beforeResult;
+	} else {
+		// ② スキル本体実行
+		const startTime = Date.now();
+		const commandResults = await executeCommands(
+			codeBlocks,
+			variables,
+			reserved,
+			deps.commandExecutor,
+			{ force: input.force, timeout },
+		);
+		const durationMs = Date.now() - startTime;
+
+		// 出力ファイルに書き込み
+		if (outputFile && deps.outputFileStore !== undefined) {
+			if (commandResults.ok) {
+				await deps.outputFileStore.write(outputFile, buildTemplateOutput(commandResults.value));
+			}
+		}
+
+		const afterContext: AfterHookContext = {
+			...beforeContext,
+			status: commandResults.ok ? "success" : "failed",
+			durationMs,
+			error: commandResults.ok ? undefined : domainErrorMessage(commandResults.error),
+		};
+
+		// ③ skill hooks.after（常に）
+		await runAfterHooks({ hookExecutor: deps.hookExecutor, hooks, context: afterContext, logger });
+
+		// ④ skill hooks.on_failure（失敗時のみ）
+		if (!commandResults.ok) {
+			await runOnFailureHooks({
+				hookExecutor: deps.hookExecutor,
+				hooks,
+				context: afterContext,
+				logger,
+			});
+		}
+
+		// ⑤ global hooks
+		await runHooks({
+			hookExecutor: deps.hookExecutor,
+			hooksConfig: deps.hooksConfig,
+			context: {
+				skillName: skill.metadata.name,
+				actionName: input.action,
+				mode: "template",
+				status: commandResults.ok ? "success" : "failed",
+				durationMs,
+				error: commandResults.ok ? undefined : domainErrorMessage(commandResults.error),
+				callerSkill: input.callerSkill,
+				sessionId: input.sessionId,
+			},
+		});
+
+		if (commandResults.ok) {
+			finalResult = ok({
+				skillName: skill.metadata.name,
+				rendered,
+				commands: commandResults.value,
+				dryRun: false,
+				sessionId: input.sessionId,
+			});
+		} else {
+			finalResult = commandResults;
+		}
 	}
 
-	await runHooks({
-		hookExecutor: deps.hookExecutor,
-		hooksConfig: deps.hooksConfig,
-		context: {
-			skillName: skill.metadata.name,
-			actionName: input.action,
-			mode: "template",
-			status: "success",
-			durationMs,
-			callerSkill: input.callerSkill,
-			sessionId: input.sessionId,
-		},
-	});
+	// クリーンアップ
+	if (outputFile && deps.outputFileStore !== undefined) {
+		await deps.outputFileStore.cleanup(input.sessionId);
+	}
 
-	return ok({
-		skillName: skill.metadata.name,
-		rendered,
-		commands: commandResults.value,
-		dryRun: false,
-		sessionId: input.sessionId,
-	});
+	return finalResult;
 }
 
 type ExecuteCommandsOptions = {

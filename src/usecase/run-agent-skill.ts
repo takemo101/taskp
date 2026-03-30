@@ -16,14 +16,20 @@ import { type HooksConfig, runHooks } from "./hook-runner";
 import type { AgentExecutorPort, AgentExecutorResult } from "./port/agent-executor";
 import type { CommandExecutor } from "./port/command-executor";
 import type { CollectedContext, ContextCollectorPort } from "./port/context-collector";
-import type { HookExecutorPort } from "./port/hook-executor";
-import type { Logger } from "./port/logger";
+import type { AfterHookContext, BeforeHookContext, HookExecutorPort } from "./port/hook-executor";
+import { createNoopLogger, type Logger } from "./port/logger";
 import type { McpToolResolverPort, ResolvedMcpToolSet } from "./port/mcp-tool-resolver";
 import type { OutputFileStorePort } from "./port/output-file-store";
 import { createNoopProgressWriter, type ProgressWriter } from "./port/progress-writer";
 import type { PromptCollector } from "./port/prompt-collector";
 import type { SkillRepository } from "./port/skill-repository";
 import type { SystemPromptResolver } from "./port/system-prompt-resolver";
+import {
+	resolveSkillHooks,
+	runAfterHooks,
+	runBeforeHooks,
+	runOnFailureHooks,
+} from "./skill-hook-runner";
 
 export type RunAgentSkillInput = {
 	readonly name: string;
@@ -153,6 +159,70 @@ export async function runAgentSkill(
 		return err(configError("MCP tool references found but mcpToolResolver is not configured"));
 	}
 
+	const hooks = resolveSkillHooks(skill, input.action);
+	const logger = deps.logger ?? createNoopLogger();
+
+	let outputFile = "";
+	if (hooks !== undefined && deps.outputFileStore !== undefined) {
+		outputFile = await deps.outputFileStore.prepare(input.sessionId);
+	}
+
+	const beforeContext: BeforeHookContext = {
+		skillName: skill.metadata.name,
+		actionName: input.action,
+		mode: "agent",
+		outputFile,
+		callerSkill: undefined,
+		sessionId: input.sessionId,
+	};
+
+	// ① skill hooks.before
+	const beforeResult = await runBeforeHooks({
+		hookExecutor: deps.hookExecutor,
+		hooks,
+		context: beforeContext,
+		logger,
+	});
+
+	if (!beforeResult.ok) {
+		const afterContext: AfterHookContext = {
+			...beforeContext,
+			status: "failed",
+			durationMs: 0,
+			error: domainErrorMessage(beforeResult.error),
+		};
+
+		// ③ skill hooks.after（常に）
+		await runAfterHooks({ hookExecutor: deps.hookExecutor, hooks, context: afterContext, logger });
+		// ④ skill hooks.on_failure
+		await runOnFailureHooks({
+			hookExecutor: deps.hookExecutor,
+			hooks,
+			context: afterContext,
+			logger,
+		});
+		// ⑤ global hooks
+		await runHooks({
+			hookExecutor: deps.hookExecutor,
+			hooksConfig: deps.hooksConfig,
+			context: {
+				skillName: skill.metadata.name,
+				actionName: input.action,
+				mode: "agent",
+				status: "failed",
+				durationMs: 0,
+				error: domainErrorMessage(beforeResult.error),
+				sessionId: input.sessionId,
+			},
+		});
+
+		if (outputFile && deps.outputFileStore !== undefined) {
+			await deps.outputFileStore.cleanup(input.sessionId);
+		}
+		await deps.mcpToolResolver?.closeAll();
+		return beforeResult;
+	}
+
 	try {
 		let toolSet: ToolSet;
 
@@ -167,8 +237,7 @@ export async function runAgentSkill(
 			toolSet = builtinToolsResult.value;
 		}
 
-		// durationMs は LLM エージェントの実行時間のみを測定する
-		// （コンテキスト収集時間は含めない — hooks に渡す情報として実行コストを正確に反映するため）
+		// ② スキル本体実行
 		const startTime = Date.now();
 
 		const executeResult = await deps.agentExecutor.execute({
@@ -181,23 +250,33 @@ export async function runAgentSkill(
 
 		const durationMs = Date.now() - startTime;
 
-		if (!executeResult.ok) {
-			await runHooks({
-				hookExecutor: deps.hookExecutor,
-				hooksConfig: deps.hooksConfig,
-				context: {
-					skillName: skill.metadata.name,
-					actionName: input.action,
-					mode: "agent",
-					status: "failed",
-					durationMs,
-					error: domainErrorMessage(executeResult.error),
-					sessionId: input.sessionId,
-				},
-			});
-			return executeResult;
+		if (outputFile && deps.outputFileStore !== undefined) {
+			if (executeResult.ok) {
+				await deps.outputFileStore.write(outputFile, executeResult.value.output);
+			}
 		}
 
+		const afterContext: AfterHookContext = {
+			...beforeContext,
+			status: executeResult.ok ? "success" : "failed",
+			durationMs,
+			error: executeResult.ok ? undefined : domainErrorMessage(executeResult.error),
+		};
+
+		// ③ skill hooks.after（常に）
+		await runAfterHooks({ hookExecutor: deps.hookExecutor, hooks, context: afterContext, logger });
+
+		// ④ skill hooks.on_failure（失敗時のみ）
+		if (!executeResult.ok) {
+			await runOnFailureHooks({
+				hookExecutor: deps.hookExecutor,
+				hooks,
+				context: afterContext,
+				logger,
+			});
+		}
+
+		// ⑤ global hooks
 		await runHooks({
 			hookExecutor: deps.hookExecutor,
 			hooksConfig: deps.hooksConfig,
@@ -205,11 +284,16 @@ export async function runAgentSkill(
 				skillName: skill.metadata.name,
 				actionName: input.action,
 				mode: "agent",
-				status: "success",
+				status: executeResult.ok ? "success" : "failed",
 				durationMs,
+				error: executeResult.ok ? undefined : domainErrorMessage(executeResult.error),
 				sessionId: input.sessionId,
 			},
 		});
+
+		if (!executeResult.ok) {
+			return executeResult;
+		}
 
 		return ok({
 			skillName: skill.metadata.name,
@@ -217,6 +301,9 @@ export async function runAgentSkill(
 			sessionId: input.sessionId,
 		});
 	} finally {
+		if (outputFile && deps.outputFileStore !== undefined) {
+			await deps.outputFileStore.cleanup(input.sessionId);
+		}
 		await deps.mcpToolResolver?.closeAll();
 	}
 }
