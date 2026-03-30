@@ -89,13 +89,16 @@ agent モードでは、LLM とツールの間でループを回す。
 
 ```typescript
 async function agentLoop(skill: Skill, variables: Record<string, string>): Promise<AgentResult> {
-  // 1. システムプロンプト構築
-  const systemPrompt = buildSystemPrompt(skill, variables);
+  // 1. セッション ID の受け取り（CLI/TUI で事前に発行済み）
+  const sessionId = input.sessionId;
 
-  // 2. コンテキスト収集
+  // 2. システムプロンプト構築（セッション ID を環境情報に含める）
+  const systemPrompt = buildSystemPrompt(skill, variables, sessionId);
+
+  // 3. コンテキスト収集
   const context = await gatherContext(skill.context, variables);
 
-  // 3. LLM 呼び出し（ツールループ）
+  // 4. LLM 呼び出し（ツールループ）
   const result = await generateText({
     model: resolveModel(skill.model),
     system: systemPrompt,
@@ -106,6 +109,19 @@ async function agentLoop(skill: Skill, variables: Record<string, string>): Promi
 
   return { output: result.text, steps: result.steps.length };
 }
+```
+
+### システムプロンプトの環境情報
+
+システムプロンプトの環境情報セクションにセッション ID が含まれる。LLM がツール呼び出し時に識別子として利用できる。
+
+```
+# Environment
+
+- Working directory: /path/to/project
+- Date: 2026-03-30
+- Platform: darwin
+- Session ID: tskp_a1b2c3d4e5f6
 ```
 
 ### 最大ステップ数
@@ -287,6 +303,7 @@ for await (const chunk of result.textStream) {
 
 ```
 [taskp] Running skill: code-review (agent mode)
+[taskp] Session: tskp_a1b2c3d4e5f6
 [taskp] Model: claude-sonnet-4-20250514
 [taskp] ──────────────────────────
 
@@ -300,7 +317,7 @@ for await (const chunk of result.textStream) {
   ← ツール呼び出し時はツール名と引数を表示
 
 [taskp] ──────────────────────────
-[taskp] Done in 12.3s (8 steps)
+[taskp] Done in 12.3s (8 steps) [tskp_a1b2c3d4e5f6]
 ```
 
 ## エラーハンドリング

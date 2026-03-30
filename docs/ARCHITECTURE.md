@@ -39,7 +39,8 @@ taskp/
 │       │   │   │   ├── execution-mode.ts     ← template | agent
 │       │   │   │   ├── template-executor.ts  ← テンプレート実行
 │       │   │   │   ├── agent-executor.ts     ← LLM エージェント実行
-│       │   │   │   └── mcp-tool-ref.ts       ← MCP ツール参照の型・パーサー
+│       │   │   │   ├── mcp-tool-ref.ts       ← MCP ツール参照の型・パーサー
+│       │   │   │   └── session.ts            ← SessionId branded type（型定義のみ）
 │       │   │   └── variable/       ← 変数展開
 │       │   │       └── template-renderer.ts  ← {{var}} 展開
 │       │   ├── adapter/            ← インターフェースアダプタ
@@ -47,6 +48,7 @@ taskp/
 │       │   │   ├── prompt-runner.ts          ← インタラクティブ質問の実行
 │       │   │   ├── command-runner.ts         ← シェルコマンド実行
 │       │   │   ├── ai-provider.ts            ← LLM プロバイダ管理
+│       │   │   ├── session-id-generator.ts  ← セッション ID 生成（副作用）
 │       │   │   └── mcp-tool-resolver.ts     ← MCP サーバー接続・ツール解決
 │       │   ├── usecase/            ← ユースケース
 │       │   │   ├── run-skill.ts              ← スキル実行
@@ -159,3 +161,77 @@ default_model = "qwen2.5-coder:14b"
 ```
 
 マージ順序: グローバル → プロジェクト（プロジェクト設定が優先）
+
+## セッション ID
+
+スキル実行ごとに一意のセッション ID を発行する。実行のトレース・識別に使用する。
+
+### 型
+
+`SessionId` は branded type として定義する（Parse, Don't Validate 原則）。生の `string` との取り違えを型レベルで防止する。
+
+```typescript
+// core/execution/session.ts — Domain 層（純粋、型定義のみ）
+type SessionId = string & { readonly __brand: "SessionId" };
+```
+
+### 形式
+
+```
+tskp_<ランダム文字列>
+```
+
+例: `tskp_a1b2c3d4e5f6`
+
+プレフィックス `tskp_` により、他システムの ID と視認上区別できる。
+
+### 生成
+
+`generateSessionId()` はランダム値生成（副作用）を伴うため、Domain 層ではなく **Adapter 層** に配置する。
+
+```typescript
+// adapter/session-id-generator.ts — Adapter 層（副作用あり）
+function generateSessionId(): SessionId
+```
+
+CLI / TUI が生成し、UseCase に注入する。
+
+### 伝搬
+
+```
+┌────────────────────────────────────────────┐
+│  CLI / TUI                                 │
+│  generateSessionId() で発行（Adapter 経由） │
+│                                            │
+├────────────────────────────────────────────┤
+│  Use Cases (run-skill / run-agent-skill)   │
+│  RunSkillInput.sessionId で受け取り         │
+│  RunOutput.sessionId で返却                │
+│  HookContext.sessionId でフックに伝搬      │
+├────────────────────────────────────────────┤
+│  Domain (template-renderer)                │
+│  ReservedVars.sessionId として             │
+│  {{__session_id__}} で SKILL.md 内参照可能 │
+├────────────────────────────────────────────┤
+│  Adapters (hook-executor)                  │
+│  環境変数 TASKP_SESSION_ID として          │
+│  フックコマンドに渡される                   │
+└────────────────────────────────────────────┘
+```
+
+### ライフサイクル
+
+- **発行タイミング**: CLI の `run` コマンド実行時、または TUI の実行画面表示時
+- **スコープ**: 1回の `taskp run` / TUI 実行 = 1つのセッション ID
+- **子スキル**: `taskp_run` ツールでネスト呼び出しされた子スキルは、親のセッション ID を継承する
+- **TUI での連続実行**: スキル選択に戻って再実行すると新しいセッション ID が発行される
+
+### 参照方法
+
+| 参照元 | 方法 |
+|--------|------|
+| SKILL.md テンプレート | `{{__session_id__}}` 予約変数 |
+| agent モード LLM | システムプロンプトの環境情報セクション |
+| フックコマンド | 環境変数 `TASKP_SESSION_ID` |
+| CLI 出力 | 実行結果のサマリーに表示 |
+| TUI | 実行画面のタイトルバーに表示 |
