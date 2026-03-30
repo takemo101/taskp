@@ -4,7 +4,7 @@ import type { McpServerConfig } from "../../adapter/config-loader";
 import { createConsoleLogger } from "../../adapter/console-logger";
 import { createContextCollector } from "../../adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "../../adapter/context-collector-deps";
-import { generateSessionId } from "../../adapter/session-id-generator";
+import type { SessionId } from "../../core/execution/session";
 import { resolveActionConfig } from "../../core/skill/action";
 import type { Skill } from "../../core/skill/skill";
 import { domainErrorMessage } from "../../core/types/errors";
@@ -45,7 +45,8 @@ export async function runExecution(
 	model: LanguageModelV3 | null,
 	viewPort: ExecutionViewPort,
 	deps: ExecutionDeps,
-	actionName?: string,
+	actionName: string | undefined,
+	sessionId: SessionId,
 ): Promise<void> {
 	const effectiveMode = resolveEffectiveMode(skill, actionName);
 
@@ -58,9 +59,9 @@ export async function runExecution(
 
 	try {
 		if (effectiveMode === "agent" && model !== null) {
-			await executeAgentMode(skill, variables, model, viewPort, deps, actionName);
+			await executeAgentMode(skill, variables, model, viewPort, deps, actionName, sessionId);
 		} else {
-			await executeTemplateMode(skill, variables, viewPort, deps, actionName);
+			await executeTemplateMode(skill, variables, viewPort, deps, actionName, sessionId);
 		}
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -99,7 +100,8 @@ async function executeAgentMode(
 	model: LanguageModelV3,
 	viewPort: ExecutionViewPort,
 	deps: ExecutionDeps,
-	actionName?: string,
+	actionName: string | undefined,
+	sessionId: SessionId,
 ): Promise<void> {
 	const writer = createTuiStreamWriter(viewPort);
 	const progressWriter = createTuiProgressWriter(viewPort);
@@ -123,7 +125,7 @@ async function executeAgentMode(
 			presets: variables,
 			model,
 			maxAgentSteps: deps.maxAgentSteps,
-			sessionId: generateSessionId(),
+			sessionId,
 		},
 		{
 			skillRepository: deps.skillRepositoryFactory(skill),
@@ -151,7 +153,8 @@ async function executeTemplateMode(
 	variables: Readonly<Record<string, string>>,
 	viewPort: ExecutionViewPort,
 	deps: ExecutionDeps,
-	actionName?: string,
+	actionName: string | undefined,
+	sessionId: SessionId,
 ): Promise<void> {
 	const progressWriter = createTuiProgressWriter(viewPort);
 
@@ -162,7 +165,7 @@ async function executeTemplateMode(
 			presets: variables,
 			dryRun: false,
 			force: false,
-			sessionId: generateSessionId(),
+			sessionId,
 		},
 		{
 			skillRepository: deps.skillRepositoryFactory(skill),
