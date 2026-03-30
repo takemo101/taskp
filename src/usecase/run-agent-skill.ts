@@ -5,6 +5,7 @@ import type { TaskpRunDeps } from "../core/execution/agent-tools";
 import { buildTaskpRunDescription, buildTools } from "../core/execution/agent-tools";
 import type { ContentPart } from "../core/execution/content-part";
 import { partitionToolRefs } from "../core/execution/mcp-tool-ref";
+import type { SessionId } from "../core/execution/session";
 import { resolveAgentExecution } from "../core/skill/skill-execution-resolver";
 import { configError, type DomainError, domainErrorMessage } from "../core/types/errors";
 import type { Result } from "../core/types/result";
@@ -79,7 +80,7 @@ export async function runAgentSkill(
 
 	progress.writeInputs(inputs, variables);
 
-	const reserved = buildReservedVars(skill.location);
+	const reserved = buildReservedVars(skill.location, "" as SessionId);
 
 	const renderResult = renderTemplate(content, variables, reserved);
 	if (!renderResult.ok) {
