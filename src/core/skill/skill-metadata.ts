@@ -12,16 +12,18 @@ import { skillInputSchema } from "./skill-input";
 
 const skillModeSchema = z.enum(["template", "agent"]);
 
+const hookCommandsSchema = z
+	.preprocess((val) => (typeof val === "string" ? [val] : val), z.array(z.string().min(1)))
+	.optional();
+
 const skillHooksSchema = z.object({
-	before: z.array(z.string().min(1)).optional().describe("Commands to run before skill execution"),
-	after: z
-		.array(z.string().min(1))
-		.optional()
-		.describe("Commands to run after skill execution (always, regardless of success/failure)"),
-	on_failure: z
-		.array(z.string().min(1))
-		.optional()
-		.describe("Commands to run only on skill failure (after 'after' hooks)"),
+	before: hookCommandsSchema.describe("Commands to run before skill execution"),
+	after: hookCommandsSchema.describe(
+		"Commands to run after skill execution (always, regardless of success/failure)",
+	),
+	on_failure: hookCommandsSchema.describe(
+		"Commands to run only on skill failure (after 'after' hooks)",
+	),
 });
 
 type SkillHooks = z.infer<typeof skillHooksSchema>;

@@ -343,6 +343,44 @@ describe("parseSkillMetadata", () => {
 		expect(result.value.hooks?.on_failure).toBeUndefined();
 	});
 
+	it("hooks の値が文字列単体の場合、配列に正規化される", () => {
+		const result = parseSkillMetadata({
+			name: "deploy",
+			description: "デプロイする",
+			hooks: {
+				before: "scripts/setup.sh",
+				after: "scripts/cleanup.sh",
+			},
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.hooks).toStrictEqual({
+			before: ["scripts/setup.sh"],
+			after: ["scripts/cleanup.sh"],
+		});
+	});
+
+	it("hooks で文字列と配列を混在できる", () => {
+		const result = parseSkillMetadata({
+			name: "deploy",
+			description: "デプロイする",
+			hooks: {
+				before: "scripts/setup.sh",
+				after: ["scripts/cleanup.sh", "echo done"],
+				on_failure: "echo failed",
+			},
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.hooks).toStrictEqual({
+			before: ["scripts/setup.sh"],
+			after: ["scripts/cleanup.sh", "echo done"],
+			on_failure: ["echo failed"],
+		});
+	});
+
 	it("hooks のコマンドが空文字列の場合エラーになる", () => {
 		const result = parseSkillMetadata({
 			name: "deploy",

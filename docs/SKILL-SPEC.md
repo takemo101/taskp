@@ -202,18 +202,19 @@ type ContextSource =
 
 ```typescript
 interface SkillHooks {
-  before?: string[];      // スキル実行前に実行（失敗→スキル中断）
-  after?: string[];       // スキル実行後に常に実行（成功・失敗問わず）
-  on_failure?: string[];  // スキル失敗時のみ追加実行（after の後）
+  before?: string | string[];      // スキル実行前に実行（失敗→スキル中断）
+  after?: string | string[];       // スキル実行後に常に実行（成功・失敗問わず）
+  on_failure?: string | string[];  // スキル失敗時のみ追加実行（after の後）
 }
 ```
 
+各フィールドは文字列単体でも配列でも指定可能。文字列の場合は内部で `[string]` に正規化される。
+
 ```yaml
 hooks:
-  before:
-    - "git stash --include-untracked"
+  before: "git stash --include-untracked"   # 文字列単体 OK
   after:
-    - "git stash pop || true"
+    - "git stash pop || true"               # 配列も OK
   on_failure:
     - "echo 'Failed: $TASKP_ERROR'"
 ```

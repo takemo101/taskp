@@ -456,14 +456,13 @@ context:
 
 ## スキルフック
 
-`hooks` フィールドで `before`、`after`、`on_failure` コマンドを定義し、スキル実行前後にセットアップ/クリーンアップ処理を実行できます。
+`hooks` フィールドで `before`、`after`、`on_failure` コマンドを定義し、スキル実行前後にセットアップ/クリーンアップ処理を実行できます。各フィールドは文字列単体でも配列でも指定可能です。
 
 ```yaml
 hooks:
-  before:
-    - "git stash --include-untracked"
+  before: "git stash --include-untracked"       # 文字列単体 OK
   after:
-    - "git stash pop || true"
+    - "git stash pop || true"                   # 配列も OK
   on_failure:
     - "curl -X POST https://slack.example.com/webhook -d '{\"text\": \"失敗: $TASKP_ERROR\"}'"
 ```

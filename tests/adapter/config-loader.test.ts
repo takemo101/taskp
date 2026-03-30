@@ -192,20 +192,20 @@ on_success = [""]
 			expect(result.error.type).toBe("CONFIG_ERROR");
 		});
 
-		it("returns error for non-array on_success", async () => {
+		it("accepts string on_success and normalizes to array", async () => {
 			writeConfig(
 				globalRoot,
 				`
 [hooks]
-on_success = "not-an-array"
+on_success = "single-command"
 `,
 			);
 
 			const result = await createLoader().load();
 
-			expect(result.ok).toBe(false);
-			if (result.ok) return;
-			expect(result.error.type).toBe("CONFIG_ERROR");
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.hooks?.on_success).toStrictEqual(["single-command"]);
 		});
 
 		it("merges hooks: project on_success overrides global, global on_failure preserved", async () => {

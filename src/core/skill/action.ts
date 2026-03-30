@@ -8,10 +8,14 @@ import type { SkillHooks, SkillMetadata } from "./skill-metadata";
 
 const skillModeSchema = z.enum(["template", "agent"]);
 
+const actionHookCommandsSchema = z
+	.preprocess((val) => (typeof val === "string" ? [val] : val), z.array(z.string().min(1)))
+	.optional();
+
 const actionHooksSchema = z.object({
-	before: z.array(z.string().min(1)).optional(),
-	after: z.array(z.string().min(1)).optional(),
-	on_failure: z.array(z.string().min(1)).optional(),
+	before: actionHookCommandsSchema,
+	after: actionHookCommandsSchema,
+	on_failure: actionHookCommandsSchema,
 });
 
 const actionSchema = z.object({

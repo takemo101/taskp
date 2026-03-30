@@ -34,9 +34,13 @@ export const aiConfigSchema = z.object({
 		.describe("Per-provider settings"),
 });
 
+const globalHookCommandsSchema = z
+	.preprocess((val) => (typeof val === "string" ? [val] : val), z.array(z.string().min(1)))
+	.optional();
+
 export const hooksConfigSchema = z.object({
-	on_success: z.array(z.string().min(1)).optional().describe("Commands to run on skill success"),
-	on_failure: z.array(z.string().min(1)).optional().describe("Commands to run on skill failure"),
+	on_success: globalHookCommandsSchema.describe("Commands to run on skill success"),
+	on_failure: globalHookCommandsSchema.describe("Commands to run on skill failure"),
 });
 
 const stdioServerSchema = z.object({
