@@ -13,6 +13,7 @@ import { createHookExecutor } from "./adapter/hook-executor";
 import { createCliProgressWriter } from "./adapter/progress-formatter";
 import { createProjectInitializer } from "./adapter/project-initializer";
 import { createPromptRunner } from "./adapter/prompt-runner";
+import { generateSessionId } from "./adapter/session-id-generator";
 import { createSkillInitializer } from "./adapter/skill-initializer";
 import { createDefaultSkillLoader } from "./adapter/skill-loader";
 import { createStreamWriter } from "./adapter/stream-writer";
@@ -206,6 +207,7 @@ const cli = Cli.create("taskp", {
 					dryRun: c.options.dryRun ?? false,
 					force: c.options.force ?? false,
 					noInput: c.options.skipPrompt,
+					sessionId: generateSessionId(),
 				},
 				{
 					skillRepository,
@@ -395,6 +397,7 @@ async function runAgentMode(
 			model: languageModel,
 			noInput: c.options.skipPrompt,
 			maxAgentSteps: config.cli?.max_agent_steps,
+			sessionId: generateSessionId(),
 		},
 		{
 			skillRepository,

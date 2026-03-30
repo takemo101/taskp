@@ -4,6 +4,7 @@ import type { McpServerConfig } from "../../adapter/config-loader";
 import { createConsoleLogger } from "../../adapter/console-logger";
 import { createContextCollector } from "../../adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "../../adapter/context-collector-deps";
+import { generateSessionId } from "../../adapter/session-id-generator";
 import { resolveActionConfig } from "../../core/skill/action";
 import type { Skill } from "../../core/skill/skill";
 import { domainErrorMessage } from "../../core/types/errors";
@@ -122,6 +123,7 @@ async function executeAgentMode(
 			presets: variables,
 			model,
 			maxAgentSteps: deps.maxAgentSteps,
+			sessionId: generateSessionId(),
 		},
 		{
 			skillRepository: deps.skillRepositoryFactory(skill),
@@ -160,6 +162,7 @@ async function executeTemplateMode(
 			presets: variables,
 			dryRun: false,
 			force: false,
+			sessionId: generateSessionId(),
 		},
 		{
 			skillRepository: deps.skillRepositoryFactory(skill),

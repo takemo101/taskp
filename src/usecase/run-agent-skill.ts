@@ -31,11 +31,13 @@ export type RunAgentSkillInput = {
 	readonly model: LanguageModelV3;
 	readonly noInput?: boolean;
 	readonly maxAgentSteps?: number;
+	readonly sessionId: SessionId;
 };
 
 export type RunAgentSkillOutput = {
 	readonly skillName: string;
 	readonly result: AgentExecutorResult;
+	readonly sessionId: SessionId;
 };
 
 export type RunAgentSkillDeps = {
@@ -80,7 +82,7 @@ export async function runAgentSkill(
 
 	progress.writeInputs(inputs, variables);
 
-	const reserved = buildReservedVars(skill.location, "" as SessionId);
+	const reserved = buildReservedVars(skill.location, input.sessionId);
 
 	const renderResult = renderTemplate(content, variables, reserved);
 	if (!renderResult.ok) {
@@ -135,6 +137,7 @@ export async function runAgentSkill(
 		callerSkillName: skill.metadata.name,
 		hookExecutor: deps.hookExecutor,
 		hooksConfig: deps.hooksConfig,
+		sessionId: input.sessionId,
 	};
 
 	const builtinToolsResult = buildTools(builtins, taskpRunDeps, toolDescriptions);
@@ -185,6 +188,7 @@ export async function runAgentSkill(
 					status: "failed",
 					durationMs,
 					error: domainErrorMessage(executeResult.error),
+					sessionId: input.sessionId,
 				},
 			});
 			return executeResult;
@@ -199,12 +203,14 @@ export async function runAgentSkill(
 				mode: "agent",
 				status: "success",
 				durationMs,
+				sessionId: input.sessionId,
 			},
 		});
 
 		return ok({
 			skillName: skill.metadata.name,
 			result: executeResult.value,
+			sessionId: input.sessionId,
 		});
 	} finally {
 		await deps.mcpToolResolver?.closeAll();
