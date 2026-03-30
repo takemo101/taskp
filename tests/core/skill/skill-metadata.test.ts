@@ -282,6 +282,81 @@ describe("parseSkillMetadata", () => {
 		expect(result.error.message).toContain("actions must not be empty");
 	});
 
+	it("hooks 付きメタデータが正しくパースされる", () => {
+		const result = parseSkillMetadata({
+			name: "deploy",
+			description: "デプロイする",
+			hooks: {
+				before: ["git stash --include-untracked"],
+				after: ["git stash pop"],
+				on_failure: ["echo 'deploy failed'"],
+			},
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.hooks).toStrictEqual({
+			before: ["git stash --include-untracked"],
+			after: ["git stash pop"],
+			on_failure: ["echo 'deploy failed'"],
+		});
+	});
+
+	it("hooks なしの既存スキルが後方互換で動作する", () => {
+		const result = parseSkillMetadata({
+			name: "deploy",
+			description: "デプロイする",
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.hooks).toBeUndefined();
+	});
+
+	it("hooks が空オブジェクトでもパースが通る", () => {
+		const result = parseSkillMetadata({
+			name: "deploy",
+			description: "デプロイする",
+			hooks: {},
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.hooks).toStrictEqual({});
+	});
+
+	it("hooks の一部フィールドのみ指定でもパースが通る", () => {
+		const result = parseSkillMetadata({
+			name: "deploy",
+			description: "デプロイする",
+			hooks: {
+				before: ["echo 'starting'"],
+			},
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.hooks).toStrictEqual({
+			before: ["echo 'starting'"],
+		});
+		expect(result.value.hooks?.after).toBeUndefined();
+		expect(result.value.hooks?.on_failure).toBeUndefined();
+	});
+
+	it("hooks のコマンドが空文字列の場合エラーになる", () => {
+		const result = parseSkillMetadata({
+			name: "deploy",
+			description: "デプロイする",
+			hooks: {
+				before: [""],
+			},
+		});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("PARSE_ERROR");
+	});
+
 	it("アクション名にコロンを含む場合エラーになる", () => {
 		const result = parseSkillMetadata({
 			name: "test",

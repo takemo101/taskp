@@ -113,4 +113,45 @@ describe("resolveActionConfig", () => {
 
 		expect(resolved.description).toBe("Custom action description");
 	});
+
+	it("hooks 未指定のアクションはスキルの hooks を継承する", () => {
+		const skillHooks = {
+			before: ["echo 'skill before'"],
+			after: ["echo 'skill after'"],
+		};
+		const skill = baseSkill({ hooks: skillHooks });
+		const action = baseAction();
+
+		const resolved = resolveActionConfig(action, skill);
+
+		expect(resolved.hooks).toStrictEqual(skillHooks);
+	});
+
+	it("アクション固有の hooks はスキルの hooks を完全に置き換える（オブジェクト単位）", () => {
+		const skillHooks = {
+			before: ["echo 'skill before'"],
+			after: ["echo 'skill after'"],
+			on_failure: ["echo 'skill failure'"],
+		};
+		const actionHooks = {
+			before: ["echo 'action before'"],
+		};
+		const skill = baseSkill({ hooks: skillHooks });
+		const action = baseAction({ hooks: actionHooks });
+
+		const resolved = resolveActionConfig(action, skill);
+
+		expect(resolved.hooks).toStrictEqual(actionHooks);
+		expect(resolved.hooks?.after).toBeUndefined();
+		expect(resolved.hooks?.on_failure).toBeUndefined();
+	});
+
+	it("スキルもアクションも hooks 未指定の場合 undefined になる", () => {
+		const skill = baseSkill();
+		const action = baseAction();
+
+		const resolved = resolveActionConfig(action, skill);
+
+		expect(resolved.hooks).toBeUndefined();
+	});
 });

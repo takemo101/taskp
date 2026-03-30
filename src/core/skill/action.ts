@@ -4,9 +4,15 @@ import type { ContextSource } from "./context-source";
 import { contextSourceSchema } from "./context-source";
 import type { SkillInput } from "./skill-input";
 import { skillInputSchema } from "./skill-input";
-import type { SkillMetadata } from "./skill-metadata";
+import type { SkillHooks, SkillMetadata } from "./skill-metadata";
 
 const skillModeSchema = z.enum(["template", "agent"]);
+
+const actionHooksSchema = z.object({
+	before: z.array(z.string().min(1)).optional(),
+	after: z.array(z.string().min(1)).optional(),
+	on_failure: z.array(z.string().min(1)).optional(),
+});
 
 const actionSchema = z.object({
 	description: z.string().min(1),
@@ -16,6 +22,7 @@ const actionSchema = z.object({
 	context: z.array(contextSourceSchema).optional(),
 	tools: z.array(z.string().min(1)).optional(),
 	timeout: z.number().int().positive().max(3_600_000).optional(),
+	hooks: actionHooksSchema.optional(),
 });
 
 type Action = z.infer<typeof actionSchema>;
@@ -28,6 +35,7 @@ type ResolvedActionConfig = {
 	readonly context: readonly ContextSource[];
 	readonly tools: readonly string[];
 	readonly timeout: number | undefined;
+	readonly hooks: SkillHooks | undefined;
 };
 
 function resolveActionConfig(action: Action, skill: SkillMetadata): ResolvedActionConfig {
@@ -39,6 +47,7 @@ function resolveActionConfig(action: Action, skill: SkillMetadata): ResolvedActi
 		context: action.context ?? skill.context ?? [],
 		tools: action.tools ?? skill.tools ?? DEFAULT_TOOLS,
 		timeout: action.timeout ?? skill.timeout ?? undefined,
+		hooks: action.hooks ?? skill.hooks ?? undefined,
 	};
 }
 
