@@ -25,6 +25,7 @@ export { createMcpToolResolver } from "./mcp-tool-resolver";
 export { createPromptRunner } from "./prompt-runner";
 export type { RetryConfig } from "./retry";
 export { calculateDelay, withRetry } from "./retry";
+export { generateSessionId } from "./session-id-generator";
 export { createSkillInitializer } from "./skill-initializer";
 export { createDefaultSkillLoader, createSkillLoader } from "./skill-loader";
 export type { StreamWriter, StreamWriterOptions } from "./stream-writer";
