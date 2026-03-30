@@ -60,15 +60,19 @@ export function createMcpToolResolver(
 
 function connectByTransport(config: McpServerConfig, logger: Logger): Promise<MCPClient> {
 	switch (config.transport) {
-		case "stdio":
+		case "stdio": {
 			logger.debug(`Connecting to MCP server via stdio: ${config.command}`);
-			return createMCPClient({
-				transport: new StdioClientTransport({
-					command: config.command,
-					args: config.args,
-					env: resolveEnvMap(config.env),
-				}),
+			// MCP サーバーの stderr を inherit するとターミナル（TUI 画面）に
+			// ログが漏れるため、pipe で受けて破棄する
+			const transport = new StdioClientTransport({
+				command: config.command,
+				args: config.args,
+				env: resolveEnvMap(config.env),
+				stderr: "pipe",
 			});
+			transport.stderr?.on("data", () => {});
+			return createMCPClient({ transport });
+		}
 		case "http":
 			logger.debug(`Connecting to MCP server via HTTP: ${config.url}`);
 			return createMCPClient({
