@@ -12,6 +12,20 @@ import { skillInputSchema } from "./skill-input";
 
 const skillModeSchema = z.enum(["template", "agent"]);
 
+const skillHooksSchema = z.object({
+	before: z.array(z.string().min(1)).optional().describe("Commands to run before skill execution"),
+	after: z
+		.array(z.string().min(1))
+		.optional()
+		.describe("Commands to run after skill execution (always, regardless of success/failure)"),
+	on_failure: z
+		.array(z.string().min(1))
+		.optional()
+		.describe("Commands to run only on skill failure (after 'after' hooks)"),
+});
+
+type SkillHooks = z.infer<typeof skillHooksSchema>;
+
 const skillMetadataSchema = z
 	.object({
 		name: z.string().min(1),
@@ -29,6 +43,7 @@ const skillMetadataSchema = z
 		tools: z.array(z.string().min(1)).default([...DEFAULT_TOOLS]),
 		context: z.array(contextSourceSchema).default([]),
 		actions: z.record(z.string(), actionSchema).optional(),
+		hooks: skillHooksSchema.optional(),
 	})
 	.refine((data) => !data.actions || Object.keys(data.actions).length > 0, {
 		message: "actions must not be empty",
@@ -57,5 +72,5 @@ function parseSkillMetadata(data: unknown): Result<SkillMetadata, ParseError> {
 	return ok(result.data);
 }
 
-export type { ContextSource, SkillInput, SkillMetadata, SkillMode };
-export { parseSkillMetadata, skillInputSchema, skillMetadataSchema };
+export type { ContextSource, SkillHooks, SkillInput, SkillMetadata, SkillMode };
+export { parseSkillMetadata, skillHooksSchema, skillInputSchema, skillMetadataSchema };
