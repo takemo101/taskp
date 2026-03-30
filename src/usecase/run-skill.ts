@@ -25,6 +25,7 @@ export type RunSkillInput = {
 	readonly force: boolean;
 	readonly noInput?: boolean;
 	readonly callerSkill?: string;
+	readonly sessionId: SessionId;
 };
 
 export type CommandResult = {
@@ -37,6 +38,7 @@ export type RunOutput = {
 	readonly rendered: string;
 	readonly commands: readonly CommandResult[];
 	readonly dryRun: boolean;
+	readonly sessionId: SessionId;
 };
 
 export type RunSkillDeps = {
@@ -83,7 +85,7 @@ async function executeSkill(
 	const progress = deps.progressWriter ?? createNoopProgressWriter();
 	progress.writeInputs(config.inputs, variables);
 
-	const reserved = buildReservedVars(skill.location, "" as SessionId);
+	const reserved = buildReservedVars(skill.location, input.sessionId);
 
 	const renderResult = renderTemplate(config.content, variables, reserved);
 	if (!renderResult.ok) {
@@ -98,6 +100,7 @@ async function executeSkill(
 			rendered,
 			commands: [],
 			dryRun: true,
+			sessionId: input.sessionId,
 		});
 	}
 
@@ -147,6 +150,7 @@ async function executeAndReport(
 				durationMs,
 				error: domainErrorMessage(commandResults.error),
 				callerSkill: input.callerSkill,
+				sessionId: input.sessionId,
 			},
 		});
 		return commandResults;
@@ -162,6 +166,7 @@ async function executeAndReport(
 			status: "success",
 			durationMs,
 			callerSkill: input.callerSkill,
+			sessionId: input.sessionId,
 		},
 	});
 
@@ -170,6 +175,7 @@ async function executeAndReport(
 		rendered,
 		commands: commandResults.value,
 		dryRun: false,
+		sessionId: input.sessionId,
 	});
 }
 

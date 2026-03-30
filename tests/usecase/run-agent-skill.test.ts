@@ -1,8 +1,12 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import type { ToolSet } from "ai";
 import { describe, expect, it, vi } from "vitest";
+import type { SessionId } from "../../src/core/execution/session";
 import type { Skill } from "../../src/core/skill/skill";
 import { err, ok } from "../../src/core/types/result";
+
+const TEST_SESSION_ID = "tskp_test000001" as SessionId;
+
 import type { AgentExecutorPort } from "../../src/usecase/port/agent-executor";
 import type { CommandExecutor } from "../../src/usecase/port/command-executor";
 import type { ContextCollectorPort } from "../../src/usecase/port/context-collector";
@@ -93,7 +97,10 @@ describe("runAgentSkill", () => {
 		const skill = createAgentSkill();
 		const deps = createMockDeps(skill);
 
-		const result = await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+		const result = await runAgentSkill(
+			{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+			deps,
+		);
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
@@ -104,11 +111,28 @@ describe("runAgentSkill", () => {
 		expect(result.value.result.elapsedMs).toBe(1500);
 	});
 
+	it("includes sessionId in output", async () => {
+		const skill = createAgentSkill();
+		const deps = createMockDeps(skill);
+
+		const result = await runAgentSkill(
+			{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+			deps,
+		);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.sessionId).toBe(TEST_SESSION_ID);
+	});
+
 	it("passes correct input to agent executor", async () => {
 		const skill = createAgentSkill();
 		const deps = createMockDeps(skill);
 
-		await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+		await runAgentSkill(
+			{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+			deps,
+		);
 
 		const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
 		expect(executorCall.model).toBe(mockModel);
@@ -128,7 +152,10 @@ describe("runAgentSkill", () => {
 		});
 		const deps = createMockDeps(skill);
 
-		const result = await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+		const result = await runAgentSkill(
+			{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+			deps,
+		);
 
 		expect(result.ok).toBe(true);
 		expect(deps.contextCollector.collect).toHaveBeenCalledWith(
@@ -165,7 +192,10 @@ describe("runAgentSkill", () => {
 			]),
 		);
 
-		await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+		await runAgentSkill(
+			{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+			deps,
+		);
 
 		const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
 		expect(executorCall.contentParts).toHaveLength(2);
@@ -202,7 +232,10 @@ describe("runAgentSkill", () => {
 			]),
 		);
 
-		await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+		await runAgentSkill(
+			{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+			deps,
+		);
 
 		const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
 		expect(executorCall.contentParts).toHaveLength(3);
@@ -225,14 +258,17 @@ describe("runAgentSkill", () => {
 		const skill = createAgentSkill({ context: [] });
 		const deps = createMockDeps(skill);
 
-		await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+		await runAgentSkill(
+			{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+			deps,
+		);
 
 		expect(deps.contextCollector.collect).not.toHaveBeenCalled();
 	});
 
 	it("propagates skill-not-found error", async () => {
 		const result = await runAgentSkill(
-			{ name: "missing", presets: {}, model: mockModel },
+			{ name: "missing", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
 			{
 				...createMockDeps(createAgentSkill()),
 				skillRepository: {
@@ -258,7 +294,7 @@ describe("runAgentSkill", () => {
 		});
 
 		const result = await runAgentSkill(
-			{ name: "test-agent", presets: {}, model: mockModel },
+			{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
 			{
 				...createMockDeps(skill),
 				contextCollector: {
@@ -279,7 +315,7 @@ describe("runAgentSkill", () => {
 		const skill = createAgentSkill();
 
 		const result = await runAgentSkill(
-			{ name: "test-agent", presets: {}, model: mockModel },
+			{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
 			{
 				...createMockDeps(skill),
 				agentExecutor: {
@@ -320,7 +356,7 @@ describe("runAgentSkill", () => {
 			};
 
 			const result = await runAgentSkill(
-				{ name: "test-agent", presets: {}, model: mockModel },
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
 				deps,
 			);
 
@@ -349,7 +385,7 @@ describe("runAgentSkill", () => {
 			};
 
 			const result = await runAgentSkill(
-				{ name: "test-agent", presets: {}, model: mockModel },
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
 				deps,
 			);
 
@@ -365,7 +401,7 @@ describe("runAgentSkill", () => {
 			const deps = createMockDeps(skill);
 
 			const result = await runAgentSkill(
-				{ name: "test-agent", presets: {}, model: mockModel },
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
 				deps,
 			);
 
@@ -381,7 +417,10 @@ describe("runAgentSkill", () => {
 				hooksConfig: { on_success: [], on_failure: [] },
 			};
 
-			await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+			await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+				deps,
+			);
 
 			expect(hookExecutor.execute).not.toHaveBeenCalled();
 		});
@@ -402,7 +441,7 @@ describe("runAgentSkill", () => {
 			};
 
 			const result = await runAgentSkill(
-				{ name: "test-agent", presets: {}, model: mockModel },
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
 				deps,
 			);
 
@@ -467,7 +506,13 @@ describe("runAgentSkill", () => {
 			const deps = createMockDeps(skill);
 
 			await runAgentSkill(
-				{ name: "multi-action", action: "analyze", presets: {}, model: mockModel },
+				{
+					name: "multi-action",
+					action: "analyze",
+					presets: {},
+					model: mockModel,
+					sessionId: TEST_SESSION_ID,
+				},
 				deps,
 			);
 
@@ -486,7 +531,13 @@ describe("runAgentSkill", () => {
 			);
 
 			await runAgentSkill(
-				{ name: "multi-action", action: "review", presets: { target: "src/" }, model: mockModel },
+				{
+					name: "multi-action",
+					action: "review",
+					presets: { target: "src/" },
+					model: mockModel,
+					sessionId: TEST_SESSION_ID,
+				},
 				deps,
 			);
 
@@ -503,7 +554,13 @@ describe("runAgentSkill", () => {
 			);
 
 			await runAgentSkill(
-				{ name: "multi-action", action: "review", presets: { target: "src/" }, model: mockModel },
+				{
+					name: "multi-action",
+					action: "review",
+					presets: { target: "src/" },
+					model: mockModel,
+					sessionId: TEST_SESSION_ID,
+				},
 				deps,
 			);
 
@@ -522,7 +579,13 @@ describe("runAgentSkill", () => {
 			);
 
 			await runAgentSkill(
-				{ name: "multi-action", action: "review", presets: { target: "src/" }, model: mockModel },
+				{
+					name: "multi-action",
+					action: "review",
+					presets: { target: "src/" },
+					model: mockModel,
+					sessionId: TEST_SESSION_ID,
+				},
 				deps,
 			);
 
@@ -537,7 +600,13 @@ describe("runAgentSkill", () => {
 			const deps = createMockDeps(skill);
 
 			await runAgentSkill(
-				{ name: "multi-action", action: "analyze", presets: {}, model: mockModel },
+				{
+					name: "multi-action",
+					action: "analyze",
+					presets: {},
+					model: mockModel,
+					sessionId: TEST_SESSION_ID,
+				},
 				deps,
 			);
 
@@ -557,7 +626,13 @@ describe("runAgentSkill", () => {
 			const deps = createMockDeps(skill);
 
 			const result = await runAgentSkill(
-				{ name: "multi-action", action: "nonexistent", presets: {}, model: mockModel },
+				{
+					name: "multi-action",
+					action: "nonexistent",
+					presets: {},
+					model: mockModel,
+					sessionId: TEST_SESSION_ID,
+				},
 				deps,
 			);
 
@@ -595,7 +670,13 @@ describe("runAgentSkill", () => {
 			const deps = createMockDeps(skill);
 
 			const result = await runAgentSkill(
-				{ name: "bad-skill", action: "deploy", presets: {}, model: mockModel },
+				{
+					name: "bad-skill",
+					action: "deploy",
+					presets: {},
+					model: mockModel,
+					sessionId: TEST_SESSION_ID,
+				},
 				deps,
 			);
 
@@ -617,6 +698,7 @@ describe("runAgentSkill", () => {
 					action: "review",
 					presets: { target: "src/main.ts" },
 					model: mockModel,
+					sessionId: TEST_SESSION_ID,
 				},
 				deps,
 			);
@@ -677,7 +759,12 @@ describe("runAgentSkill", () => {
 			);
 
 			const result = await runAgentSkill(
-				{ name: "analyze-image", presets: { image_path: "screenshot.png" }, model: mockModel },
+				{
+					name: "analyze-image",
+					presets: { image_path: "screenshot.png" },
+					model: mockModel,
+					sessionId: TEST_SESSION_ID,
+				},
 				deps,
 			);
 
@@ -735,7 +822,10 @@ describe("runAgentSkill", () => {
 				]),
 			);
 
-			await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+			await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+				deps,
+			);
 
 			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
 				.calls[0][0];
@@ -771,7 +861,10 @@ describe("runAgentSkill", () => {
 				]),
 			);
 
-			await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+			await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+				deps,
+			);
 
 			const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock
 				.calls[0][0];
@@ -786,7 +879,10 @@ describe("runAgentSkill", () => {
 		const skill = createAgentSkill();
 		const deps = createMockDeps(skill);
 
-		await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+		await runAgentSkill(
+			{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+			deps,
+		);
 
 		const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
 		expect(executorCall.model).toBe(mockModel);
@@ -796,7 +892,16 @@ describe("runAgentSkill", () => {
 		const skill = createAgentSkill();
 		const deps = createMockDeps(skill);
 
-		await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel, noInput: true }, deps);
+		await runAgentSkill(
+			{
+				name: "test-agent",
+				presets: {},
+				model: mockModel,
+				noInput: true,
+				sessionId: TEST_SESSION_ID,
+			},
+			deps,
+		);
 
 		expect(deps.promptCollector.collect).toHaveBeenCalledWith(
 			expect.anything(),
@@ -836,7 +941,7 @@ describe("runAgentSkill", () => {
 			};
 
 			const result = await runAgentSkill(
-				{ name: "test-agent", presets: {}, model: mockModel },
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
 				deps,
 			);
 
@@ -857,7 +962,7 @@ describe("runAgentSkill", () => {
 			};
 
 			const result = await runAgentSkill(
-				{ name: "test-agent", presets: {}, model: mockModel },
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
 				deps,
 			);
 
@@ -890,7 +995,7 @@ describe("runAgentSkill", () => {
 			};
 
 			const result = await runAgentSkill(
-				{ name: "test-agent", presets: {}, model: mockModel },
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
 				deps,
 			);
 
@@ -909,7 +1014,7 @@ describe("runAgentSkill", () => {
 			const deps = createMockDeps(skill);
 
 			const result = await runAgentSkill(
-				{ name: "test-agent", presets: {}, model: mockModel },
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
 				deps,
 			);
 
@@ -934,7 +1039,7 @@ describe("runAgentSkill", () => {
 			};
 
 			const result = await runAgentSkill(
-				{ name: "test-agent", presets: {}, model: mockModel },
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
 				deps,
 			);
 
@@ -956,7 +1061,10 @@ describe("runAgentSkill", () => {
 				mcpToolResolver,
 			};
 
-			await runAgentSkill({ name: "test-agent", presets: {}, model: mockModel }, deps);
+			await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+				deps,
+			);
 
 			expect(mcpToolResolver.closeAll).toHaveBeenCalledOnce();
 		});
@@ -980,7 +1088,7 @@ describe("runAgentSkill", () => {
 			};
 
 			const result = await runAgentSkill(
-				{ name: "test-agent", presets: {}, model: mockModel },
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
 				deps,
 			);
 

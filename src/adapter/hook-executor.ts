@@ -30,6 +30,7 @@ function buildEnvVars(context: HookContext): Record<string, string> {
 		TASKP_DURATION_MS: String(context.durationMs),
 		TASKP_ERROR: errorValue.slice(0, MAX_ERROR_LENGTH),
 		TASKP_CALLER_SKILL: context.callerSkill ?? "",
+		TASKP_SESSION_ID: context.sessionId,
 	};
 }
 

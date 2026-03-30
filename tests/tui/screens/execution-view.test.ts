@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+import type { SessionId } from "../../../src/core/execution/session";
 import type { Skill } from "../../../src/core/skill/skill";
 import type { SkillInput } from "../../../src/core/skill/skill-input";
 import type { SkillMetadata } from "../../../src/core/skill/skill-metadata";
 import { err, ok } from "../../../src/core/types/result";
 import type { ExecutionViewPort } from "../../../src/tui/tui-stream-writer";
+
+const TEST_SESSION_ID = "tskp_test000001" as SessionId;
 
 vi.mock("../../../src/usecase/run-skill");
 vi.mock("../../../src/usecase/run-agent-skill");
@@ -180,6 +183,7 @@ describe("runExecution", () => {
 						result: { exitCode: 0, stdout: "hello\n", stderr: "" },
 					},
 				],
+				sessionId: TEST_SESSION_ID,
 			}),
 		);
 
@@ -206,6 +210,7 @@ describe("runExecution", () => {
 						result: { exitCode: 1, stdout: "", stderr: "not found\n" },
 					},
 				],
+				sessionId: TEST_SESSION_ID,
 			}),
 		);
 

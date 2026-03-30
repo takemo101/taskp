@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import type { SessionId } from "../../src/core/execution/session";
 import { ErrorType } from "../../src/core/types/errors";
 import { runHooks } from "../../src/usecase/hook-runner";
 import type { HookContext, HookExecutorPort } from "../../src/usecase/port/hook-executor";
+
+const TEST_SESSION_ID = "tskp_test000001" as SessionId;
 
 function createMockExecutor(): HookExecutorPort & {
 	calls: { commands: readonly string[]; context: HookContext }[];
@@ -22,7 +25,13 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["echo ok"], on_failure: ["echo fail"] },
-			context: { skillName: "deploy", mode: "template", status: "success", durationMs: 100 },
+			context: {
+				skillName: "deploy",
+				mode: "template",
+				status: "success",
+				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
+			},
 		});
 
 		expect(result.ok).toBe(true);
@@ -41,6 +50,7 @@ describe("runHooks", () => {
 				status: "failed",
 				durationMs: 50,
 				error: "boom",
+				sessionId: TEST_SESSION_ID,
 			},
 		});
 
@@ -54,7 +64,13 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_success: [], on_failure: [] },
-			context: { skillName: "deploy", mode: "template", status: "success", durationMs: 100 },
+			context: {
+				skillName: "deploy",
+				mode: "template",
+				status: "success",
+				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
+			},
 		});
 
 		expect(result.ok).toBe(true);
@@ -66,7 +82,13 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: {},
-			context: { skillName: "deploy", mode: "agent", status: "success", durationMs: 100 },
+			context: {
+				skillName: "deploy",
+				mode: "agent",
+				status: "success",
+				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
+			},
 		});
 
 		expect(result.ok).toBe(true);
@@ -77,7 +99,13 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: undefined,
 			hooksConfig: { on_success: ["echo ok"] },
-			context: { skillName: "deploy", mode: "template", status: "success", durationMs: 100 },
+			context: {
+				skillName: "deploy",
+				mode: "template",
+				status: "success",
+				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
+			},
 		});
 
 		expect(result.ok).toBe(true);
@@ -88,7 +116,13 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: undefined,
-			context: { skillName: "deploy", mode: "template", status: "success", durationMs: 100 },
+			context: {
+				skillName: "deploy",
+				mode: "template",
+				status: "success",
+				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
+			},
 		});
 
 		expect(result.ok).toBe(true);
@@ -109,7 +143,13 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["echo ok", "fail-cmd"] },
-			context: { skillName: "deploy", mode: "template", status: "success", durationMs: 100 },
+			context: {
+				skillName: "deploy",
+				mode: "template",
+				status: "success",
+				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
+			},
 		});
 
 		expect(result.ok).toBe(false);
@@ -129,7 +169,13 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_failure: ["notify", "cleanup"] },
-			context: { skillName: "deploy", mode: "template", status: "failed", durationMs: 50 },
+			context: {
+				skillName: "deploy",
+				mode: "template",
+				status: "failed",
+				durationMs: 50,
+				sessionId: TEST_SESSION_ID,
+			},
 		});
 
 		expect(result.ok).toBe(false);
@@ -149,7 +195,13 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["bad-cmd"] },
-			context: { skillName: "deploy", mode: "template", status: "success", durationMs: 100 },
+			context: {
+				skillName: "deploy",
+				mode: "template",
+				status: "success",
+				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
+			},
 		});
 
 		expect(result.ok).toBe(false);
@@ -168,7 +220,13 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: throwingExecutor,
 			hooksConfig: { on_success: ["echo ok"] },
-			context: { skillName: "deploy", mode: "template", status: "success", durationMs: 100 },
+			context: {
+				skillName: "deploy",
+				mode: "template",
+				status: "success",
+				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
+			},
 		});
 
 		expect(result.ok).toBe(false);
@@ -186,6 +244,7 @@ describe("runHooks", () => {
 			status: "failed",
 			durationMs: 5000,
 			error: "timeout",
+			sessionId: TEST_SESSION_ID,
 		};
 
 		const result = await runHooks({
@@ -206,6 +265,7 @@ describe("runHooks", () => {
 			mode: "template",
 			status: "success",
 			durationMs: 100,
+			sessionId: TEST_SESSION_ID,
 		};
 
 		const result = await runHooks({
@@ -226,6 +286,7 @@ describe("runHooks", () => {
 			status: "success",
 			durationMs: 100,
 			callerSkill: "diagnose",
+			sessionId: TEST_SESSION_ID,
 		};
 
 		const result = await runHooks({
@@ -245,6 +306,7 @@ describe("runHooks", () => {
 			mode: "template",
 			status: "success",
 			durationMs: 100,
+			sessionId: TEST_SESSION_ID,
 		};
 
 		const result = await runHooks({
@@ -264,6 +326,7 @@ describe("runHooks", () => {
 			mode: "template",
 			status: "success",
 			durationMs: 100,
+			sessionId: TEST_SESSION_ID,
 		};
 
 		const result = await runHooks({
