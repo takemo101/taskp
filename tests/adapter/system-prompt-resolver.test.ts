@@ -3,11 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createSystemPromptResolver } from "../../src/adapter/system-prompt-resolver";
+import type { SessionId } from "../../src/core/execution/session";
 
 const defaultOptions = {
 	toolNames: ["bash", "write"] as readonly string[],
 	cwd: "/test/project",
 	date: "2026-03-22",
+	sessionId: "tskp_test000001" as SessionId,
 };
 
 describe("SystemPromptResolver", () => {

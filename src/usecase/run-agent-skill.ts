@@ -96,6 +96,7 @@ export async function runAgentSkill(
 		toolNames,
 		cwd: process.cwd(),
 		date: reserved.date,
+		sessionId: input.sessionId,
 	});
 
 	// prompt: SKILL.md 本文（タスク指示）を先頭に、context ソース出力（データ）を続けて配置

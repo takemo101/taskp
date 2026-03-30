@@ -32,7 +32,7 @@ export function createSystemPromptResolver(projectRoot: string): SystemPromptRes
 			return [
 				customPrompt,
 				`# Available tools\n\n${formatToolsList(options.toolNames)}`,
-				formatEnvironment(options.cwd, options.date),
+				formatEnvironment(options.cwd, options.date, options.sessionId),
 			].join("\n\n");
 		},
 	};
