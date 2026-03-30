@@ -19,6 +19,10 @@ vi.mock("@modelcontextprotocol/sdk/client/stdio.js", () => ({
 }));
 
 const { createMcpToolResolver } = await import("../../../src/adapter/mcp-tool-resolver");
+const { StdioClientTransport: MockStdioTransport } = await import(
+	"@modelcontextprotocol/sdk/client/stdio.js"
+);
+const mockStdioTransport = MockStdioTransport as unknown as ReturnType<typeof vi.fn>;
 
 function createMockLogger(): Logger {
 	return {
@@ -216,7 +220,7 @@ describe("createMcpToolResolver", () => {
 			}
 		});
 
-		it("stdio トランスポートで正しい引数が渡されること", async () => {
+		it("stdio トランスポートで ${VAR} 形式の env が解決されること", async () => {
 			const client = createMockClient();
 			mockCreateMCPClient.mockResolvedValue(client);
 			mockTools.mockResolvedValue({});
@@ -230,21 +234,75 @@ describe("createMcpToolResolver", () => {
 						transport: "stdio",
 						command: "npx",
 						args: ["-y", "test-server"],
-						env: { API_KEY: "MY_TOKEN" },
+						env: { API_KEY: "${MY_TOKEN}" },
 					},
 				};
 
 				const resolver = createMcpToolResolver(configs, logger);
 				await resolver.resolveTools([{ type: "all", server: "test" }]);
 
-				expect(mockCreateMCPClient).toHaveBeenCalledTimes(1);
-				const callArg = mockCreateMCPClient.mock.calls[0][0];
-				expect(callArg.transport).toBeDefined();
+				const transportOpts = mockStdioTransport.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+				expect(transportOpts.env).toEqual({ API_KEY: "secret-value" });
 			} finally {
 				if (originalEnv === undefined) {
 					delete process.env.MY_TOKEN;
 				} else {
 					process.env.MY_TOKEN = originalEnv;
+				}
+			}
+		});
+
+		it("stdio トランスポートで env のリテラル値がそのまま渡されること", async () => {
+			const client = createMockClient();
+			mockCreateMCPClient.mockResolvedValue(client);
+			mockTools.mockResolvedValue({});
+
+			const configs: Record<string, McpServerConfig> = {
+				test: {
+					transport: "stdio",
+					command: "npx",
+					args: ["-y", "test-server"],
+					env: { DIRECT_FLAG: "1", MODE: "production" },
+				},
+			};
+
+			const resolver = createMcpToolResolver(configs, logger);
+			await resolver.resolveTools([{ type: "all", server: "test" }]);
+
+			const transportOpts = mockStdioTransport.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+			expect(transportOpts.env).toEqual({ DIRECT_FLAG: "1", MODE: "production" });
+		});
+
+		it("stdio トランスポートで env のリテラル値と ${VAR} を混在できること", async () => {
+			const client = createMockClient();
+			mockCreateMCPClient.mockResolvedValue(client);
+			mockTools.mockResolvedValue({});
+
+			const originalEnv = process.env.SECRET_KEY;
+			process.env.SECRET_KEY = "s3cret";
+
+			try {
+				const configs: Record<string, McpServerConfig> = {
+					test: {
+						transport: "stdio",
+						command: "npx",
+						env: { MODE: "production", API_KEY: "${SECRET_KEY}" },
+					},
+				};
+
+				const resolver = createMcpToolResolver(configs, logger);
+				await resolver.resolveTools([{ type: "all", server: "test" }]);
+
+				const transportOpts = mockStdioTransport.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+				expect(transportOpts.env).toEqual({
+					MODE: "production",
+					API_KEY: "s3cret",
+				});
+			} finally {
+				if (originalEnv === undefined) {
+					delete process.env.SECRET_KEY;
+				} else {
+					process.env.SECRET_KEY = originalEnv;
 				}
 			}
 		});
@@ -262,7 +320,7 @@ describe("createMcpToolResolver", () => {
 					remote: {
 						transport: "http",
 						url: "https://mcp.example.com/mcp",
-						headers_env: { Authorization: "AUTH_TOKEN" },
+						headers_env: { Authorization: "${AUTH_TOKEN}" },
 					},
 				};
 
@@ -280,6 +338,26 @@ describe("createMcpToolResolver", () => {
 					process.env.AUTH_TOKEN = originalEnv;
 				}
 			}
+		});
+
+		it("headers_env のリテラル値がそのまま渡されること", async () => {
+			const client = createMockClient();
+			mockCreateMCPClient.mockResolvedValue(client);
+			mockTools.mockResolvedValue({});
+
+			const configs: Record<string, McpServerConfig> = {
+				remote: {
+					transport: "http",
+					url: "https://mcp.example.com/mcp",
+					headers_env: { "X-Custom": "static-value" },
+				},
+			};
+
+			const resolver = createMcpToolResolver(configs, logger);
+			await resolver.resolveTools([{ type: "all", server: "remote" }]);
+
+			const callArg = mockCreateMCPClient.mock.calls[0][0];
+			expect(callArg.transport.headers).toEqual({ "X-Custom": "static-value" });
 		});
 
 		it("sse トランスポートで正しく接続されること", async () => {
@@ -312,7 +390,7 @@ describe("createMcpToolResolver", () => {
 					remote: {
 						transport: "http",
 						url: "https://mcp.example.com/mcp",
-						headers_env: { Authorization: "NONEXISTENT_VAR_FOR_TEST" },
+						headers_env: { Authorization: "${NONEXISTENT_VAR_FOR_TEST}" },
 					},
 				};
 

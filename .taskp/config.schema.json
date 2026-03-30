@@ -129,7 +129,7 @@
                     }
                   },
                   "env": {
-                    "description": "Environment variable names to pass",
+                    "description": "Environment variables to pass. Use ${VAR} to reference process env, or literal values",
                     "type": "object",
                     "propertyNames": {
                       "type": "string"
@@ -158,7 +158,7 @@
                     "description": "HTTP endpoint URL"
                   },
                   "headers_env": {
-                    "description": "Environment variable names for HTTP headers",
+                    "description": "HTTP header values. Use ${VAR} to reference process env, or literal values",
                     "type": "object",
                     "propertyNames": {
                       "type": "string"
@@ -187,7 +187,7 @@
                     "description": "SSE endpoint URL"
                   },
                   "headers_env": {
-                    "description": "Environment variable names for HTTP headers",
+                    "description": "HTTP header values. Use ${VAR} to reference process env, or literal values",
                     "type": "object",
                     "propertyNames": {
                       "type": "string"

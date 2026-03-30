@@ -43,10 +43,21 @@ LLM が GitHub でリリースを作成し、Slack に通知する。
 transport = "stdio"
 command = "npx"
 args = ["-y", "@modelcontextprotocol/server-github"]
-env = { GITHUB_TOKEN = "GITHUB_TOKEN" }
+env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }
 ```
 
-`env` の値は環境変数名を指定する。実行時に `process.env[値]` で解決し、子プロセスの環境変数として渡す。既存の `api_key_env` パターンと同じ戦略。
+`env` の値はリテラル値または `${VAR}` 形式の環境変数参照を指定する。`${VAR}` 形式の場合は実行時に `process.env[VAR]` で解決し、それ以外はリテラル値としてそのまま子プロセスの環境変数に渡す。
+
+```toml
+# リテラル値: そのまま "1" が渡される
+env = { DIRECT_FLAG = "1" }
+
+# 環境変数参照: process.env["GITHUB_TOKEN"] の値が渡される
+env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }
+
+# 混在も可能
+env = { MODE = "production", API_KEY = "${MY_API_KEY}" }
+```
 
 #### HTTP トランスポート
 
@@ -54,10 +65,10 @@ env = { GITHUB_TOKEN = "GITHUB_TOKEN" }
 [mcp.servers.remote-api]
 transport = "http"
 url = "https://mcp.example.com/mcp"
-headers_env = { Authorization = "MCP_API_TOKEN" }
+headers_env = { Authorization = "${MCP_API_TOKEN}" }
 ```
 
-`headers_env` の値は環境変数名を指定する。実行時に `process.env[値]` で解決し、HTTP ヘッダーの値として使用する。
+`headers_env` の値も `env` と同様にリテラル値または `${VAR}` 形式の環境変数参照を指定する。
 
 #### SSE トランスポート
 
@@ -492,7 +503,7 @@ function connectByTransport(config: McpServerConfig, logger: Logger): Promise<MC
         transport: new StdioClientTransport({
           command: config.command,
           args: config.args,
-          env: resolveEnvMap(config.env),
+          env: resolveValueMap(config.env),
         }),
       });
     case "http":
@@ -500,7 +511,7 @@ function connectByTransport(config: McpServerConfig, logger: Logger): Promise<MC
         transport: {
           type: "http",
           url: config.url,
-          headers: resolveHeadersEnv(config.headers_env),
+          headers: resolveValueMap(config.headers_env),
         },
       });
     case "sse":
@@ -508,37 +519,30 @@ function connectByTransport(config: McpServerConfig, logger: Logger): Promise<MC
         transport: {
           type: "sse",
           url: config.url,
-          headers: resolveHeadersEnv(config.headers_env),
+          headers: resolveValueMap(config.headers_env),
         },
       });
   }
 }
 
-// env マップの値（環境変数名）を実際の環境変数値に解決する
-function resolveEnvMap(
-  envMap: Record<string, string> | undefined,
-): Record<string, string> | undefined {
-  if (!envMap) return undefined;
-  const resolved: Record<string, string> = {};
-  for (const [key, envVarName] of Object.entries(envMap)) {
-    const value = process.env[envVarName];
-    if (value !== undefined) {
-      resolved[key] = value;
-    }
-  }
-  return resolved;
+// ${VAR} 形式の環境変数参照パターン（完全一致のみ、部分展開は非サポート）
+const ENV_REF_PATTERN = /^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/;
+
+function resolveEnvValue(raw: string): string | undefined {
+  const match = ENV_REF_PATTERN.exec(raw);
+  if (match) return process.env[match[1]];
+  return raw;
 }
 
-// headers_env の値（環境変数名）を実際の値に解決する
-function resolveHeadersEnv(
-  headersEnv: Record<string, string> | undefined,
+function resolveValueMap(
+  map: Record<string, string> | undefined,
 ): Record<string, string> | undefined {
-  if (!headersEnv) return undefined;
+  if (!map) return undefined;
   const resolved: Record<string, string> = {};
-  for (const [header, envVarName] of Object.entries(headersEnv)) {
-    const value = process.env[envVarName];
+  for (const [key, raw] of Object.entries(map)) {
+    const value = resolveEnvValue(raw);
     if (value !== undefined) {
-      resolved[header] = value;
+      resolved[key] = value;
     }
   }
   return resolved;

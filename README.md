@@ -441,7 +441,7 @@ tools:
 transport = "stdio"
 command = "npx"
 args = ["-y", "@modelcontextprotocol/server-github"]
-env = { GITHUB_TOKEN = "GITHUB_TOKEN" }
+env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }
 ```
 
 #### `taskp_run`

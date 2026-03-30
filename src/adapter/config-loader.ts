@@ -47,7 +47,12 @@ const stdioServerSchema = z.object({
 	transport: z.literal("stdio"),
 	command: z.string().min(1).describe("Command to execute"),
 	args: z.array(z.string()).optional().describe("Command arguments"),
-	env: z.record(z.string(), z.string()).optional().describe("Environment variable names to pass"),
+	env: z
+		.record(z.string(), z.string())
+		.optional()
+		.describe(
+			"Environment variables to pass. Use ${VAR} to reference process env, or literal values",
+		),
 });
 
 const httpServerSchema = z.object({
@@ -56,7 +61,7 @@ const httpServerSchema = z.object({
 	headers_env: z
 		.record(z.string(), z.string())
 		.optional()
-		.describe("Environment variable names for HTTP headers"),
+		.describe("HTTP header values. Use ${VAR} to reference process env, or literal values"),
 });
 
 const sseServerSchema = z.object({
@@ -65,7 +70,7 @@ const sseServerSchema = z.object({
 	headers_env: z
 		.record(z.string(), z.string())
 		.optional()
-		.describe("Environment variable names for HTTP headers"),
+		.describe("HTTP header values. Use ${VAR} to reference process env, or literal values"),
 });
 
 export const mcpServerConfigSchema = z.discriminatedUnion("transport", [

@@ -191,7 +191,7 @@ transport の値によって必要なフィールドが異なる（discriminated
 | `transport` | `"stdio"` | ✅ | トランスポート種別 |
 | `command` | `string` | ✅ | 実行コマンド |
 | `args` | `string[]` | - | コマンド引数 |
-| `env` | `Record<string, string>` | - | 環境変数名のマップ（値は環境変数名、実行時に `process.env[値]` で解決） |
+| `env` | `Record<string, string>` | - | 環境変数マップ（リテラル値または `${VAR}` 形式で環境変数参照） |
 
 #### http トランスポート
 
@@ -199,7 +199,7 @@ transport の値によって必要なフィールドが異なる（discriminated
 |-----------|-----|:---:|------|
 | `transport` | `"http"` | ✅ | トランスポート種別 |
 | `url` | `string` (URL) | ✅ | HTTP エンドポイント URL |
-| `headers_env` | `Record<string, string>` | - | HTTP ヘッダーの環境変数名マップ（値は環境変数名、実行時に解決） |
+| `headers_env` | `Record<string, string>` | - | HTTP ヘッダー値マップ（リテラル値または `${VAR}` 形式で環境変数参照） |
 
 #### sse トランスポート
 
@@ -207,7 +207,7 @@ transport の値によって必要なフィールドが異なる（discriminated
 |-----------|-----|:---:|------|
 | `transport` | `"sse"` | ✅ | トランスポート種別 |
 | `url` | `string` (URL) | ✅ | SSE エンドポイント URL |
-| `headers_env` | `Record<string, string>` | - | HTTP ヘッダーの環境変数名マップ |
+| `headers_env` | `Record<string, string>` | - | HTTP ヘッダー値マップ（リテラル値または `${VAR}` 形式で環境変数参照） |
 
 ### マージ戦略
 
@@ -221,13 +221,13 @@ transport の値によって必要なフィールドが異なる（discriminated
 transport = "stdio"
 command = "npx"
 args = ["-y", "@modelcontextprotocol/server-github"]
-env = { GITHUB_TOKEN = "GITHUB_TOKEN" }
+env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }
 
 # http: リモート MCP サーバーに接続
 [mcp.servers.remote-api]
 transport = "http"
 url = "https://mcp.example.com/mcp"
-headers_env = { Authorization = "MCP_API_TOKEN" }
+headers_env = { Authorization = "${MCP_API_TOKEN}" }
 
 # sse: SSE エンドポイントに接続
 [mcp.servers.local-db]
