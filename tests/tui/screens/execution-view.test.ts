@@ -132,7 +132,7 @@ describe("runExecution", () => {
 		const view = createMockViewPort();
 		const deps = createMockDeps();
 
-		await runExecution(skill, {}, null, view, deps);
+		await runExecution(skill, {}, null, view, deps, undefined, TEST_SESSION_ID);
 
 		expect(view.calls).toContain("appendOutput:Error: LLM model not configured.\n");
 		expect(view.calls).toContain(
@@ -148,7 +148,7 @@ describe("runExecution", () => {
 
 		mockedRunSkill.mockRejectedValueOnce(new Error("unexpected failure"));
 
-		await runExecution(skill, {}, null, view, deps);
+		await runExecution(skill, {}, null, view, deps, undefined, TEST_SESSION_ID);
 
 		expect(view.calls).toContain("appendOutput:\nError: unexpected failure\n");
 		expect(view.calls).toContain("showSummary:0:0");
@@ -161,7 +161,7 @@ describe("runExecution", () => {
 
 		mockedRunSkill.mockRejectedValueOnce("string error");
 
-		await runExecution(skill, {}, null, view, deps);
+		await runExecution(skill, {}, null, view, deps, undefined, TEST_SESSION_ID);
 
 		expect(view.calls).toContain("appendOutput:\nError: string error\n");
 		expect(view.calls).toContain("showSummary:0:0");
@@ -187,7 +187,7 @@ describe("runExecution", () => {
 			}),
 		);
 
-		await runExecution(skill, {}, null, view, deps);
+		await runExecution(skill, {}, null, view, deps, undefined, TEST_SESSION_ID);
 
 		expect(view.calls).toContain("appendOutput:\n$ echo hello\n");
 		expect(view.calls).toContain("appendOutput:hello\n");
@@ -214,7 +214,7 @@ describe("runExecution", () => {
 			}),
 		);
 
-		await runExecution(skill, {}, null, view, deps);
+		await runExecution(skill, {}, null, view, deps, undefined, TEST_SESSION_ID);
 
 		expect(view.calls).toContain("appendOutput:not found\n");
 	});
@@ -228,7 +228,7 @@ describe("runExecution", () => {
 			err({ type: "SKILL_NOT_FOUND" as const, name: "tmpl-skill" }),
 		);
 
-		await runExecution(skill, {}, null, view, deps);
+		await runExecution(skill, {}, null, view, deps, undefined, TEST_SESSION_ID);
 
 		expect(view.calls).toContain("appendOutput:\nError: Skill not found: tmpl-skill\n");
 		expect(view.calls).toContain("showSummary:0:0");
@@ -244,7 +244,7 @@ describe("runExecution", () => {
 			err({ type: "EXECUTION_ERROR" as const, message: "LLM unavailable" }),
 		);
 
-		await runExecution(skill, {}, fakeModel, view, deps);
+		await runExecution(skill, {}, fakeModel, view, deps, undefined, TEST_SESSION_ID);
 
 		expect(view.calls).toContain("appendOutput:\nError: LLM unavailable\n");
 		expect(view.calls).toContain("showSummary:0:0");
@@ -258,7 +258,7 @@ describe("runExecution", () => {
 
 		mockedRunAgentSkill.mockRejectedValueOnce(new Error("network error"));
 
-		await runExecution(skill, {}, fakeModel, view, deps);
+		await runExecution(skill, {}, fakeModel, view, deps, undefined, TEST_SESSION_ID);
 
 		expect(view.calls).toContain("appendOutput:\nError: network error\n");
 		expect(view.calls).toContain("showSummary:0:0");

@@ -5,6 +5,7 @@ import { createCommandRunner } from "../adapter/command-runner";
 import { createDefaultConfigLoader, type McpServerConfig } from "../adapter/config-loader";
 import { createConsoleLogger } from "../adapter/console-logger";
 import { createHookExecutor } from "../adapter/hook-executor";
+import { generateSessionId } from "../adapter/session-id-generator";
 import { createDefaultSkillLoader } from "../adapter/skill-loader";
 import { createSystemPromptResolver } from "../adapter/system-prompt-resolver";
 import { resolveActionConfig } from "../core/skill/action";
@@ -75,9 +76,10 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 			const variables = await showInputForm(renderer, skill, actionInputs);
 			if (!variables) continue;
 
+			const sessionId = generateSessionId();
 			const navAction = await showExecution(
 				renderer,
-				{ skill, variables, model, modelSpec, actionName },
+				{ skill, variables, model, modelSpec, actionName, sessionId },
 				executionDeps,
 			);
 			if (navAction === "exit") break;

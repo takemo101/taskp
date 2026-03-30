@@ -9,6 +9,7 @@ import {
 	TextRenderable,
 } from "@opentui/core";
 import type { ModelSpec } from "../../adapter/ai-provider";
+import type { SessionId } from "../../core/execution/session";
 import type { Skill } from "../../core/skill/skill";
 import { KeyHelp } from "../components/key-help";
 import { SPINNER_FRAMES, SPINNER_INTERVAL_MS } from "../components/spinner";
@@ -32,6 +33,7 @@ export type ExecutionParams = {
 	readonly model: LanguageModelV3 | null;
 	readonly modelSpec: ModelSpec | null;
 	readonly actionName?: string;
+	readonly sessionId: SessionId;
 };
 
 export async function showExecution(
@@ -39,7 +41,7 @@ export async function showExecution(
 	params: ExecutionParams,
 	deps: ExecutionDeps,
 ): Promise<"back" | "exit"> {
-	const { skill, variables, model, modelSpec, actionName } = params;
+	const { skill, variables, model, modelSpec, actionName, sessionId } = params;
 	return new Promise((resolve) => {
 		clearScreen(renderer);
 
@@ -51,7 +53,7 @@ export async function showExecution(
 			width: "100%",
 			height: "100%",
 			borderStyle: "rounded",
-			title: `${skillLabel} [Running]${modelLabel}`,
+			title: `${skillLabel} [Running] ${sessionId}${modelLabel}`,
 			padding: 1,
 			flexDirection: "column",
 			justifyContent: "flex-start",
@@ -141,12 +143,12 @@ export async function showExecution(
 				stopSpinner();
 				const seconds = (elapsedMs / 1000).toFixed(1);
 				summaryText.content = `Done in ${seconds}s (${steps} steps)`;
-				container.title = `${skillLabel} [Done]${modelLabel}`;
+				container.title = `${skillLabel} [Done] ${sessionId}${modelLabel}`;
 				helpBox.visible = true;
 			},
 		};
 
-		runExecution(skill, variables, model, viewPort, deps, actionName).then(() => {
+		runExecution(skill, variables, model, viewPort, deps, actionName, sessionId).then(() => {
 			const doneHandler = (key: KeyEvent) => {
 				if (key.name === "return") {
 					cleanup(doneHandler);
