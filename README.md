@@ -480,14 +480,13 @@ Supported formats: PNG, JPEG, GIF, WebP. The image is sent as binary data direct
 
 ## Skill Hooks
 
-Define `before`, `after`, and `on_failure` commands in the `hooks` field to run setup/teardown logic around skill execution.
+Define `before`, `after`, and `on_failure` commands in the `hooks` field to run setup/teardown logic around skill execution. Each field accepts a single command string or an array.
 
 ```yaml
 hooks:
-  before:
-    - "git stash --include-untracked"
+  before: "git stash --include-untracked"       # single string OK
   after:
-    - "git stash pop || true"
+    - "git stash pop || true"                   # array also OK
   on_failure:
     - "curl -X POST https://slack.example.com/webhook -d '{\"text\": \"Failed: $TASKP_ERROR\"}'"
 ```
