@@ -10,6 +10,8 @@ A CLI tool that runs skills (task procedures) defined in Markdown — collecting
 - **Two execution modes** — Template rendering (no LLM required) and AI agent execution
 - **Multi-action skills** — Group related operations (add/delete/list) into a single skill
 - **Multi-provider support** — Anthropic / OpenAI / Google / Ollama
+- **Skill hooks** — Run setup/teardown commands before and after skill execution
+- **Session ID & output forwarding** — Track executions and pipe results to hooks
 - **MCP server** — Usable from AI tools like Claude Code and pi
 - **MCP client** — Use external MCP server tools (GitHub, Slack, etc.) in agent mode
 
@@ -183,7 +185,7 @@ taskp run task:add --set title="Buy milk"
 taskp tui                          # Select actions interactively
 ```
 
-Each action can have its own `mode`, `model`, `inputs`, `tools`, and `context` — mixing template and agent mode within a single skill.
+Each action can have its own `mode`, `model`, `inputs`, `tools`, `context`, and `hooks` — mixing template and agent mode within a single skill.
 
 ## Commands
 
@@ -330,6 +332,13 @@ context:                # Sources auto-included in context (optional)
     run: "git diff --cached"
   - type: image
     path: "docs/diagram.png"
+hooks:                  # Lifecycle hooks (optional)
+  before:
+    - "git stash --include-untracked"
+  after:
+    - "git stash pop || true"
+  on_failure:
+    - "echo 'Failed: $TASKP_ERROR'"
 actions:                # Multi-action definitions (optional)
   build:
     description: Build the project
@@ -468,6 +477,89 @@ context:
 ```
 
 Supported formats: PNG, JPEG, GIF, WebP. The image is sent as binary data directly to the LLM.
+
+## Skill Hooks
+
+Define `before`, `after`, and `on_failure` commands in the `hooks` field to run setup/teardown logic around skill execution.
+
+```yaml
+hooks:
+  before:
+    - "git stash --include-untracked"
+  after:
+    - "git stash pop || true"
+  on_failure:
+    - "curl -X POST https://slack.example.com/webhook -d '{\"text\": \"Failed: $TASKP_ERROR\"}'"
+```
+
+### Execution Order
+
+```
+skill hooks.before → skill body → skill hooks.after → skill hooks.on_failure → global hooks
+```
+
+- **`before`** — Blocking. If any command fails, the skill body is skipped (but `after` still runs for cleanup).
+- **`after`** — Always runs after the skill body (success or failure). Failures are warnings only.
+- **`on_failure`** — Runs only when the skill body or `before` failed. Runs after `after`.
+
+Global hooks defined in `config.toml` run independently after skill hooks. See [Config Spec](docs/CONFIG-SPEC.md#hooks--ライフサイクルフック設定) for details.
+
+Actions can also define their own `hooks`, which completely override the skill-level hooks (no merging).
+
+Hooks are skipped when `--dry-run` is specified.
+
+### Hook Environment Variables
+
+In addition to the [global hook environment variables](docs/CONFIG-SPEC.md#フックに渡される環境変数), skill hooks receive:
+
+| Variable | Description |
+|----------|-------------|
+| `TASKP_HOOK_PHASE` | Current phase (`before` / `after` / `on_failure`) |
+| `TASKP_OUTPUT_FILE` | Absolute path to the output file (see [Output Forwarding](#output-forwarding)) |
+
+## Session ID
+
+Each skill execution is assigned a unique session ID in the format `tskp_<random>` (e.g., `tskp_a1b2c3d4e5f6`).
+
+- Available as the reserved variable `{{__session_id__}}` in skill templates
+- Passed to hooks via the `TASKP_SESSION_ID` environment variable
+- Included in the agent mode system prompt
+- Nested `taskp_run` calls share the parent's session ID
+
+```yaml
+---
+name: deploy
+mode: template
+---
+```
+
+```markdown
+# Deploy (Session: {{__session_id__}})
+
+｀｀｀bash
+curl -X POST https://api.example.com/deploy \
+  --header "X-Session-Id: {{__session_id__}}"
+｀｀｀
+```
+
+## Output Forwarding
+
+Skill execution output is written to a temporary file, accessible from hook commands via `$TASKP_OUTPUT_FILE`.
+
+- **Template mode**: stdout from all commands, concatenated with newlines
+- **Agent mode**: final LLM text output
+
+```bash
+# after hook: save output to a log file
+cp "$TASKP_OUTPUT_FILE" "logs/${TASKP_SKILL_REF}_$(date +%Y%m%d).txt"
+
+# after hook: feed output into another skill
+taskp run summarize --set content="$(cat $TASKP_OUTPUT_FILE)"
+```
+
+The output file is created before execution and cleaned up (directory deleted) after all hooks complete.
+
+For full details, see [Skill Spec — Output Forwarding](docs/SKILL-SPEC.md#出力フォワーディング).
 
 ## Custom System Prompt
 
