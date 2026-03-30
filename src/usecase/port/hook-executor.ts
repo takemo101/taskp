@@ -1,5 +1,6 @@
+import type { SessionId } from "../../core/execution/session";
+
 export type HookContext = {
-	readonly sessionId: string;
 	readonly skillName: string;
 	readonly actionName?: string;
 	readonly mode: "template" | "agent";
@@ -7,6 +8,7 @@ export type HookContext = {
 	readonly durationMs: number;
 	readonly error?: string;
 	readonly callerSkill?: string;
+	readonly sessionId: SessionId;
 };
 
 export type HookResult = {

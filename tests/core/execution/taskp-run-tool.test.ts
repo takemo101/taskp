@@ -2,11 +2,14 @@ import matter from "gray-matter";
 import { describe, expect, it } from "vitest";
 import type { TaskpRunDeps, TaskpRunResult } from "../../../src/core/execution/agent-tools";
 import { buildTools, TOOL_NAMES } from "../../../src/core/execution/agent-tools";
+import type { SessionId } from "../../../src/core/execution/session";
 import type { Skill } from "../../../src/core/skill/skill";
 import { createSkillBody } from "../../../src/core/skill/skill-body";
 import { createInMemorySkillRepository } from "../../stubs/in-memory-skill-repository";
 import { createStubCommandExecutor } from "../../stubs/stub-command-executor";
 import { createStubPromptCollector } from "../../stubs/stub-prompt-collector";
+
+const TEST_SESSION_ID = "tskp_test000001" as SessionId;
 
 const TEMPLATE_SKILL_MD = `---
 name: greet
@@ -135,6 +138,7 @@ function createDeps(skills: readonly Skill[], callStack?: readonly string[]): Ta
 		commandExecutor: createStubCommandExecutor(),
 		promptCollector: createStubPromptCollector({}),
 		callStack,
+		sessionId: TEST_SESSION_ID,
 	};
 }
 
@@ -296,6 +300,7 @@ describe("taskp_run tool", () => {
 			skillRepository: createInMemorySkillRepository([skill]),
 			commandExecutor: executor,
 			promptCollector: createStubPromptCollector({}),
+			sessionId: TEST_SESSION_ID,
 		};
 		const tool = unwrapTaskpRun(deps);
 

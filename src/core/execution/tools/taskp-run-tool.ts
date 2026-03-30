@@ -6,6 +6,7 @@ import type { HookExecutorPort } from "../../../usecase/port/hook-executor";
 import type { PromptCollector } from "../../../usecase/port/prompt-collector";
 import type { SkillRepository } from "../../../usecase/port/skill-repository";
 import { type RunOutput, runSkill } from "../../../usecase/run-skill";
+import type { SessionId } from "../../execution/session";
 import type { Action } from "../../skill/action";
 import { resolveActionConfig } from "../../skill/action";
 import type { Skill } from "../../skill/skill";
@@ -41,6 +42,7 @@ export type TaskpRunDeps = {
 	readonly callerSkillName?: string;
 	readonly hookExecutor?: HookExecutorPort;
 	readonly hooksConfig?: HooksConfig;
+	readonly sessionId: SessionId;
 };
 
 // Tool<I, O> のジェネリクスが共変でないため、異なる I/O を持つツールを
@@ -114,6 +116,7 @@ async function executeTaskpRun(
 			force: false,
 			noInput: true,
 			callerSkill: deps.callerSkillName,
+			sessionId: deps.sessionId,
 		},
 		{
 			skillRepository: deps.skillRepository,

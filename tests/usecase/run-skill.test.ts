@@ -1,5 +1,6 @@
 import matter from "gray-matter";
 import { describe, expect, it, vi } from "vitest";
+import type { SessionId } from "../../src/core/execution/session";
 import type { Skill } from "../../src/core/skill/skill";
 import { createSkillBody } from "../../src/core/skill/skill-body";
 import { executionError, skillNotFoundError } from "../../src/core/types/errors";
@@ -11,6 +12,8 @@ import type { PromptCollector } from "../../src/usecase/port/prompt-collector";
 import type { SkillRepository } from "../../src/usecase/port/skill-repository";
 import type { RunSkillDeps, RunSkillInput } from "../../src/usecase/run-skill";
 import { runSkill } from "../../src/usecase/run-skill";
+
+const TEST_SESSION_ID = "tskp_test000001" as SessionId;
 
 const TEMPLATE_SKILL_MD = `---
 name: deploy
@@ -106,6 +109,7 @@ function createInput(overrides?: Partial<RunSkillInput>): RunSkillInput {
 		presets: {},
 		dryRun: false,
 		force: false,
+		sessionId: TEST_SESSION_ID,
 		...overrides,
 	};
 }
@@ -121,6 +125,22 @@ describe("runSkill", () => {
 		expect(result.value.commands).toHaveLength(1);
 		expect(result.value.commands[0].result.exitCode).toBe(0);
 		expect(result.value.commands[0].command).toContain("deploying to staging");
+	});
+
+	it("includes sessionId in output", async () => {
+		const result = await runSkill(createInput(), createDeps());
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.sessionId).toBe(TEST_SESSION_ID);
+	});
+
+	it("includes sessionId in dry-run output", async () => {
+		const result = await runSkill(createInput({ dryRun: true }), createDeps());
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.sessionId).toBe(TEST_SESSION_ID);
 	});
 
 	it("returns error for non-existent skill", async () => {
@@ -415,6 +435,33 @@ echo "step 2 {{env}}"
 
 			expect(result.ok).toBe(true);
 			expect(hookExecutor.execute).not.toHaveBeenCalled();
+		});
+
+		it("passes sessionId to hook context on success", async () => {
+			const hookExecutor = stubHookExecutor();
+			const deps = createDeps({
+				hookExecutor,
+				hooksConfig: { on_success: ["echo done"] },
+			});
+
+			const result = await runSkill(createInput(), deps);
+
+			expect(result.ok).toBe(true);
+			expect(hookExecutor.calls[0].context.sessionId).toBe(TEST_SESSION_ID);
+		});
+
+		it("passes sessionId to hook context on failure", async () => {
+			const hookExecutor = stubHookExecutor();
+			const deps = createDeps({
+				commandExecutor: stubExecutor("fail"),
+				hookExecutor,
+				hooksConfig: { on_failure: ["echo fail"] },
+			});
+
+			const result = await runSkill(createInput(), deps);
+
+			expect(result.ok).toBe(false);
+			expect(hookExecutor.calls[0].context.sessionId).toBe(TEST_SESSION_ID);
 		});
 	});
 

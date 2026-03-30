@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import type { SessionId } from "../../src/core/execution/session";
 import { ErrorType } from "../../src/core/types/errors";
 import { runHooks } from "../../src/usecase/hook-runner";
 import type { HookContext, HookExecutorPort } from "../../src/usecase/port/hook-executor";
+
+const TEST_SESSION_ID = "tskp_test000001" as SessionId;
 
 function createMockExecutor(): HookExecutorPort & {
 	calls: { commands: readonly string[]; context: HookContext }[];
@@ -23,11 +26,11 @@ describe("runHooks", () => {
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["echo ok"], on_failure: ["echo fail"] },
 			context: {
-				sessionId: "tskp_test",
 				skillName: "deploy",
 				mode: "template",
 				status: "success",
 				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
 			},
 		});
 
@@ -42,12 +45,12 @@ describe("runHooks", () => {
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["echo ok"], on_failure: ["echo fail"] },
 			context: {
-				sessionId: "tskp_test",
 				skillName: "deploy",
 				mode: "template",
 				status: "failed",
 				durationMs: 50,
 				error: "boom",
+				sessionId: TEST_SESSION_ID,
 			},
 		});
 
@@ -62,11 +65,11 @@ describe("runHooks", () => {
 			hookExecutor: executor,
 			hooksConfig: { on_success: [], on_failure: [] },
 			context: {
-				sessionId: "tskp_test",
 				skillName: "deploy",
 				mode: "template",
 				status: "success",
 				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
 			},
 		});
 
@@ -80,11 +83,11 @@ describe("runHooks", () => {
 			hookExecutor: executor,
 			hooksConfig: {},
 			context: {
-				sessionId: "tskp_test",
 				skillName: "deploy",
 				mode: "agent",
 				status: "success",
 				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
 			},
 		});
 
@@ -97,11 +100,11 @@ describe("runHooks", () => {
 			hookExecutor: undefined,
 			hooksConfig: { on_success: ["echo ok"] },
 			context: {
-				sessionId: "tskp_test",
 				skillName: "deploy",
 				mode: "template",
 				status: "success",
 				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
 			},
 		});
 
@@ -114,11 +117,11 @@ describe("runHooks", () => {
 			hookExecutor: executor,
 			hooksConfig: undefined,
 			context: {
-				sessionId: "tskp_test",
 				skillName: "deploy",
 				mode: "template",
 				status: "success",
 				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
 			},
 		});
 
@@ -141,11 +144,11 @@ describe("runHooks", () => {
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["echo ok", "fail-cmd"] },
 			context: {
-				sessionId: "tskp_test",
 				skillName: "deploy",
 				mode: "template",
 				status: "success",
 				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
 			},
 		});
 
@@ -167,11 +170,11 @@ describe("runHooks", () => {
 			hookExecutor: executor,
 			hooksConfig: { on_failure: ["notify", "cleanup"] },
 			context: {
-				sessionId: "tskp_test",
 				skillName: "deploy",
 				mode: "template",
 				status: "failed",
 				durationMs: 50,
+				sessionId: TEST_SESSION_ID,
 			},
 		});
 
@@ -193,11 +196,11 @@ describe("runHooks", () => {
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["bad-cmd"] },
 			context: {
-				sessionId: "tskp_test",
 				skillName: "deploy",
 				mode: "template",
 				status: "success",
 				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
 			},
 		});
 
@@ -218,11 +221,11 @@ describe("runHooks", () => {
 			hookExecutor: throwingExecutor,
 			hooksConfig: { on_success: ["echo ok"] },
 			context: {
-				sessionId: "tskp_test",
 				skillName: "deploy",
 				mode: "template",
 				status: "success",
 				durationMs: 100,
+				sessionId: TEST_SESSION_ID,
 			},
 		});
 
@@ -236,12 +239,12 @@ describe("runHooks", () => {
 	it("passes context to executor", async () => {
 		const executor = createMockExecutor();
 		const context: HookContext = {
-			sessionId: "tskp_test",
 			skillName: "build",
 			mode: "agent",
 			status: "failed",
 			durationMs: 5000,
 			error: "timeout",
+			sessionId: TEST_SESSION_ID,
 		};
 
 		const result = await runHooks({
@@ -257,12 +260,12 @@ describe("runHooks", () => {
 	it("passes actionName in context when action is specified", async () => {
 		const executor = createMockExecutor();
 		const context: HookContext = {
-			sessionId: "tskp_test",
 			skillName: "task",
 			actionName: "add",
 			mode: "template",
 			status: "success",
 			durationMs: 100,
+			sessionId: TEST_SESSION_ID,
 		};
 
 		const result = await runHooks({
@@ -278,12 +281,12 @@ describe("runHooks", () => {
 	it("passes callerSkill in context when present", async () => {
 		const executor = createMockExecutor();
 		const context: HookContext = {
-			sessionId: "tskp_test",
 			skillName: "build",
 			mode: "template",
 			status: "success",
 			durationMs: 100,
 			callerSkill: "diagnose",
+			sessionId: TEST_SESSION_ID,
 		};
 
 		const result = await runHooks({
@@ -299,11 +302,11 @@ describe("runHooks", () => {
 	it("omits callerSkill in context for direct execution", async () => {
 		const executor = createMockExecutor();
 		const context: HookContext = {
-			sessionId: "tskp_test",
 			skillName: "deploy",
 			mode: "template",
 			status: "success",
 			durationMs: 100,
+			sessionId: TEST_SESSION_ID,
 		};
 
 		const result = await runHooks({
@@ -319,11 +322,11 @@ describe("runHooks", () => {
 	it("omits actionName in context for single skill execution", async () => {
 		const executor = createMockExecutor();
 		const context: HookContext = {
-			sessionId: "tskp_test",
 			skillName: "deploy",
 			mode: "template",
 			status: "success",
 			durationMs: 100,
+			sessionId: TEST_SESSION_ID,
 		};
 
 		const result = await runHooks({

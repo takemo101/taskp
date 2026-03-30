@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHookExecutor } from "../../src/adapter/hook-executor";
 import { createSilentLogger } from "../../src/adapter/silent-logger";
+import type { SessionId } from "../../src/core/execution/session";
 import type { ExecutionError } from "../../src/core/types/errors";
 import type { Result } from "../../src/core/types/result";
 import { err, ok } from "../../src/core/types/result";
@@ -11,6 +12,8 @@ import type {
 } from "../../src/usecase/port/command-executor";
 import type { HookContext } from "../../src/usecase/port/hook-executor";
 import type { Logger } from "../../src/usecase/port/logger";
+
+const TEST_SESSION_ID = "tskp_test000001" as SessionId;
 
 type ExecutedCommand = {
 	readonly command: string;
@@ -37,20 +40,20 @@ function createSpyCommandExecutor(
 }
 
 const successContext: HookContext = {
-	sessionId: "tskp_abc123",
 	skillName: "deploy",
 	mode: "template",
 	status: "success",
 	durationMs: 1234,
+	sessionId: TEST_SESSION_ID,
 };
 
 const failedContext: HookContext = {
-	sessionId: "tskp_abc123",
 	skillName: "deploy",
 	mode: "agent",
 	status: "failed",
 	durationMs: 5678,
 	error: "Command failed: exit 1",
+	sessionId: TEST_SESSION_ID,
 };
 
 describe("HookExecutor", () => {
@@ -77,7 +80,7 @@ describe("HookExecutor", () => {
 
 		const env = executor.executedCommands[0].options?.env;
 		expect(env).toMatchObject({
-			TASKP_SESSION_ID: "tskp_abc123",
+			TASKP_SESSION_ID: TEST_SESSION_ID,
 			TASKP_SKILL_NAME: "deploy",
 			TASKP_ACTION_NAME: "",
 			TASKP_SKILL_REF: "deploy",
@@ -96,7 +99,7 @@ describe("HookExecutor", () => {
 		await hookExecutor.execute(["echo test"], successContext);
 
 		const env = executor.executedCommands[0].options?.env;
-		expect(env?.TASKP_SESSION_ID).toBe("tskp_abc123");
+		expect(env?.TASKP_SESSION_ID).toBe(TEST_SESSION_ID);
 	});
 
 	it("injects TASKP_ACTION_NAME when actionName is present", async () => {
@@ -117,12 +120,12 @@ describe("HookExecutor", () => {
 		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
 		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 		const contextWithAction: HookContext = {
-			sessionId: "tskp_abc123",
 			skillName: "task",
 			actionName: "add",
 			mode: "template",
 			status: "success",
 			durationMs: 100,
+			sessionId: TEST_SESSION_ID,
 		};
 
 		await hookExecutor.execute(["echo test"], contextWithAction);
@@ -229,6 +232,16 @@ describe("HookExecutor", () => {
 
 		const env = executor.executedCommands[0].options?.env;
 		expect(env?.TASKP_CALLER_SKILL).toBe("");
+	});
+
+	it("injects TASKP_SESSION_ID", async () => {
+		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
+
+		await hookExecutor.execute(["echo test"], successContext);
+
+		const env = executor.executedCommands[0].options?.env;
+		expect(env?.TASKP_SESSION_ID).toBe(TEST_SESSION_ID);
 	});
 
 	it("sets timeout to 30 seconds", async () => {
