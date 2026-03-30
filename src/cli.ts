@@ -74,7 +74,7 @@ function formatRunOutput(output: RunOutput): string {
 	const failed = output.commands.filter((c) => c.result.exitCode !== 0);
 	lines.push("");
 	lines.push(
-		`✔ ${output.skillName} completed (${output.commands.length} steps, ${failed.length} failed)`,
+		`✔ ${output.skillName} completed (${output.commands.length} steps, ${failed.length} failed) [${output.sessionId}]`,
 	);
 
 	return lines.join("\n");
@@ -366,10 +366,15 @@ async function runAgentMode(
 
 	const languageModel = exitOnError(createLanguageModel(modelSpec, aiConfig));
 
+	const sessionId = generateSessionId();
+
 	const writer = createStreamWriter({
 		verbose: c.options.verbose ?? false,
 		output: process.stdout,
+		sessionId,
 	});
+
+	writer.writeHeader();
 
 	const logger = createConsoleLogger();
 	const contextCollectorDeps = await createDefaultContextCollectorDeps();
@@ -397,7 +402,7 @@ async function runAgentMode(
 			model: languageModel,
 			noInput: c.options.skipPrompt,
 			maxAgentSteps: config.cli?.max_agent_steps,
-			sessionId: generateSessionId(),
+			sessionId,
 		},
 		{
 			skillRepository,

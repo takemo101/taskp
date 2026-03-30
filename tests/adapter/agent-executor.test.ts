@@ -8,6 +8,7 @@ function createMockWriter(): StreamWriter & {
 	const calls: { method: string; args: unknown[] }[] = [];
 	return {
 		calls,
+		writeHeader: vi.fn((...args) => calls.push({ method: "writeHeader", args })),
 		writeText: vi.fn((...args) => calls.push({ method: "writeText", args })),
 		writeToolCall: vi.fn((...args) => calls.push({ method: "writeToolCall", args })),
 		writeToolResult: vi.fn((...args) => calls.push({ method: "writeToolResult", args })),

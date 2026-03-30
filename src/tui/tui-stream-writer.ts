@@ -33,6 +33,9 @@ export function createTuiStreamWriter(view: ExecutionViewPort): StreamWriter {
 	}
 
 	return {
+		writeHeader(): void {
+			// TUI は独自のヘッダー表示を持つため、ストリームヘッダーは出力しない
+		},
 		writeText(text: string): void {
 			buffer += text;
 			scheduleFlush();

@@ -57,6 +57,14 @@ describe("CLI E2E: init → list → run", () => {
 		expect(runResult.stdout).toContain("hello completed");
 	});
 
+	it("run output includes session ID with tskp_ prefix", async () => {
+		await run("init sid-test", projectDir);
+
+		const runResult = await run("run sid-test", projectDir);
+		expect(runResult.exitCode).toBe(0);
+		expect(runResult.stdout).toMatch(/\[tskp_[a-f0-9]{12}\]/);
+	});
+
 	it("init with --mode template creates a template skill", async () => {
 		const initResult = await run("init greet --mode template", projectDir);
 		expect(initResult.exitCode).toBe(0);
