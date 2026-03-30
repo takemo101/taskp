@@ -65,6 +65,7 @@ taskp run deploy --skip-prompt
 
 ```typescript
 interface RunOutput {
+  sessionId: string;                // セッション ID（tskp_xxxxx 形式）
   skill: string;                    // 実行したスキル名
   mode: "template" | "agent";      // 実行モード
   status: "success" | "failed";    // 実行結果
@@ -72,6 +73,12 @@ interface RunOutput {
   steps?: number;                   // 実行ステップ数（template モード）
   error?: string;                   // エラーメッセージ（失敗時）
 }
+```
+
+セッション ID は実行開始時に自動発行され、CLI 出力のサマリー行に表示される:
+
+```
+✔ deploy completed (3 steps, 0 failed) [tskp_a1b2c3d4e5f6]
 ```
 
 ### taskp list
@@ -347,6 +354,12 @@ taskp tui
 
 fzf 風のファジー検索でスキルを選択し、パラメータを入力して実行する。
 agent モードの実行結果はマークダウンでストリーミング表示される。
+
+実行画面のタイトルバーにはセッション ID が表示される:
+
+```
+┌ deploy [Running] tskp_a1b2c3d4e5f6 ─── anthropic/claude-sonnet-4-20250514 ┐
+```
 
 #### キーバインド
 

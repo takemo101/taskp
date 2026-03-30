@@ -246,10 +246,34 @@ url = "http://localhost:3001/sse"
 
 マージ戦略: プロジェクト設定がグローバル設定を上書き（フィールド単位）。
 
+### フックに渡される環境変数
+
+フックコマンド実行時、以下の環境変数が自動的に設定される:
+
+| 環境変数 | 説明 |
+|---------|------|
+| `TASKP_SESSION_ID` | セッション ID（`tskp_xxxxx` 形式） |
+| `TASKP_SKILL_NAME` | 実行したスキル名 |
+| `TASKP_ACTION_NAME` | 実行したアクション名（アクションなしの場合は空文字） |
+| `TASKP_SKILL_REF` | スキル参照（`skill` または `skill:action` 形式） |
+| `TASKP_MODE` | 実行モード（`template` \| `agent`） |
+| `TASKP_STATUS` | 実行結果（`success` \| `failed`） |
+| `TASKP_DURATION_MS` | 実行時間（ミリ秒） |
+| `TASKP_ERROR` | エラーメッセージ（失敗時、最大 1024 文字） |
+| `TASKP_CALLER_SKILL` | 呼び出し元スキル名（`taskp_run` 経由の場合） |
+
 ### 設定例
 
 ```toml
 [hooks]
 on_success = ["echo 'done'"]
 on_failure = ["echo 'failed'"]
+```
+
+セッション ID を利用したフックの例:
+
+```toml
+[hooks]
+on_success = ["curl -X POST https://api.example.com/notify -d '{\"session\":\"'$TASKP_SESSION_ID'\"}'"]
+on_failure = ["echo \"Session $TASKP_SESSION_ID failed: $TASKP_ERROR\""]
 ```

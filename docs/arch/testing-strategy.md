@@ -197,6 +197,38 @@ tests/
 4. **高速を維持** — `bun run test` が 10 秒以内に完了すること
 5. **決定的** — 同じ入力で常に同じ結果
 
+### 非決定的な値の扱い
+
+ランダム生成やタイムスタンプなど非決定的な値は、テスト時に固定値を外部から注入する。
+
+#### SessionId
+
+`SessionId` は Adapter 層の `generateSessionId()` で生成されるが、UseCase の入力型（`RunSkillInput.sessionId`）で受け取る設計のため、テスト時には固定値を直接渡す。
+
+```typescript
+import type { SessionId } from "../src/core/execution/session";
+
+// テスト用の固定セッション ID
+const TEST_SESSION_ID = "tskp_test000001" as SessionId;
+
+describe("RunSkill", () => {
+  it("セッション ID を出力に含める", async () => {
+    const result = await runSkill({
+      name: "deploy",
+      sessionId: TEST_SESSION_ID,
+      presets: {},
+      dryRun: false,
+      force: false,
+    }, deps);
+
+    expect(result.ok).toBe(true);
+    expect(result.value.sessionId).toBe(TEST_SESSION_ID);
+  });
+});
+```
+
+`generateSessionId()` 自体のテストではプレフィックスと長さの検証のみ行い、ランダム部分の具体値には依存しない。
+
 ## 実行コマンド
 
 ```bash
