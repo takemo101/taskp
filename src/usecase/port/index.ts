@@ -4,6 +4,7 @@ export type { ContextCollectorPort } from "./context-collector";
 export type { HookContext, HookExecutorPort, HookResult } from "./hook-executor";
 export type { Logger } from "./logger";
 export type { McpToolResolverPort, ResolvedMcpToolSet } from "./mcp-tool-resolver";
+export type { OutputFileStorePort } from "./output-file-store";
 export type { PromptCollector } from "./prompt-collector";
 export type { InitOptions, SkillInitializer } from "./skill-initializer";
 export type { SkillRepository } from "./skill-repository";
