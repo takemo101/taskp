@@ -1,4 +1,5 @@
 export type HookContext = {
+	readonly sessionId: string;
 	readonly skillName: string;
 	readonly actionName?: string;
 	readonly mode: "template" | "agent";

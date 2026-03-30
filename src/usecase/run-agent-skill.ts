@@ -179,6 +179,7 @@ export async function runAgentSkill(
 				hookExecutor: deps.hookExecutor,
 				hooksConfig: deps.hooksConfig,
 				context: {
+					sessionId: reserved.sessionId,
 					skillName: skill.metadata.name,
 					actionName: input.action,
 					mode: "agent",
@@ -194,6 +195,7 @@ export async function runAgentSkill(
 			hookExecutor: deps.hookExecutor,
 			hooksConfig: deps.hooksConfig,
 			context: {
+				sessionId: reserved.sessionId,
 				skillName: skill.metadata.name,
 				actionName: input.action,
 				mode: "agent",

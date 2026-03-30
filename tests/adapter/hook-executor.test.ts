@@ -37,6 +37,7 @@ function createSpyCommandExecutor(
 }
 
 const successContext: HookContext = {
+	sessionId: "tskp_abc123",
 	skillName: "deploy",
 	mode: "template",
 	status: "success",
@@ -44,6 +45,7 @@ const successContext: HookContext = {
 };
 
 const failedContext: HookContext = {
+	sessionId: "tskp_abc123",
 	skillName: "deploy",
 	mode: "agent",
 	status: "failed",
@@ -75,6 +77,7 @@ describe("HookExecutor", () => {
 
 		const env = executor.executedCommands[0].options?.env;
 		expect(env).toMatchObject({
+			TASKP_SESSION_ID: "tskp_abc123",
 			TASKP_SKILL_NAME: "deploy",
 			TASKP_ACTION_NAME: "",
 			TASKP_SKILL_REF: "deploy",
@@ -84,6 +87,16 @@ describe("HookExecutor", () => {
 			TASKP_ERROR: "",
 			TASKP_CALLER_SKILL: "",
 		});
+	});
+
+	it("injects TASKP_SESSION_ID from context", async () => {
+		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
+		const hookExecutor = createHookExecutor(executor, createSilentLogger());
+
+		await hookExecutor.execute(["echo test"], successContext);
+
+		const env = executor.executedCommands[0].options?.env;
+		expect(env?.TASKP_SESSION_ID).toBe("tskp_abc123");
 	});
 
 	it("injects TASKP_ACTION_NAME when actionName is present", async () => {
@@ -104,6 +117,7 @@ describe("HookExecutor", () => {
 		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
 		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 		const contextWithAction: HookContext = {
+			sessionId: "tskp_abc123",
 			skillName: "task",
 			actionName: "add",
 			mode: "template",

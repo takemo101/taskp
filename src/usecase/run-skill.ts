@@ -140,6 +140,7 @@ async function executeAndReport(
 			hookExecutor: deps.hookExecutor,
 			hooksConfig: deps.hooksConfig,
 			context: {
+				sessionId: reserved.sessionId,
 				skillName: skill.metadata.name,
 				actionName: input.action,
 				mode: "template",
@@ -156,6 +157,7 @@ async function executeAndReport(
 		hookExecutor: deps.hookExecutor,
 		hooksConfig: deps.hooksConfig,
 		context: {
+			sessionId: reserved.sessionId,
 			skillName: skill.metadata.name,
 			actionName: input.action,
 			mode: "template",
