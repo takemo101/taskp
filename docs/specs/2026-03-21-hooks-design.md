@@ -193,6 +193,7 @@ taskp run deploy
 
 ## 将来の拡張候補
 
-- スキル単位のフック定義（SKILL.md フロントマターに `hooks` セクション）
-- `on_start` フック（実行開始前）
+- ~~スキル単位のフック定義（SKILL.md フロントマターに `hooks` セクション）~~ → **設計済み**: [スキル単位フック設計](./2026-03-30-per-skill-hooks-design.md)
+- ~~`on_start` フック（実行開始前）~~ → **設計済み**: `hooks.before` として [スキル単位フック設計](./2026-03-30-per-skill-hooks-design.md) に含まれる
 - フック実行のタイムアウト設定（config.toml で変更可能に）
+- `before` の non-blocking オプション（`!` プレフィックスで失敗しても続行）
