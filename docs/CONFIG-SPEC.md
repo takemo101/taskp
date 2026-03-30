@@ -261,6 +261,28 @@ url = "http://localhost:3001/sse"
 | `TASKP_DURATION_MS` | 実行時間（ミリ秒） |
 | `TASKP_ERROR` | エラーメッセージ（失敗時、最大 1024 文字） |
 | `TASKP_CALLER_SKILL` | 呼び出し元スキル名（`taskp_run` 経由の場合） |
+| `TASKP_HOOK_PHASE` | フックフェーズ（`before` / `after` / `on_failure` / `on_success`）。グローバル hooks では `on_success` または `on_failure` |
+| `TASKP_OUTPUT_FILE` | スキル出力ファイルの絶対パス（[出力フォワーディング](SKILL-SPEC.md#出力フォワーディング)参照） |
+
+### スキル単位フックとの関係
+
+`config.toml` のグローバル hooks に加え、SKILL.md フロントマターでスキル/アクション単位のフックを定義できる。詳細は [スキル仕様 — スキル単位フック](SKILL-SPEC.md#スキル単位フック) を参照。
+
+#### 実行順序
+
+```
+① skill hooks.before       ← SKILL.md で定義（失敗→スキル中断）
+② スキル本体実行
+③ skill hooks.after         ← SKILL.md で定義（常に実行、warning only）
+④ skill hooks.on_failure    ← SKILL.md で定義（失敗時のみ、warning only）
+⑤ global hooks.on_success   ← config.toml で定義（成功時のみ、warning only）
+   or on_failure             ← config.toml で定義（失敗時のみ、warning only）
+```
+
+スキル hooks とグローバル hooks はマージされず、独立して順次実行される。
+
+- **スキル hooks**: スキル固有のセットアップ・クリーンアップ（`git stash`, バックアップ等）
+- **グローバル hooks**: 横断的関心事（通知、ログ記録等）
 
 ### 設定例
 
@@ -276,4 +298,11 @@ on_failure = ["echo 'failed'"]
 [hooks]
 on_success = ["curl -X POST https://api.example.com/notify -d '{\"session\":\"'$TASKP_SESSION_ID'\"}'"]
 on_failure = ["echo \"Session $TASKP_SESSION_ID failed: $TASKP_ERROR\""]
+```
+
+出力ファイルを利用したフックの例:
+
+```toml
+[hooks]
+on_success = ["cp \"$TASKP_OUTPUT_FILE\" \"logs/${TASKP_SKILL_REF}_$(date +%Y%m%d).log\" 2>/dev/null || true"]
 ```

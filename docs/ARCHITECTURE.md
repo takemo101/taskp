@@ -48,10 +48,15 @@ taskp/
 │       │   │   ├── prompt-runner.ts          ← インタラクティブ質問の実行
 │       │   │   ├── command-runner.ts         ← シェルコマンド実行
 │       │   │   ├── ai-provider.ts            ← LLM プロバイダ管理
+│       │   │   ├── hook-executor.ts          ← HookExecutorPort の実装
+│       │   │   ├── output-file-store.ts     ← 出力ファイル管理（/tmp/taskp/）
 │       │   │   ├── session-id-generator.ts  ← セッション ID 生成（副作用）
 │       │   │   └── mcp-tool-resolver.ts     ← MCP サーバー接続・ツール解決
 │       │   ├── usecase/            ← ユースケース
 │       │   │   ├── run-skill.ts              ← スキル実行
+│       │   │   ├── run-agent-skill.ts        ← agent モードスキル実行
+│       │   │   ├── hook-runner.ts            ← グローバルフック実行
+│       │   │   ├── skill-hook-runner.ts      ← スキル単位フック実行（before/after/on_failure）
 │       │   │   ├── list-skills.ts            ← スキル一覧
 │       │   │   └── init-skill.ts             ← スキル雛形生成
 │       │   └── types/              ← 共有型定義

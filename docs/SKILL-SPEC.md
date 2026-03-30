@@ -64,6 +64,7 @@ npm run deploy:{{environment}}
 | `tools` | `string[]` | `["bash", "read", "write"]` | agent モードで使用するツール。組み込み: `bash`, `read`, `write`, `edit`, `glob`, `grep`, `fetch`, `ask_user`, `taskp_run`。MCP: `mcp:<server>`, `mcp:<server>/<tool>` |
 | `context` | `ContextSource[]` | `[]` | 自動的にコンテキストに含めるソース |
 | `actions` | `Record<string, Action>` | - | アクション定義マップ。1つのスキルで複数のアクションを持つ場合に使用 |
+| `hooks` | `SkillHooks` | - | スキル固有ライフサイクルフック。詳細は [フック](#スキル単位フック) を参照 |
 
 ### Action 型
 
@@ -78,6 +79,7 @@ npm run deploy:{{environment}}
 | `context` | `ContextSource[]` | `skill.context` → `[]` | コンテキストソース |
 | `tools` | `string[]` | `skill.tools` → `["bash", "read", "write"]` | agent モード用ツール |
 | `timeout` | `number` | `skill.timeout` → コマンドランナーのデフォルト | template モードのタイムアウト（ms） |
+| `hooks` | `SkillHooks` | `skill.hooks` → `undefined` | スキル固有フック |
 
 #### 継承ルール
 
@@ -87,9 +89,12 @@ action.model   ?? skill.model   ?? undefined
 action.context ?? skill.context ?? []
 action.tools   ?? skill.tools   ?? ["bash", "read", "write"]
 action.timeout ?? skill.timeout ?? undefined
+action.hooks   ?? skill.hooks   ?? undefined
 ```
 
 `inputs` は継承しない。各アクションが独立した入力セットを持つため、スキルレベルの `inputs` からの暗黙の継承は混乱を招く。
+
+`hooks` はオブジェクト単位で置き換える。アクションが `hooks` を定義した場合、スキルレベルの `hooks` は完全に無視される（フィールド単位マージはしない）。これは `tools`, `context` と同じ戦略。
 
 #### スキルレベルの `inputs` との排他
 
@@ -190,6 +195,92 @@ type ContextSource =
 | `.webp` | `image/webp` |
 
 未対応の拡張子（`.svg`, `.bmp` 等）はエラーになる。
+
+### SkillHooks 型
+
+スキル/アクション単位で実行前後のフックコマンドを定義する。
+
+```typescript
+interface SkillHooks {
+  before?: string[];      // スキル実行前に実行（失敗→スキル中断）
+  after?: string[];       // スキル実行後に常に実行（成功・失敗問わず）
+  on_failure?: string[];  // スキル失敗時のみ追加実行（after の後）
+}
+```
+
+```yaml
+hooks:
+  before:
+    - "git stash --include-untracked"
+  after:
+    - "git stash pop || true"
+  on_failure:
+    - "echo 'Failed: $TASKP_ERROR'"
+```
+
+#### 実行順序
+
+```
+skill hooks.before → スキル本体 → skill hooks.after → skill hooks.on_failure → global hooks
+```
+
+- `before` は **blocking**: いずれかが失敗するとスキル実行を中断する
+- `after` は **non-blocking**: 失敗しても警告のみ。before 失敗時も実行される（リソース解放のため）
+- `on_failure` は **non-blocking**: スキル本体または before が失敗した場合のみ実行
+
+#### フックに渡される環境変数
+
+[`config.toml` のグローバル hooks と同じ環境変数](CONFIG-SPEC.md#フックに渡される環境変数)に加え、以下が利用可能:
+
+| 環境変数 | 説明 |
+|---------|------|
+| `TASKP_HOOK_PHASE` | 現在のフェーズ（`before` / `after` / `on_failure`） |
+| `TASKP_OUTPUT_FILE` | 出力ファイルの絶対パス（[出力フォワーディング](#出力フォワーディング)参照） |
+
+`before` フェーズでは `TASKP_STATUS`, `TASKP_DURATION_MS`, `TASKP_ERROR` は設定されない（実行前のため値が存在しない）。`TASKP_OUTPUT_FILE` は空ファイルとして存在する。
+
+#### `--dry-run` 時の挙動
+
+`--dry-run` 指定時はフックを実行しない（dry-run はプレビュー目的のため）。
+
+#### グローバル hooks との関係
+
+スキル hooks は `config.toml` のグローバル hooks とは独立して実行される。スキル hooks が先に実行され、その後にグローバル hooks が実行される。詳細は [CONFIG-SPEC の hooks セクション](CONFIG-SPEC.md#hooks--ライフサイクルフック設定) を参照。
+
+### 出力フォワーディング
+
+スキルの実行結果（template モードの stdout / agent モードの AI 出力テキスト）を一時ファイルに書き出し、フックコマンドから参照可能にする。
+
+#### 仕組み
+
+```
+TASKP_OUTPUT_FILE=/tmp/taskp/<session_id>/output.txt
+```
+
+- template モード: 全コマンドの stdout を改行区切りで連結
+- agent モード: LLM の最終テキスト出力
+
+#### 利用例
+
+```bash
+# after hook: 出力をログに保存
+cp "$TASKP_OUTPUT_FILE" "logs/${TASKP_SKILL_REF}_$(date +%Y%m%d).txt"
+
+# after hook: 出力を次のスキルの入力として利用
+taskp run summarize --set content="$(cat $TASKP_OUTPUT_FILE)"
+
+# after hook: AI 出力を Slack に通知
+curl -X POST https://slack.example.com/webhook \
+  -d "{\"text\": \"$(cat $TASKP_OUTPUT_FILE | head -50)\"}"
+```
+
+#### ファイルライフサイクル
+
+1. スキル実行開始前にディレクトリ `/tmp/taskp/<session_id>/` と空ファイルを作成
+2. スキル本体実行完了後に結果を書き込み
+3. 全フック完了後にクリーンアップ（ディレクトリごと削除）
+
+`taskp_run` で呼ばれた子スキルも同一セッションディレクトリに出力ファイルを作成する（ファイル名: `<skill_ref>_output.txt`）。
 
 ### MCP ツール参照
 
@@ -525,6 +616,117 @@ tools:
 ```
 
 `context: [{ type: image }]` で指定された画像は `Uint8Array` + mediaType としてバイナリ読み込みされ、マルチモーダルコンテンツとして LLM に送信される。`path` フィールドでは `{{変数}}` による変数展開が可能。
+
+### template モード（フック付き）: deploy
+
+```markdown
+---
+name: deploy
+description: アプリケーションをデプロイする
+mode: template
+hooks:
+  before:
+    - "git stash --include-untracked"
+    - "echo 'Deploying $TASKP_SKILL_REF'"
+  after:
+    - "git stash pop || true"
+  on_failure:
+    - "curl -X POST https://slack.example.com/webhook -d '{\"text\": \"❌ Deploy failed: $TASKP_ERROR\"}'"
+inputs:
+  - name: environment
+    type: select
+    message: "デプロイ先は？"
+    choices: [staging, production]
+  - name: branch
+    type: text
+    message: "ブランチ名は？"
+    default: main
+---
+
+# Deploy to {{environment}}
+
+\`\`\`bash
+git checkout {{branch}}
+git pull origin {{branch}}
+npm run build
+npm run deploy:{{environment}}
+\`\`\`
+```
+
+### agent モード（出力フォワーディング）: code-review
+
+```markdown
+---
+name: code-review
+description: コードレビューを実行する
+mode: agent
+model: anthropic/claude-sonnet-4-20250514
+hooks:
+  after:
+    - "cp \"$TASKP_OUTPUT_FILE\" \"reviews/$(date +%Y%m%d)_review.md\""
+inputs:
+  - name: target
+    type: text
+    message: "レビュー対象は？"
+context:
+  - type: glob
+    pattern: "{{target}}"
+---
+
+# コードレビュー
+
+以下の観点でコードをレビューしてください:
+
+1. バグの可能性がある箇所
+2. パフォーマンスの問題
+3. 可読性・保守性の改善点
+```
+
+### アクション付きスキル（アクション単位フック）: db
+
+```markdown
+---
+name: db
+description: データベースを管理する
+mode: template
+hooks:
+  after:
+    - "echo 'DB operation done: $TASKP_SKILL_REF in ${TASKP_DURATION_MS}ms'"
+actions:
+  migrate:
+    description: マイグレーション実行
+    hooks:
+      before:
+        - "pg_dump $DATABASE_URL > /tmp/backup_$(date +%s).sql"
+      on_failure:
+        - "echo '⚠️ Migration failed. Backup at /tmp/backup_*.sql'"
+    inputs:
+      - name: direction
+        type: select
+        message: "方向は？"
+        choices: [up, down]
+  seed:
+    description: シードデータ投入
+---
+
+# データベース管理
+
+## action:migrate
+
+マイグレーションを実行する。
+
+\`\`\`bash
+npx prisma migrate {{direction}}
+\`\`\`
+
+## action:seed
+
+シードデータを投入する。
+
+\`\`\`bash
+npx prisma db seed
+\`\`\`
+```
 
 ### アクション付きスキル: task
 

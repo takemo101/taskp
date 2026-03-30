@@ -132,6 +132,20 @@ async function agentLoop(skill: Skill, variables: Record<string, string>): Promi
 
 上限に達した場合はエラーとして中断する。無限ループ防止のための安全装置。
 
+### フックとの連携
+
+agent モードのスキルも SKILL.md フロントマターで `hooks` を定義できる。LLM の最終テキスト出力は一時ファイル（`TASKP_OUTPUT_FILE`）に書き出され、`after` / `on_failure` フックから参照可能。
+
+```yaml
+hooks:
+  after:
+    - "cp \"$TASKP_OUTPUT_FILE\" \"reviews/$(date +%Y%m%d).md\""
+```
+
+フックの実行順序: `skill before` → エージェントループ → `skill after` → `skill on_failure` → `global hooks`。
+
+`before` フックが失敗した場合、エージェントループは実行されない。詳細は [スキル仕様 — スキル単位フック](SKILL-SPEC.md#スキル単位フック) を参照。
+
 ## ツール定義
 
 agent モードで LLM に提供するツール。
