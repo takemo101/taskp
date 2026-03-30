@@ -10,6 +10,8 @@
 - **2つの実行モード** — テンプレート展開（LLM 不要）と AI エージェント実行
 - **マルチアクション** — 関連する操作（追加/削除/一覧）を1つのスキルにまとめられる
 - **マルチプロバイダ対応** — Anthropic / OpenAI / Google / Ollama をサポート
+- **スキルフック** — スキル実行前後にセットアップ/クリーンアップコマンドを実行可能
+- **セッション ID & 出力フォワーディング** — 実行のトラッキングとフックへの結果連携
 - **MCP サーバー** — Claude Code や pi などの AI ツールからも利用可能
 
 ## インストール
@@ -182,7 +184,7 @@ taskp run task:add --set title="買い物"
 taskp tui                          # TUI でアクションを選択
 ```
 
-各アクションは独自の `mode`、`model`、`inputs`、`tools`、`context` を持てます。1つのスキル内で template と agent モードを混在できます。
+各アクションは独自の `mode`、`model`、`inputs`、`tools`、`context`、`hooks` を持てます。1つのスキル内で template と agent モードを混在できます。
 
 ## コマンド一覧
 
@@ -329,6 +331,13 @@ context:                # 自動的にコンテキストに含めるソース（
     run: "git diff --cached"
   - type: image
     path: "docs/diagram.png"
+hooks:                  # ライフサイクルフック（省略可）
+  before:
+    - "git stash --include-untracked"
+  after:
+    - "git stash pop || true"
+  on_failure:
+    - "echo 'Failed: $TASKP_ERROR'"
 actions:                # マルチアクション定義（省略可）
   build:
     description: プロジェクトをビルドする
@@ -444,6 +453,89 @@ context:
 ```
 
 対応フォーマット: PNG, JPEG, GIF, WebP。画像はバイナリデータとして直接 LLM に送信されます。
+
+## スキルフック
+
+`hooks` フィールドで `before`、`after`、`on_failure` コマンドを定義し、スキル実行前後にセットアップ/クリーンアップ処理を実行できます。
+
+```yaml
+hooks:
+  before:
+    - "git stash --include-untracked"
+  after:
+    - "git stash pop || true"
+  on_failure:
+    - "curl -X POST https://slack.example.com/webhook -d '{\"text\": \"失敗: $TASKP_ERROR\"}'"
+```
+
+### 実行順序
+
+```
+skill hooks.before → スキル本体 → skill hooks.after → skill hooks.on_failure → global hooks
+```
+
+- **`before`** — ブロッキング。いずれかが失敗するとスキル本体をスキップ（ただし `after` はリソース解放のため実行される）
+- **`after`** — スキル本体の後に常に実行（成功・失敗問わず）。失敗しても警告のみ
+- **`on_failure`** — スキル本体または `before` が失敗した場合のみ実行。`after` の後に実行される
+
+`config.toml` で定義されるグローバル hooks はスキル hooks の後に独立して実行されます。詳細は [設定ファイル仕様](docs/CONFIG-SPEC.md#hooks--ライフサイクルフック設定) を参照。
+
+アクションも独自の `hooks` を定義でき、スキルレベルの hooks を完全に置き換えます（マージされません）。
+
+`--dry-run` 指定時はフックは実行されません。
+
+### フック環境変数
+
+[グローバルフックの環境変数](docs/CONFIG-SPEC.md#フックに渡される環境変数)に加え、スキルフックでは以下が利用可能です:
+
+| 環境変数 | 説明 |
+|---------|------|
+| `TASKP_HOOK_PHASE` | 現在のフェーズ（`before` / `after` / `on_failure`） |
+| `TASKP_OUTPUT_FILE` | 出力ファイルの絶対パス（[出力フォワーディング](#出力フォワーディング)参照） |
+
+## セッション ID
+
+スキル実行ごとに `tskp_<ランダム文字列>` 形式の一意なセッション ID が自動発行されます（例: `tskp_a1b2c3d4e5f6`）。
+
+- 予約変数 `{{__session_id__}}` としてテンプレート内で利用可能
+- フック実行時に環境変数 `TASKP_SESSION_ID` として参照可能
+- agent モードのシステムプロンプトにも含まれる
+- `taskp_run` でのネスト呼び出しでは親のセッション ID が伝搬される
+
+```yaml
+---
+name: deploy
+mode: template
+---
+```
+
+```markdown
+# Deploy (Session: {{__session_id__}})
+
+｀｀｀bash
+curl -X POST https://api.example.com/deploy \
+  --header "X-Session-Id: {{__session_id__}}"
+｀｀｀
+```
+
+## 出力フォワーディング
+
+スキルの実行結果は一時ファイルに書き出され、フックコマンドから `$TASKP_OUTPUT_FILE` で参照できます。
+
+- **template モード**: 全コマンドの stdout を改行区切りで連結
+- **agent モード**: LLM の最終テキスト出力
+
+```bash
+# after hook: 出力をログに保存
+cp "$TASKP_OUTPUT_FILE" "logs/${TASKP_SKILL_REF}_$(date +%Y%m%d).txt"
+
+# after hook: 出力を次のスキルの入力として利用
+taskp run summarize --set content="$(cat $TASKP_OUTPUT_FILE)"
+```
+
+出力ファイルは実行前に作成され、全フック完了後にディレクトリごとクリーンアップされます。
+
+詳細は [スキル仕様 — 出力フォワーディング](docs/SKILL-SPEC.md#出力フォワーディング) を参照してください。
 
 ## カスタムシステムプロンプト
 
