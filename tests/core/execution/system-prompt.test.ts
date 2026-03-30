@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { SessionId } from "../../../src/core/execution/session";
 import {
 	buildSystemPrompt,
 	formatEnvironment,
@@ -35,12 +36,17 @@ describe("formatToolsList", () => {
 });
 
 describe("formatEnvironment", () => {
-	it("includes cwd, date, and platform", () => {
-		const result = formatEnvironment("/home/user/project", "2026-03-22");
+	it("includes cwd, date, platform, and session ID", () => {
+		const result = formatEnvironment(
+			"/home/user/project",
+			"2026-03-22",
+			"tskp_test000001" as SessionId,
+		);
 
 		expect(result).toContain("Working directory: /home/user/project");
 		expect(result).toContain("Date: 2026-03-22");
 		expect(result).toContain(`Platform: ${process.platform}`);
+		expect(result).toContain("Session ID: tskp_test000001");
 	});
 });
 
@@ -49,6 +55,7 @@ describe("buildSystemPrompt", () => {
 		toolNames: ["bash", "read", "write"] as readonly string[],
 		cwd: "/home/user/project",
 		date: "2026-03-22",
+		sessionId: "tskp_test000001" as SessionId,
 	};
 
 	it("includes role definition", () => {
