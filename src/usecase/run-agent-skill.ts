@@ -19,6 +19,7 @@ import type { CollectedContext, ContextCollectorPort } from "./port/context-coll
 import type { HookExecutorPort } from "./port/hook-executor";
 import type { Logger } from "./port/logger";
 import type { McpToolResolverPort, ResolvedMcpToolSet } from "./port/mcp-tool-resolver";
+import type { OutputFileStorePort } from "./port/output-file-store";
 import { createNoopProgressWriter, type ProgressWriter } from "./port/progress-writer";
 import type { PromptCollector } from "./port/prompt-collector";
 import type { SkillRepository } from "./port/skill-repository";
@@ -51,6 +52,7 @@ export type RunAgentSkillDeps = {
 	readonly hookExecutor?: HookExecutorPort;
 	readonly hooksConfig?: HooksConfig;
 	readonly mcpToolResolver?: McpToolResolverPort;
+	readonly outputFileStore?: OutputFileStorePort;
 	readonly logger?: Logger;
 };
 
@@ -138,6 +140,7 @@ export async function runAgentSkill(
 		callerSkillName: skill.metadata.name,
 		hookExecutor: deps.hookExecutor,
 		hooksConfig: deps.hooksConfig,
+		outputFileStore: deps.outputFileStore,
 		sessionId: input.sessionId,
 	};
 

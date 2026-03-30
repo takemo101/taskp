@@ -7,6 +7,7 @@ import { executionError, skillNotFoundError } from "../../src/core/types/errors"
 import { err, ok } from "../../src/core/types/result";
 import type { CommandExecutor } from "../../src/usecase/port/command-executor";
 import type { HookContext, HookExecutorPort } from "../../src/usecase/port/hook-executor";
+import type { OutputFileStorePort } from "../../src/usecase/port/output-file-store";
 import { createNoopProgressWriter } from "../../src/usecase/port/progress-writer";
 import type { PromptCollector } from "../../src/usecase/port/prompt-collector";
 import type { SkillRepository } from "../../src/usecase/port/skill-repository";
@@ -637,6 +638,36 @@ echo "listing tasks"
 			if (!result.ok) return;
 			expect(result.value.skillName).toBe("deploy");
 			expect(result.value.commands).toHaveLength(1);
+		});
+	});
+
+	describe("outputFileStore injection", () => {
+		function stubOutputFileStore(): OutputFileStorePort {
+			return {
+				prepare: vi.fn().mockResolvedValue("/tmp/taskp/test/output.txt"),
+				write: vi.fn().mockResolvedValue(undefined),
+				cleanup: vi.fn().mockResolvedValue(undefined),
+			};
+		}
+
+		it("accepts outputFileStore in deps without affecting execution", async () => {
+			const outputFileStore = stubOutputFileStore();
+			const deps = createDeps({ outputFileStore });
+
+			const result = await runSkill(createInput(), deps);
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.skillName).toBe("deploy");
+			expect(result.value.commands).toHaveLength(1);
+		});
+
+		it("works without outputFileStore (backward compatible)", async () => {
+			const deps = createDeps();
+
+			const result = await runSkill(createInput(), deps);
+
+			expect(result.ok).toBe(true);
 		});
 	});
 });

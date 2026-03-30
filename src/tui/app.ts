@@ -5,6 +5,7 @@ import { createCommandRunner } from "../adapter/command-runner";
 import { createDefaultConfigLoader, type McpServerConfig } from "../adapter/config-loader";
 import { createConsoleLogger } from "../adapter/console-logger";
 import { createHookExecutor } from "../adapter/hook-executor";
+import { createOutputFileStore } from "../adapter/output-file-store";
 import { generateSessionId } from "../adapter/session-id-generator";
 import { createDefaultSkillLoader } from "../adapter/skill-loader";
 import { createSystemPromptResolver } from "../adapter/system-prompt-resolver";
@@ -55,10 +56,12 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 		const commandExecutor = createCommandRunner({ defaultTimeoutMs: commandTimeoutMs });
 		const logger = createConsoleLogger();
 		const hookExecutor = createHookExecutor(commandExecutor, logger);
+		const outputFileStore = createOutputFileStore();
 		const executionDeps: ExecutionDeps = {
 			commandExecutor,
 			hookExecutor,
 			hooksConfig,
+			outputFileStore,
 			skillRepositoryFactory: createSingleSkillRepository,
 			promptCollectorFactory: createPresetPromptCollector,
 			systemPromptResolver: createSystemPromptResolver(process.cwd()),
