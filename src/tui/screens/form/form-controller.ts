@@ -1,7 +1,14 @@
 import { FocusManager } from "./focus-manager";
 import type { FormElement } from "./form-element";
+import type { FormValidationError, FormValidator } from "./form-validator";
 import { RenderStateManager } from "./render-state-manager";
 import { ValueStore } from "./value-store";
+
+type FormControllerOptions = {
+	readonly onComplete: (result: Record<string, string>) => void;
+	readonly validator?: FormValidator;
+	readonly onValidationError?: (error: FormValidationError) => void;
+};
 
 class FormController {
 	private readonly focusManager: FocusManager;
@@ -9,9 +16,13 @@ class FormController {
 	private readonly renderState: RenderStateManager;
 	private elements: readonly FormElement[] = [];
 	private readonly onComplete: (result: Record<string, string>) => void;
+	private readonly validator: FormValidator | undefined;
+	private readonly onValidationError: ((error: FormValidationError) => void) | undefined;
 
-	constructor(onComplete: (result: Record<string, string>) => void) {
-		this.onComplete = onComplete;
+	constructor(options: FormControllerOptions) {
+		this.onComplete = options.onComplete;
+		this.validator = options.validator;
+		this.onValidationError = options.onValidationError;
 		this.focusManager = new FocusManager();
 		this.valueStore = new ValueStore();
 		this.renderState = new RenderStateManager(this.focusManager, this.valueStore);
@@ -59,7 +70,22 @@ class FormController {
 	}
 
 	private completeForm(): void {
-		this.onComplete(this.valueStore.collect(this.elements));
+		const values = this.valueStore.collect(this.elements);
+
+		if (this.validator) {
+			const error = this.validator(values);
+			if (error !== undefined) {
+				this.onValidationError?.(error);
+				const index = this.elements.findIndex((e) => e.input.name === error.name);
+				if (index !== -1) {
+					this.focusManager.setIndex(index);
+					this.syncView();
+				}
+				return;
+			}
+		}
+
+		this.onComplete(values);
 	}
 }
 

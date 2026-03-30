@@ -1,5 +1,6 @@
 import { ExitPromptError } from "@inquirer/core";
 import { confirm, editor, input, number, password, select } from "@inquirer/prompts";
+import { checkInputError } from "../core/skill/check-input-error";
 import type { SkillInput } from "../core/skill/skill-input";
 import type { ExecutionError } from "../core/types/errors";
 import { executionError } from "../core/types/errors";
@@ -45,7 +46,12 @@ async function resolveInput(
 	options?: PromptCollectOptions,
 ): Promise<Result<string, ExecutionError>> {
 	if (skillInput.name in presets) {
-		return ok(presets[skillInput.name]);
+		const presetValue = presets[skillInput.name];
+		const error = checkInputError(skillInput, presetValue);
+		if (error !== undefined) {
+			return err(executionError(error));
+		}
+		return ok(presetValue);
 	}
 	if (options?.noInput) {
 		return resolveNonInteractive(skillInput);
@@ -55,7 +61,12 @@ async function resolveInput(
 
 function resolveNonInteractive(skillInput: SkillInput): Result<string, ExecutionError> {
 	if (skillInput.default !== undefined) {
-		return ok(String(skillInput.default));
+		const value = String(skillInput.default);
+		const error = checkInputError(skillInput, value);
+		if (error !== undefined) {
+			return err(executionError(error));
+		}
+		return ok(value);
 	}
 	// required は optional (boolean | undefined)。undefined は「required」として扱う
 	// （SkillInput の Zod スキーマでデフォルト値が設定されていないため）

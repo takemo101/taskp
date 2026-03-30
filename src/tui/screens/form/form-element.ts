@@ -10,6 +10,7 @@ type FormElement = {
 	readonly input: SkillInput;
 	readonly label: TextRenderable;
 	readonly element: InputRenderable | SelectRenderable | TextareaRenderable;
+	readonly errorLabel: TextRenderable;
 };
 
 export type { FormElement };
