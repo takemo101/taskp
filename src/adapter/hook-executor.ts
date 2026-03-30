@@ -4,6 +4,7 @@ import type {
 	BeforeHookContext,
 	HookContext,
 	HookExecutorPort,
+	HookPhase,
 	HookResult,
 } from "../usecase/port/hook-executor";
 import type { Logger } from "../usecase/port/logger";
@@ -68,6 +69,31 @@ export function buildAfterEnvVars(
 	};
 }
 
+function isSkillHookContext(
+	context: HookContext | BeforeHookContext | AfterHookContext,
+): context is BeforeHookContext | AfterHookContext {
+	return "outputFile" in context;
+}
+
+function isAfterHookContext(
+	context: BeforeHookContext | AfterHookContext,
+): context is AfterHookContext {
+	return "status" in context;
+}
+
+function buildEnvVarsForContext(
+	context: HookContext | BeforeHookContext | AfterHookContext,
+	phase: string,
+): Record<string, string> {
+	if (!isSkillHookContext(context)) {
+		return buildEnvVars(context);
+	}
+	if (isAfterHookContext(context)) {
+		return buildAfterEnvVars(context, phase);
+	}
+	return buildBaseEnvVars(context, phase);
+}
+
 export function createHookExecutor(
 	commandExecutor: CommandExecutor,
 	logger: Logger,
@@ -75,13 +101,17 @@ export function createHookExecutor(
 	return {
 		async execute(
 			commands: readonly string[],
-			context: HookContext,
+			context: HookContext | BeforeHookContext | AfterHookContext,
+			phase?: HookPhase,
 		): Promise<readonly HookResult[]> {
 			if (commands.length === 0) {
 				return [];
 			}
 
-			const mergedEnv = { ...getParentEnv(), ...buildEnvVars(context) };
+			const mergedEnv = {
+				...getParentEnv(),
+				...buildEnvVarsForContext(context, phase ?? ""),
+			};
 			const results: HookResult[] = [];
 
 			for (const command of commands) {

@@ -40,6 +40,14 @@ export type HookResult = {
 	readonly error?: string;
 };
 
+export type SkillHookContext = BeforeHookContext | AfterHookContext;
+
+export type HookPhase = "before" | "after" | "on_failure";
+
 export interface HookExecutorPort {
-	execute(commands: readonly string[], context: HookContext): Promise<readonly HookResult[]>;
+	execute(
+		commands: readonly string[],
+		context: HookContext | SkillHookContext,
+		phase?: HookPhase,
+	): Promise<readonly HookResult[]>;
 }

@@ -1,7 +1,15 @@
 export type { AgentExecutorInput, AgentExecutorPort, AgentExecutorResult } from "./agent-executor";
 export type { CommandExecutor, ExecOptions, ExecResult } from "./command-executor";
 export type { ContextCollectorPort } from "./context-collector";
-export type { HookContext, HookExecutorPort, HookResult } from "./hook-executor";
+export type {
+	AfterHookContext,
+	BeforeHookContext,
+	HookContext,
+	HookExecutorPort,
+	HookPhase,
+	HookResult,
+	SkillHookContext,
+} from "./hook-executor";
 export type { Logger } from "./logger";
 export type { McpToolResolverPort, ResolvedMcpToolSet } from "./mcp-tool-resolver";
 export type { OutputFileStorePort } from "./output-file-store";
