@@ -51,6 +51,31 @@ console.log("PASS: movePrevious at 0 returns false");
 if (fm.elementCount !== 3) throw new Error("FAIL: elementCount should be 3");
 console.log("PASS: elementCount works");
 
+// setIndex
+const fm3 = new FocusManager();
+fm3.setElements(createMockElements(5));
+
+fm3.setIndex(3);
+if ((fm3.currentIndex as number) !== 3) throw new Error("FAIL: setIndex(3) should set index to 3");
+console.log("PASS: setIndex sets correct index");
+
+fm3.setIndex(0);
+if ((fm3.currentIndex as number) !== 0) throw new Error("FAIL: setIndex(0) should set index to 0");
+console.log("PASS: setIndex(0) sets to first");
+
+fm3.setIndex(4);
+if ((fm3.currentIndex as number) !== 4)
+	throw new Error("FAIL: setIndex(4) should set index to last");
+console.log("PASS: setIndex to last element");
+
+fm3.setIndex(-1);
+if ((fm3.currentIndex as number) !== 0) throw new Error("FAIL: setIndex(-1) should clamp to 0");
+console.log("PASS: setIndex(-1) clamps to 0");
+
+fm3.setIndex(100);
+if ((fm3.currentIndex as number) !== 4) throw new Error("FAIL: setIndex(100) should clamp to last");
+console.log("PASS: setIndex(100) clamps to last");
+
 // focusCurrent calls focus
 let focusCalled = false;
 const elements2 = [

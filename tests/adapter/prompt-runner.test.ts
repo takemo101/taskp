@@ -129,6 +129,60 @@ describe("PromptRunner", () => {
 		expect(mockedInput).not.toHaveBeenCalled();
 	});
 
+	it("validates preset values against regex pattern", async () => {
+		const inputs: SkillInput[] = [
+			{
+				name: "code",
+				type: "text",
+				message: "Code?",
+				validate: "^[a-z]+\\d+$",
+			},
+		];
+
+		const result = await runner.collect(inputs, { code: "INVALID" });
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("EXECUTION_ERROR");
+		expect(result.error.message).toContain("must match pattern");
+	});
+
+	it("accepts valid preset values", async () => {
+		const inputs: SkillInput[] = [
+			{
+				name: "code",
+				type: "text",
+				message: "Code?",
+				validate: "^[a-z]+\\d+$",
+			},
+		];
+
+		const result = await runner.collect(inputs, { code: "abc123" });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toEqual({ code: "abc123" });
+	});
+
+	it("rejects empty preset for required input", async () => {
+		const inputs: SkillInput[] = [{ name: "name", type: "text", message: "Name?" }];
+
+		const result = await runner.collect(inputs, { name: "" });
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("EXECUTION_ERROR");
+		expect(result.error.message).toContain("required");
+	});
+
+	it("accepts empty preset for optional input", async () => {
+		const inputs: SkillInput[] = [
+			{ name: "note", type: "text", message: "Note?", required: false },
+		];
+
+		const result = await runner.collect(inputs, { note: "" });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toEqual({ note: "" });
+	});
+
 	it("passes default values to prompts", async () => {
 		mockedInput.mockResolvedValueOnce("world");
 

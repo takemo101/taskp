@@ -16,6 +16,10 @@ class FocusManager {
 		return this.elements.length;
 	}
 
+	setIndex(index: number): void {
+		this.focusIndex = Math.max(0, Math.min(index, this.elements.length - 1));
+	}
+
 	isAtLast(): boolean {
 		return this.focusIndex >= this.elements.length - 1;
 	}

@@ -5,6 +5,7 @@ import {
 	InputRenderable,
 	InputRenderableEvents,
 	type KeyEvent,
+	red,
 	ScrollBoxRenderable,
 	type SelectOption,
 	SelectRenderable,
@@ -13,6 +14,7 @@ import {
 	TextRenderable,
 	t,
 } from "@opentui/core";
+import { checkInputError } from "../../core/skill/check-input-error";
 import type { Skill } from "../../core/skill/skill";
 import type { SkillInput } from "../../core/skill/skill-input";
 import { KeyHelp } from "../components/key-help";
@@ -35,12 +37,24 @@ function createFormElements(
 			content: t`${dim("○")} ${input.message}`,
 		});
 
+		const errorLabel = new TextRenderable(renderer, {
+			id: `error-${input.name}`,
+			content: "",
+			marginLeft: 2,
+		});
+
 		const element = createInputElement(renderer, input, (value) => {
+			const error = checkInputError(input, value);
+			if (error !== undefined) {
+				errorLabel.content = t`${red(error)}`;
+				return;
+			}
+			errorLabel.content = "";
 			controller.setValue(input.name, value);
 			controller.advanceFocus();
 		});
 
-		return { input, label, element };
+		return { input, label, element, errorLabel };
 	});
 }
 
@@ -78,7 +92,7 @@ function buildFormUI(
 		stickyStart: "top",
 	});
 
-	for (const { input, label, element } of elements) {
+	for (const { input, label, element, errorLabel } of elements) {
 		const group = new BoxRenderable(renderer, {
 			id: `group-${input.name}`,
 			width: "100%",
@@ -87,6 +101,7 @@ function buildFormUI(
 		});
 		group.add(label);
 		group.add(element);
+		group.add(errorLabel);
 		scrollbox.add(group);
 	}
 
@@ -140,9 +155,27 @@ export async function showInputForm(
 			renderer.root.remove(CONTAINER_ID);
 		};
 
-		const controller = new FormController((result) => {
-			cleanup();
-			resolve(result);
+		const controller = new FormController({
+			onComplete: (result) => {
+				cleanup();
+				resolve(result);
+			},
+			validator: (values) => {
+				for (const skillInput of inputs) {
+					const value = values[skillInput.name] ?? "";
+					const error = checkInputError(skillInput, value);
+					if (error !== undefined) {
+						return { name: skillInput.name, message: error };
+					}
+				}
+				return undefined;
+			},
+			onValidationError: (error) => {
+				const el = elements.find((e) => e.input.name === error.name);
+				if (el) {
+					el.errorLabel.content = t`${red(error.message)}`;
+				}
+			},
 		});
 
 		const elements = createFormElements(renderer, inputs, controller);

@@ -67,7 +67,7 @@ function connectByTransport(config: McpServerConfig, logger: Logger): Promise<MC
 			const transport = new StdioClientTransport({
 				command: config.command,
 				args: config.args,
-				env: resolveEnvMap(config.env),
+				env: resolveValueMap(config.env),
 				stderr: "pipe",
 			});
 			transport.stderr?.on("data", () => {});
@@ -79,7 +79,7 @@ function connectByTransport(config: McpServerConfig, logger: Logger): Promise<MC
 				transport: {
 					type: "http",
 					url: config.url,
-					headers: resolveHeadersEnv(config.headers_env),
+					headers: resolveValueMap(config.headers_env),
 				},
 			});
 		case "sse":
@@ -88,37 +88,33 @@ function connectByTransport(config: McpServerConfig, logger: Logger): Promise<MC
 				transport: {
 					type: "sse",
 					url: config.url,
-					headers: resolveHeadersEnv(config.headers_env),
+					headers: resolveValueMap(config.headers_env),
 				},
 			});
 	}
 }
 
-function resolveEnvMap(
-	envMap: Record<string, string> | undefined,
-): Record<string, string> | undefined {
-	if (envMap === undefined) return undefined;
+// ${VAR} 形式の環境変数参照パターン（完全一致のみ、部分展開は非サポート）
+const ENV_REF_PATTERN = /^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/;
 
-	const resolved: Record<string, string> = {};
-	for (const [key, envVarName] of Object.entries(envMap)) {
-		const value = process.env[envVarName];
-		if (value !== undefined) {
-			resolved[key] = value;
-		}
+function resolveEnvValue(raw: string): string | undefined {
+	const match = ENV_REF_PATTERN.exec(raw);
+	if (match) {
+		return process.env[match[1]];
 	}
-	return resolved;
+	return raw;
 }
 
-function resolveHeadersEnv(
-	headersEnv: Record<string, string> | undefined,
+function resolveValueMap(
+	map: Record<string, string> | undefined,
 ): Record<string, string> | undefined {
-	if (headersEnv === undefined) return undefined;
+	if (map === undefined) return undefined;
 
 	const resolved: Record<string, string> = {};
-	for (const [header, envVarName] of Object.entries(headersEnv)) {
-		const value = process.env[envVarName];
+	for (const [key, raw] of Object.entries(map)) {
+		const value = resolveEnvValue(raw);
 		if (value !== undefined) {
-			resolved[header] = value;
+			resolved[key] = value;
 		}
 	}
 	return resolved;
