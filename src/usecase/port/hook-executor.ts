@@ -11,6 +11,29 @@ export type HookContext = {
 	readonly sessionId: SessionId;
 };
 
+/** before フック用コンテキスト（実行前なので status / durationMs / error を持たない） */
+export type BeforeHookContext = {
+	readonly skillName: string;
+	readonly actionName?: string;
+	readonly mode: "template" | "agent";
+	readonly outputFile: string;
+	readonly callerSkill?: string;
+	readonly sessionId: SessionId;
+};
+
+/** after / on_failure フック用コンテキスト */
+export type AfterHookContext = {
+	readonly skillName: string;
+	readonly actionName?: string;
+	readonly mode: "template" | "agent";
+	readonly status: "success" | "failed";
+	readonly durationMs: number;
+	readonly error?: string;
+	readonly outputFile: string;
+	readonly callerSkill?: string;
+	readonly sessionId: SessionId;
+};
+
 export type HookResult = {
 	readonly command: string;
 	readonly success: boolean;
