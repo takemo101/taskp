@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { createHookExecutor } from "../../src/adapter/hook-executor";
+import {
+	buildAfterEnvVars,
+	buildBaseEnvVars,
+	createHookExecutor,
+} from "../../src/adapter/hook-executor";
 import { createSilentLogger } from "../../src/adapter/silent-logger";
 import type { SessionId } from "../../src/core/execution/session";
 import type { ExecutionError } from "../../src/core/types/errors";
@@ -10,7 +14,11 @@ import type {
 	ExecOptions,
 	ExecResult,
 } from "../../src/usecase/port/command-executor";
-import type { HookContext } from "../../src/usecase/port/hook-executor";
+import type {
+	AfterHookContext,
+	BeforeHookContext,
+	HookContext,
+} from "../../src/usecase/port/hook-executor";
 import type { Logger } from "../../src/usecase/port/logger";
 
 const TEST_SESSION_ID = "tskp_test000001" as SessionId;
@@ -267,5 +275,148 @@ describe("HookExecutor", () => {
 		await hookExecutor.execute(["missing-cmd"], successContext);
 
 		expect(spyLogger.error).toHaveBeenCalledWith('hook warning: "missing-cmd" failed: not found');
+	});
+});
+
+const beforeContext: BeforeHookContext = {
+	skillName: "deploy",
+	mode: "template",
+	outputFile: "/tmp/taskp/tskp_test000001/output.txt",
+	sessionId: TEST_SESSION_ID,
+};
+
+const afterSuccessContext: AfterHookContext = {
+	skillName: "deploy",
+	mode: "template",
+	status: "success",
+	durationMs: 1234,
+	outputFile: "/tmp/taskp/tskp_test000001/output.txt",
+	sessionId: TEST_SESSION_ID,
+};
+
+const afterFailedContext: AfterHookContext = {
+	skillName: "deploy",
+	mode: "agent",
+	status: "failed",
+	durationMs: 5678,
+	error: "Command failed: exit 1",
+	outputFile: "/tmp/taskp/tskp_test000001/output.txt",
+	sessionId: TEST_SESSION_ID,
+};
+
+describe("buildBaseEnvVars", () => {
+	it("builds common env vars from BeforeHookContext", () => {
+		const env = buildBaseEnvVars(beforeContext, "before");
+
+		expect(env).toEqual({
+			TASKP_SESSION_ID: TEST_SESSION_ID,
+			TASKP_SKILL_NAME: "deploy",
+			TASKP_ACTION_NAME: "",
+			TASKP_SKILL_REF: "deploy",
+			TASKP_MODE: "template",
+			TASKP_OUTPUT_FILE: "/tmp/taskp/tskp_test000001/output.txt",
+			TASKP_CALLER_SKILL: "",
+			TASKP_HOOK_PHASE: "before",
+		});
+	});
+
+	it("does not include STATUS, DURATION_MS, or ERROR for BeforeHookContext", () => {
+		const env = buildBaseEnvVars(beforeContext, "before");
+
+		expect(env).not.toHaveProperty("TASKP_STATUS");
+		expect(env).not.toHaveProperty("TASKP_DURATION_MS");
+		expect(env).not.toHaveProperty("TASKP_ERROR");
+	});
+
+	it("includes actionName in TASKP_ACTION_NAME and TASKP_SKILL_REF", () => {
+		const contextWithAction: BeforeHookContext = {
+			...beforeContext,
+			actionName: "migrate",
+		};
+
+		const env = buildBaseEnvVars(contextWithAction, "before");
+
+		expect(env.TASKP_ACTION_NAME).toBe("migrate");
+		expect(env.TASKP_SKILL_REF).toBe("deploy:migrate");
+	});
+
+	it("includes callerSkill in TASKP_CALLER_SKILL", () => {
+		const contextWithCaller: BeforeHookContext = {
+			...beforeContext,
+			callerSkill: "diagnose",
+		};
+
+		const env = buildBaseEnvVars(contextWithCaller, "before");
+
+		expect(env.TASKP_CALLER_SKILL).toBe("diagnose");
+	});
+
+	it("sets TASKP_HOOK_PHASE to the given phase", () => {
+		const envBefore = buildBaseEnvVars(beforeContext, "before");
+		expect(envBefore.TASKP_HOOK_PHASE).toBe("before");
+
+		const envAfter = buildBaseEnvVars(afterSuccessContext, "after");
+		expect(envAfter.TASKP_HOOK_PHASE).toBe("after");
+
+		const envOnFailure = buildBaseEnvVars(afterFailedContext, "on_failure");
+		expect(envOnFailure.TASKP_HOOK_PHASE).toBe("on_failure");
+	});
+});
+
+describe("buildAfterEnvVars", () => {
+	it("builds all env vars including status fields for AfterHookContext", () => {
+		const env = buildAfterEnvVars(afterSuccessContext, "after");
+
+		expect(env).toEqual({
+			TASKP_SESSION_ID: TEST_SESSION_ID,
+			TASKP_SKILL_NAME: "deploy",
+			TASKP_ACTION_NAME: "",
+			TASKP_SKILL_REF: "deploy",
+			TASKP_MODE: "template",
+			TASKP_OUTPUT_FILE: "/tmp/taskp/tskp_test000001/output.txt",
+			TASKP_CALLER_SKILL: "",
+			TASKP_HOOK_PHASE: "after",
+			TASKP_STATUS: "success",
+			TASKP_DURATION_MS: "1234",
+			TASKP_ERROR: "",
+		});
+	});
+
+	it("includes error message on failed context", () => {
+		const env = buildAfterEnvVars(afterFailedContext, "after");
+
+		expect(env.TASKP_STATUS).toBe("failed");
+		expect(env.TASKP_DURATION_MS).toBe("5678");
+		expect(env.TASKP_ERROR).toBe("Command failed: exit 1");
+		expect(env.TASKP_MODE).toBe("agent");
+	});
+
+	it("truncates TASKP_ERROR to 1024 characters", () => {
+		const longErrorContext: AfterHookContext = {
+			...afterFailedContext,
+			error: "x".repeat(2000),
+		};
+
+		const env = buildAfterEnvVars(longErrorContext, "after");
+
+		expect(env.TASKP_ERROR).toHaveLength(1024);
+	});
+
+	it("sets TASKP_HOOK_PHASE to on_failure", () => {
+		const env = buildAfterEnvVars(afterFailedContext, "on_failure");
+
+		expect(env.TASKP_HOOK_PHASE).toBe("on_failure");
+	});
+
+	it("includes actionName in TASKP_ACTION_NAME and TASKP_SKILL_REF", () => {
+		const contextWithAction: AfterHookContext = {
+			...afterSuccessContext,
+			actionName: "migrate",
+		};
+
+		const env = buildAfterEnvVars(contextWithAction, "after");
+
+		expect(env.TASKP_ACTION_NAME).toBe("migrate");
+		expect(env.TASKP_SKILL_REF).toBe("deploy:migrate");
 	});
 });
