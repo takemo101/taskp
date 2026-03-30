@@ -13,6 +13,7 @@ import type { ContextCollectorPort } from "../../src/usecase/port/context-collec
 import type { HookContext, HookExecutorPort } from "../../src/usecase/port/hook-executor";
 import type { Logger } from "../../src/usecase/port/logger";
 import type { McpToolResolverPort } from "../../src/usecase/port/mcp-tool-resolver";
+import type { OutputFileStorePort } from "../../src/usecase/port/output-file-store";
 import type { PromptCollector } from "../../src/usecase/port/prompt-collector";
 import type { SkillRepository } from "../../src/usecase/port/skill-repository";
 import type { SystemPromptResolver } from "../../src/usecase/port/system-prompt-resolver";
@@ -1094,6 +1095,46 @@ describe("runAgentSkill", () => {
 
 			expect(result.ok).toBe(false);
 			expect(mcpToolResolver.closeAll).toHaveBeenCalledOnce();
+		});
+	});
+
+	describe("outputFileStore injection", () => {
+		function stubOutputFileStore(): OutputFileStorePort {
+			return {
+				prepare: vi.fn().mockResolvedValue("/tmp/taskp/test/output.txt"),
+				write: vi.fn().mockResolvedValue(undefined),
+				cleanup: vi.fn().mockResolvedValue(undefined),
+			};
+		}
+
+		it("accepts outputFileStore in deps without affecting execution", async () => {
+			const skill = createAgentSkill();
+			const outputFileStore = stubOutputFileStore();
+			const deps = {
+				...createMockDeps(skill),
+				outputFileStore,
+			};
+
+			const result = await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+				deps,
+			);
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.skillName).toBe("test-agent");
+		});
+
+		it("works without outputFileStore (backward compatible)", async () => {
+			const skill = createAgentSkill();
+			const deps = createMockDeps(skill);
+
+			const result = await runAgentSkill(
+				{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+				deps,
+			);
+
+			expect(result.ok).toBe(true);
 		});
 	});
 });

@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { HooksConfig } from "../../../usecase/hook-runner";
 import type { CommandExecutor } from "../../../usecase/port/command-executor";
 import type { HookExecutorPort } from "../../../usecase/port/hook-executor";
+import type { OutputFileStorePort } from "../../../usecase/port/output-file-store";
 import type { PromptCollector } from "../../../usecase/port/prompt-collector";
 import type { SkillRepository } from "../../../usecase/port/skill-repository";
 import { type RunOutput, runSkill } from "../../../usecase/run-skill";
@@ -42,6 +43,7 @@ export type TaskpRunDeps = {
 	readonly callerSkillName?: string;
 	readonly hookExecutor?: HookExecutorPort;
 	readonly hooksConfig?: HooksConfig;
+	readonly outputFileStore?: OutputFileStorePort;
 	readonly sessionId: SessionId;
 };
 
@@ -124,6 +126,7 @@ async function executeTaskpRun(
 			promptCollector: deps.promptCollector,
 			hookExecutor: deps.hookExecutor,
 			hooksConfig: deps.hooksConfig,
+			outputFileStore: deps.outputFileStore,
 		},
 	);
 

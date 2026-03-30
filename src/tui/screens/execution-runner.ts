@@ -12,6 +12,7 @@ import { ok } from "../../core/types/result";
 import type { HooksConfig } from "../../usecase/hook-runner";
 import type { CommandExecutor } from "../../usecase/port/command-executor";
 import type { HookExecutorPort } from "../../usecase/port/hook-executor";
+import type { OutputFileStorePort } from "../../usecase/port/output-file-store";
 import type { PromptCollector } from "../../usecase/port/prompt-collector";
 import type { SkillRepository } from "../../usecase/port/skill-repository";
 import type { SystemPromptResolver } from "../../usecase/port/system-prompt-resolver";
@@ -32,6 +33,7 @@ export type ExecutionDeps = {
 	readonly commandExecutor: CommandExecutor;
 	readonly hookExecutor: HookExecutorPort;
 	readonly hooksConfig?: HooksConfig;
+	readonly outputFileStore?: OutputFileStorePort;
 	readonly skillRepositoryFactory: SkillRepositoryFactory;
 	readonly promptCollectorFactory: PromptCollectorFactory;
 	readonly systemPromptResolver: SystemPromptResolver;
@@ -136,6 +138,7 @@ async function executeAgentMode(
 			progressWriter,
 			hookExecutor: deps.hookExecutor,
 			hooksConfig: deps.hooksConfig,
+			outputFileStore: deps.outputFileStore,
 			systemPromptResolver: deps.systemPromptResolver,
 			mcpToolResolver,
 			logger,
@@ -174,6 +177,7 @@ async function executeTemplateMode(
 			progressWriter,
 			hookExecutor: deps.hookExecutor,
 			hooksConfig: deps.hooksConfig,
+			outputFileStore: deps.outputFileStore,
 		},
 	);
 

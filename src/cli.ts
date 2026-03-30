@@ -10,6 +10,7 @@ import { createContextCollector } from "./adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "./adapter/context-collector-deps";
 import { createNodeFileSystem } from "./adapter/file-system-port";
 import { createHookExecutor } from "./adapter/hook-executor";
+import { createOutputFileStore } from "./adapter/output-file-store";
 import { createCliProgressWriter } from "./adapter/progress-formatter";
 import { createProjectInitializer } from "./adapter/project-initializer";
 import { createPromptRunner } from "./adapter/prompt-runner";
@@ -198,6 +199,7 @@ const cli = Cli.create("taskp", {
 			const hooksConfig = config?.hooks;
 			const logger = createConsoleLogger();
 			const hookExecutor = createHookExecutor(commandExecutor, logger);
+			const outputFileStore = createOutputFileStore();
 
 			const result = await runSkill(
 				{
@@ -216,6 +218,8 @@ const cli = Cli.create("taskp", {
 					progressWriter,
 					hookExecutor,
 					hooksConfig,
+					outputFileStore,
+					logger,
 				},
 			);
 
@@ -386,6 +390,7 @@ async function runAgentMode(
 	});
 	const hookExecutor = createHookExecutor(commandExecutor, logger);
 	const hooksConfig = config.hooks;
+	const outputFileStore = createOutputFileStore();
 
 	const mcpToolResolver = config.mcp?.servers
 		? (await import("./adapter/mcp-tool-resolver")).createMcpToolResolver(
@@ -415,6 +420,7 @@ async function runAgentMode(
 			hookExecutor,
 			hooksConfig,
 			mcpToolResolver,
+			outputFileStore,
 			logger,
 		},
 	);

@@ -13,6 +13,8 @@ import { buildReservedVars, renderTemplate } from "../core/variable/template-ren
 import { type HooksConfig, runHooks } from "./hook-runner";
 import type { CommandExecutor, ExecResult } from "./port/command-executor";
 import type { HookExecutorPort } from "./port/hook-executor";
+import type { Logger } from "./port/logger";
+import type { OutputFileStorePort } from "./port/output-file-store";
 import { createNoopProgressWriter, type ProgressWriter } from "./port/progress-writer";
 import type { PromptCollector } from "./port/prompt-collector";
 import type { SkillRepository } from "./port/skill-repository";
@@ -48,6 +50,8 @@ export type RunSkillDeps = {
 	readonly progressWriter?: ProgressWriter;
 	readonly hookExecutor?: HookExecutorPort;
 	readonly hooksConfig?: HooksConfig;
+	readonly outputFileStore?: OutputFileStorePort;
+	readonly logger?: Logger;
 };
 
 export async function runSkill(
