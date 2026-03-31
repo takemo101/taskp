@@ -159,6 +159,10 @@ async function executeAndReport(
 		outputFile,
 		callerSkill: input.callerSkill,
 		sessionId: input.sessionId,
+		skillDir: reserved.skillDir,
+		cwd: reserved.cwd,
+		date: reserved.date,
+		timestamp: reserved.timestamp,
 	};
 
 	// ① skill hooks.before
@@ -202,6 +206,10 @@ async function executeAndReport(
 				error: domainErrorMessage(beforeResult.error),
 				callerSkill: input.callerSkill,
 				sessionId: input.sessionId,
+				skillDir: reserved.skillDir,
+				cwd: reserved.cwd,
+				date: reserved.date,
+				timestamp: reserved.timestamp,
 			},
 		});
 
@@ -258,6 +266,10 @@ async function executeAndReport(
 				error: commandResults.ok ? undefined : domainErrorMessage(commandResults.error),
 				callerSkill: input.callerSkill,
 				sessionId: input.sessionId,
+				skillDir: reserved.skillDir,
+				cwd: reserved.cwd,
+				date: reserved.date,
+				timestamp: reserved.timestamp,
 			},
 		});
 

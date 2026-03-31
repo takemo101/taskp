@@ -53,6 +53,10 @@ const successContext: HookContext = {
 	status: "success",
 	durationMs: 1234,
 	sessionId: TEST_SESSION_ID,
+	skillDir: "/home/user/skills/deploy",
+	cwd: "/home/user/project",
+	date: "2026-03-31",
+	timestamp: "2026-03-31T12:00:00.000Z",
 };
 
 const failedContext: HookContext = {
@@ -62,6 +66,10 @@ const failedContext: HookContext = {
 	durationMs: 5678,
 	error: "Command failed: exit 1",
 	sessionId: TEST_SESSION_ID,
+	skillDir: "/home/user/skills/deploy",
+	cwd: "/home/user/project",
+	date: "2026-03-31",
+	timestamp: "2026-03-31T12:00:00.000Z",
 };
 
 describe("HookExecutor", () => {
@@ -97,6 +105,10 @@ describe("HookExecutor", () => {
 			TASKP_DURATION_MS: "1234",
 			TASKP_ERROR: "",
 			TASKP_CALLER_SKILL: "",
+			TASKP_SKILL_DIR: "/home/user/skills/deploy",
+			TASKP_CWD: "/home/user/project",
+			TASKP_DATE: "2026-03-31",
+			TASKP_TIMESTAMP: "2026-03-31T12:00:00.000Z",
 		});
 	});
 
@@ -128,12 +140,10 @@ describe("HookExecutor", () => {
 		const executor = createSpyCommandExecutor([ok({ stdout: "", stderr: "", exitCode: 0 })]);
 		const hookExecutor = createHookExecutor(executor, createSilentLogger());
 		const contextWithAction: HookContext = {
+			...successContext,
 			skillName: "task",
 			actionName: "add",
-			mode: "template",
-			status: "success",
 			durationMs: 100,
-			sessionId: TEST_SESSION_ID,
 		};
 
 		await hookExecutor.execute(["echo test"], contextWithAction);
@@ -283,6 +293,10 @@ const beforeContext: BeforeHookContext = {
 	mode: "template",
 	outputFile: "/tmp/taskp/tskp_test000001/output.txt",
 	sessionId: TEST_SESSION_ID,
+	skillDir: "/home/user/skills/deploy",
+	cwd: "/home/user/project",
+	date: "2026-03-31",
+	timestamp: "2026-03-31T12:00:00.000Z",
 };
 
 const afterSuccessContext: AfterHookContext = {
@@ -292,6 +306,10 @@ const afterSuccessContext: AfterHookContext = {
 	durationMs: 1234,
 	outputFile: "/tmp/taskp/tskp_test000001/output.txt",
 	sessionId: TEST_SESSION_ID,
+	skillDir: "/home/user/skills/deploy",
+	cwd: "/home/user/project",
+	date: "2026-03-31",
+	timestamp: "2026-03-31T12:00:00.000Z",
 };
 
 const afterFailedContext: AfterHookContext = {
@@ -302,6 +320,10 @@ const afterFailedContext: AfterHookContext = {
 	error: "Command failed: exit 1",
 	outputFile: "/tmp/taskp/tskp_test000001/output.txt",
 	sessionId: TEST_SESSION_ID,
+	skillDir: "/home/user/skills/deploy",
+	cwd: "/home/user/project",
+	date: "2026-03-31",
+	timestamp: "2026-03-31T12:00:00.000Z",
 };
 
 describe("buildBaseEnvVars", () => {
@@ -317,6 +339,10 @@ describe("buildBaseEnvVars", () => {
 			TASKP_OUTPUT_FILE: "/tmp/taskp/tskp_test000001/output.txt",
 			TASKP_CALLER_SKILL: "",
 			TASKP_HOOK_PHASE: "before",
+			TASKP_SKILL_DIR: "/home/user/skills/deploy",
+			TASKP_CWD: "/home/user/project",
+			TASKP_DATE: "2026-03-31",
+			TASKP_TIMESTAMP: "2026-03-31T12:00:00.000Z",
 		});
 	});
 
@@ -379,6 +405,10 @@ describe("buildAfterEnvVars", () => {
 			TASKP_STATUS: "success",
 			TASKP_DURATION_MS: "1234",
 			TASKP_ERROR: "",
+			TASKP_SKILL_DIR: "/home/user/skills/deploy",
+			TASKP_CWD: "/home/user/project",
+			TASKP_DATE: "2026-03-31",
+			TASKP_TIMESTAMP: "2026-03-31T12:00:00.000Z",
 		});
 	});
 

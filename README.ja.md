@@ -492,6 +492,15 @@ skill hooks.before → スキル本体 → skill hooks.after → skill hooks.on_
 | `TASKP_HOOK_PHASE` | 現在のフェーズ（`before` / `after` / `on_failure`） |
 | `TASKP_OUTPUT_FILE` | 出力ファイルの絶対パス（[出力フォワーディング](#出力フォワーディング)参照） |
 
+グローバルフック・スキルフック共通で、テンプレート予約変数に対応する以下の環境変数も利用可能です:
+
+| 環境変数 | テンプレート変数 | 説明 |
+|---------|----------------|------|
+| `TASKP_SKILL_DIR` | `{{__skill_dir__}}` | SKILL.md が存在するディレクトリの絶対パス |
+| `TASKP_CWD` | `{{__cwd__}}` | スキル実行開始時のカレントディレクトリ |
+| `TASKP_DATE` | `{{__date__}}` | スキル実行開始時の日付（`YYYY-MM-DD`） |
+| `TASKP_TIMESTAMP` | `{{__timestamp__}}` | スキル実行開始時のタイムスタンプ（ISO 8601） |
+
 ## セッション ID
 
 スキル実行ごとに `tskp_<ランダム文字列>` 形式の一意なセッション ID が自動発行されます（例: `tskp_a1b2c3d4e5f6`）。

@@ -174,6 +174,10 @@ export async function runAgentSkill(
 		outputFile,
 		callerSkill: undefined,
 		sessionId: input.sessionId,
+		skillDir: reserved.skillDir,
+		cwd: reserved.cwd,
+		date: reserved.date,
+		timestamp: reserved.timestamp,
 	};
 
 	// ① skill hooks.before
@@ -213,6 +217,10 @@ export async function runAgentSkill(
 				durationMs: 0,
 				error: domainErrorMessage(beforeResult.error),
 				sessionId: input.sessionId,
+				skillDir: reserved.skillDir,
+				cwd: reserved.cwd,
+				date: reserved.date,
+				timestamp: reserved.timestamp,
 			},
 		});
 
@@ -288,6 +296,10 @@ export async function runAgentSkill(
 				durationMs,
 				error: executeResult.ok ? undefined : domainErrorMessage(executeResult.error),
 				sessionId: input.sessionId,
+				skillDir: reserved.skillDir,
+				cwd: reserved.cwd,
+				date: reserved.date,
+				timestamp: reserved.timestamp,
 			},
 		});
 

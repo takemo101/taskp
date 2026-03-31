@@ -9,6 +9,10 @@ export type HookContext = {
 	readonly error?: string;
 	readonly callerSkill?: string;
 	readonly sessionId: SessionId;
+	readonly skillDir: string;
+	readonly cwd: string;
+	readonly date: string;
+	readonly timestamp: string;
 };
 
 /** before フック用コンテキスト（実行前なので status / durationMs / error を持たない） */
@@ -19,6 +23,10 @@ export type BeforeHookContext = {
 	readonly outputFile: string;
 	readonly callerSkill?: string;
 	readonly sessionId: SessionId;
+	readonly skillDir: string;
+	readonly cwd: string;
+	readonly date: string;
+	readonly timestamp: string;
 };
 
 /** after / on_failure フック用コンテキスト */
@@ -32,6 +40,10 @@ export type AfterHookContext = {
 	readonly outputFile: string;
 	readonly callerSkill?: string;
 	readonly sessionId: SessionId;
+	readonly skillDir: string;
+	readonly cwd: string;
+	readonly date: string;
+	readonly timestamp: string;
 };
 
 export type HookResult = {
