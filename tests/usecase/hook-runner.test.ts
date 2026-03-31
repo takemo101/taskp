@@ -6,6 +6,18 @@ import type { HookContext, HookExecutorPort } from "../../src/usecase/port/hook-
 
 const TEST_SESSION_ID = "tskp_test000001" as SessionId;
 
+const baseContext: HookContext = {
+	skillName: "deploy",
+	mode: "template",
+	status: "success",
+	durationMs: 100,
+	sessionId: TEST_SESSION_ID,
+	skillDir: "/home/user/skills/deploy",
+	cwd: "/home/user/project",
+	date: "2026-03-31",
+	timestamp: "2026-03-31T12:00:00.000Z",
+};
+
 function createMockExecutor(): HookExecutorPort & {
 	calls: { commands: readonly string[]; context: HookContext }[];
 } {
@@ -25,13 +37,7 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["echo ok"], on_failure: ["echo fail"] },
-			context: {
-				skillName: "deploy",
-				mode: "template",
-				status: "success",
-				durationMs: 100,
-				sessionId: TEST_SESSION_ID,
-			},
+			context: baseContext,
 		});
 
 		expect(result.ok).toBe(true);
@@ -45,12 +51,10 @@ describe("runHooks", () => {
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["echo ok"], on_failure: ["echo fail"] },
 			context: {
-				skillName: "deploy",
-				mode: "template",
+				...baseContext,
 				status: "failed",
 				durationMs: 50,
 				error: "boom",
-				sessionId: TEST_SESSION_ID,
 			},
 		});
 
@@ -64,13 +68,7 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_success: [], on_failure: [] },
-			context: {
-				skillName: "deploy",
-				mode: "template",
-				status: "success",
-				durationMs: 100,
-				sessionId: TEST_SESSION_ID,
-			},
+			context: baseContext,
 		});
 
 		expect(result.ok).toBe(true);
@@ -82,13 +80,7 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: {},
-			context: {
-				skillName: "deploy",
-				mode: "agent",
-				status: "success",
-				durationMs: 100,
-				sessionId: TEST_SESSION_ID,
-			},
+			context: { ...baseContext, mode: "agent" },
 		});
 
 		expect(result.ok).toBe(true);
@@ -99,13 +91,7 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: undefined,
 			hooksConfig: { on_success: ["echo ok"] },
-			context: {
-				skillName: "deploy",
-				mode: "template",
-				status: "success",
-				durationMs: 100,
-				sessionId: TEST_SESSION_ID,
-			},
+			context: baseContext,
 		});
 
 		expect(result.ok).toBe(true);
@@ -116,13 +102,7 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: undefined,
-			context: {
-				skillName: "deploy",
-				mode: "template",
-				status: "success",
-				durationMs: 100,
-				sessionId: TEST_SESSION_ID,
-			},
+			context: baseContext,
 		});
 
 		expect(result.ok).toBe(true);
@@ -143,13 +123,7 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["echo ok", "fail-cmd"] },
-			context: {
-				skillName: "deploy",
-				mode: "template",
-				status: "success",
-				durationMs: 100,
-				sessionId: TEST_SESSION_ID,
-			},
+			context: baseContext,
 		});
 
 		expect(result.ok).toBe(false);
@@ -169,13 +143,7 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_failure: ["notify", "cleanup"] },
-			context: {
-				skillName: "deploy",
-				mode: "template",
-				status: "failed",
-				durationMs: 50,
-				sessionId: TEST_SESSION_ID,
-			},
+			context: { ...baseContext, status: "failed", durationMs: 50 },
 		});
 
 		expect(result.ok).toBe(false);
@@ -195,13 +163,7 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: executor,
 			hooksConfig: { on_success: ["bad-cmd"] },
-			context: {
-				skillName: "deploy",
-				mode: "template",
-				status: "success",
-				durationMs: 100,
-				sessionId: TEST_SESSION_ID,
-			},
+			context: baseContext,
 		});
 
 		expect(result.ok).toBe(false);
@@ -220,13 +182,7 @@ describe("runHooks", () => {
 		const result = await runHooks({
 			hookExecutor: throwingExecutor,
 			hooksConfig: { on_success: ["echo ok"] },
-			context: {
-				skillName: "deploy",
-				mode: "template",
-				status: "success",
-				durationMs: 100,
-				sessionId: TEST_SESSION_ID,
-			},
+			context: baseContext,
 		});
 
 		expect(result.ok).toBe(false);
@@ -239,12 +195,12 @@ describe("runHooks", () => {
 	it("passes context to executor", async () => {
 		const executor = createMockExecutor();
 		const context: HookContext = {
+			...baseContext,
 			skillName: "build",
 			mode: "agent",
 			status: "failed",
 			durationMs: 5000,
 			error: "timeout",
-			sessionId: TEST_SESSION_ID,
 		};
 
 		const result = await runHooks({
@@ -260,12 +216,9 @@ describe("runHooks", () => {
 	it("passes actionName in context when action is specified", async () => {
 		const executor = createMockExecutor();
 		const context: HookContext = {
+			...baseContext,
 			skillName: "task",
 			actionName: "add",
-			mode: "template",
-			status: "success",
-			durationMs: 100,
-			sessionId: TEST_SESSION_ID,
 		};
 
 		const result = await runHooks({
@@ -281,12 +234,9 @@ describe("runHooks", () => {
 	it("passes callerSkill in context when present", async () => {
 		const executor = createMockExecutor();
 		const context: HookContext = {
+			...baseContext,
 			skillName: "build",
-			mode: "template",
-			status: "success",
-			durationMs: 100,
 			callerSkill: "diagnose",
-			sessionId: TEST_SESSION_ID,
 		};
 
 		const result = await runHooks({
@@ -301,13 +251,7 @@ describe("runHooks", () => {
 
 	it("omits callerSkill in context for direct execution", async () => {
 		const executor = createMockExecutor();
-		const context: HookContext = {
-			skillName: "deploy",
-			mode: "template",
-			status: "success",
-			durationMs: 100,
-			sessionId: TEST_SESSION_ID,
-		};
+		const context: HookContext = { ...baseContext };
 
 		const result = await runHooks({
 			hookExecutor: executor,
@@ -321,13 +265,7 @@ describe("runHooks", () => {
 
 	it("omits actionName in context for single skill execution", async () => {
 		const executor = createMockExecutor();
-		const context: HookContext = {
-			skillName: "deploy",
-			mode: "template",
-			status: "success",
-			durationMs: 100,
-			sessionId: TEST_SESSION_ID,
-		};
+		const context: HookContext = { ...baseContext };
 
 		const result = await runHooks({
 			hookExecutor: executor,

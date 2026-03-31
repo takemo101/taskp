@@ -54,6 +54,10 @@ const beforeContext: BeforeHookContext = {
 	mode: "template",
 	outputFile: "/tmp/taskp/tskp_test000001/output.txt",
 	sessionId: TEST_SESSION_ID,
+	skillDir: "/home/user/skills/deploy",
+	cwd: "/home/user/project",
+	date: "2026-03-31",
+	timestamp: "2026-03-31T12:00:00.000Z",
 };
 
 const afterSuccessContext: AfterHookContext = {
@@ -63,6 +67,10 @@ const afterSuccessContext: AfterHookContext = {
 	durationMs: 1234,
 	outputFile: "/tmp/taskp/tskp_test000001/output.txt",
 	sessionId: TEST_SESSION_ID,
+	skillDir: "/home/user/skills/deploy",
+	cwd: "/home/user/project",
+	date: "2026-03-31",
+	timestamp: "2026-03-31T12:00:00.000Z",
 };
 
 const afterFailedContext: AfterHookContext = {
@@ -73,6 +81,10 @@ const afterFailedContext: AfterHookContext = {
 	error: "Command failed: exit 1",
 	outputFile: "/tmp/taskp/tskp_test000001/output.txt",
 	sessionId: TEST_SESSION_ID,
+	skillDir: "/home/user/skills/deploy",
+	cwd: "/home/user/project",
+	date: "2026-03-31",
+	timestamp: "2026-03-31T12:00:00.000Z",
 };
 
 describe("runBeforeHooks", () => {

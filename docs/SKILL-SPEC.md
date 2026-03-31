@@ -238,6 +238,8 @@ skill hooks.before → スキル本体 → skill hooks.after → skill hooks.on_
 | `TASKP_HOOK_PHASE` | 現在のフェーズ（`before` / `after` / `on_failure`） |
 | `TASKP_OUTPUT_FILE` | 出力ファイルの絶対パス（[出力フォワーディング](#出力フォワーディング)参照） |
 
+`TASKP_SKILL_DIR`, `TASKP_CWD`, `TASKP_DATE`, `TASKP_TIMESTAMP` はテンプレート本文の予約変数（`{{__skill_dir__}}` 等）と同じ値がセットされる。いずれもスキル実行開始時に決定され、全フェーズで同一の値となる。
+
 `before` フェーズでは `TASKP_STATUS`, `TASKP_DURATION_MS`, `TASKP_ERROR` は設定されない（実行前のため値が存在しない）。`TASKP_OUTPUT_FILE` は空ファイルとして存在する。
 
 #### `--dry-run` 時の挙動

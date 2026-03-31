@@ -261,6 +261,10 @@ url = "http://localhost:3001/sse"
 | `TASKP_DURATION_MS` | 実行時間（ミリ秒） |
 | `TASKP_ERROR` | エラーメッセージ（失敗時、最大 1024 文字） |
 | `TASKP_CALLER_SKILL` | 呼び出し元スキル名（`taskp_run` 経由の場合） |
+| `TASKP_SKILL_DIR` | SKILL.md が存在するディレクトリの絶対パス（テンプレートの `{{__skill_dir__}}` と同値） |
+| `TASKP_CWD` | スキル実行時のカレントディレクトリ（テンプレートの `{{__cwd__}}` と同値） |
+| `TASKP_DATE` | スキル実行開始時の日付（ISO 形式 `YYYY-MM-DD`、テンプレートの `{{__date__}}` と同値） |
+| `TASKP_TIMESTAMP` | スキル実行開始時のタイムスタンプ（ISO 8601 形式、テンプレートの `{{__timestamp__}}` と同値） |
 | `TASKP_HOOK_PHASE` | フックフェーズ（`before` / `after` / `on_failure` / `on_success`）。グローバル hooks では `on_success` または `on_failure` |
 | `TASKP_OUTPUT_FILE` | スキル出力ファイルの絶対パス（[出力フォワーディング](SKILL-SPEC.md#出力フォワーディング)参照） |
 

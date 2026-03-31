@@ -38,6 +38,10 @@ function buildEnvVars(context: HookContext): Record<string, string> {
 		TASKP_DURATION_MS: String(context.durationMs),
 		TASKP_ERROR: errorValue.slice(0, MAX_ERROR_LENGTH),
 		TASKP_CALLER_SKILL: context.callerSkill ?? "",
+		TASKP_SKILL_DIR: context.skillDir,
+		TASKP_CWD: context.cwd,
+		TASKP_DATE: context.date,
+		TASKP_TIMESTAMP: context.timestamp,
 	};
 }
 
@@ -54,6 +58,10 @@ export function buildBaseEnvVars(
 		TASKP_OUTPUT_FILE: context.outputFile,
 		TASKP_CALLER_SKILL: context.callerSkill ?? "",
 		TASKP_HOOK_PHASE: phase,
+		TASKP_SKILL_DIR: context.skillDir,
+		TASKP_CWD: context.cwd,
+		TASKP_DATE: context.date,
+		TASKP_TIMESTAMP: context.timestamp,
 	};
 }
 
