@@ -180,12 +180,15 @@ export async function runAgentSkill(
 		timestamp: reserved.timestamp,
 	};
 
+	const templateVars = { variables, reserved };
+
 	// ① skill hooks.before
 	const beforeResult = await runBeforeHooks({
 		hookExecutor: deps.hookExecutor,
 		hooks,
 		context: beforeContext,
 		logger,
+		templateVars,
 	});
 
 	if (!beforeResult.ok) {
@@ -197,13 +200,20 @@ export async function runAgentSkill(
 		};
 
 		// ③ skill hooks.after（常に）
-		await runAfterHooks({ hookExecutor: deps.hookExecutor, hooks, context: afterContext, logger });
+		await runAfterHooks({
+			hookExecutor: deps.hookExecutor,
+			hooks,
+			context: afterContext,
+			logger,
+			templateVars,
+		});
 		// ④ skill hooks.on_failure
 		await runOnFailureHooks({
 			hookExecutor: deps.hookExecutor,
 			hooks,
 			context: afterContext,
 			logger,
+			templateVars,
 		});
 		// ⑤ global hooks
 		await runHooks({
@@ -272,7 +282,13 @@ export async function runAgentSkill(
 		};
 
 		// ③ skill hooks.after（常に）
-		await runAfterHooks({ hookExecutor: deps.hookExecutor, hooks, context: afterContext, logger });
+		await runAfterHooks({
+			hookExecutor: deps.hookExecutor,
+			hooks,
+			context: afterContext,
+			logger,
+			templateVars,
+		});
 
 		// ④ skill hooks.on_failure（失敗時のみ）
 		if (!executeResult.ok) {
@@ -281,6 +297,7 @@ export async function runAgentSkill(
 				hooks,
 				context: afterContext,
 				logger,
+				templateVars,
 			});
 		}
 

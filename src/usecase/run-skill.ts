@@ -165,12 +165,15 @@ async function executeAndReport(
 		timestamp: reserved.timestamp,
 	};
 
+	const templateVars = { variables, reserved };
+
 	// ① skill hooks.before
 	const beforeResult = await runBeforeHooks({
 		hookExecutor: deps.hookExecutor,
 		hooks,
 		context: beforeContext,
 		logger,
+		templateVars,
 	});
 
 	let finalResult: Result<RunOutput, DomainError>;
@@ -185,13 +188,20 @@ async function executeAndReport(
 		};
 
 		// ③ skill hooks.after（常に — リソース解放）
-		await runAfterHooks({ hookExecutor: deps.hookExecutor, hooks, context: afterContext, logger });
+		await runAfterHooks({
+			hookExecutor: deps.hookExecutor,
+			hooks,
+			context: afterContext,
+			logger,
+			templateVars,
+		});
 		// ④ skill hooks.on_failure
 		await runOnFailureHooks({
 			hookExecutor: deps.hookExecutor,
 			hooks,
 			context: afterContext,
 			logger,
+			templateVars,
 		});
 		// ⑤ global hooks
 		await runHooks({
@@ -241,7 +251,13 @@ async function executeAndReport(
 		};
 
 		// ③ skill hooks.after（常に）
-		await runAfterHooks({ hookExecutor: deps.hookExecutor, hooks, context: afterContext, logger });
+		await runAfterHooks({
+			hookExecutor: deps.hookExecutor,
+			hooks,
+			context: afterContext,
+			logger,
+			templateVars,
+		});
 
 		// ④ skill hooks.on_failure（失敗時のみ）
 		if (!commandResults.ok) {
@@ -250,6 +266,7 @@ async function executeAndReport(
 				hooks,
 				context: afterContext,
 				logger,
+				templateVars,
 			});
 		}
 
