@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SessionId } from "../../src/core/execution/session";
 import { ErrorType } from "../../src/core/types/errors";
+import type { ReservedVars } from "../../src/core/variable/template-renderer";
 import type {
 	AfterHookContext,
 	BeforeHookContext,
@@ -465,5 +466,231 @@ describe("runOnFailureHooks", () => {
 
 		expect(logger.warnings).toHaveLength(1);
 		expect(logger.warnings[0]).toBe("Skill on_failure hook warning: fatal");
+	});
+});
+
+const testReserved: ReservedVars = {
+	cwd: "/home/user/project",
+	skillDir: "/home/user/skills/deploy",
+	date: "2026-03-31",
+	timestamp: "2026-03-31T12:00:00.000Z",
+	sessionId: TEST_SESSION_ID,
+};
+
+describe("template variable expansion in hooks", () => {
+	it("expands user input variables in before hooks", async () => {
+		const executor = createMockExecutor();
+		const logger = createSpyLogger();
+
+		const result = await runBeforeHooks({
+			hookExecutor: executor,
+			hooks: { before: ["echo {{environment}}"] },
+			context: beforeContext,
+			logger,
+			templateVars: {
+				variables: { environment: "production" },
+				reserved: testReserved,
+			},
+		});
+
+		expect(result.ok).toBe(true);
+		expect(executor.calls[0].commands).toEqual(["echo production"]);
+	});
+
+	it("expands reserved variables in before hooks", async () => {
+		const executor = createMockExecutor();
+		const logger = createSpyLogger();
+
+		const result = await runBeforeHooks({
+			hookExecutor: executor,
+			hooks: { before: ["{{__skill_dir__}}/scripts/setup.sh"] },
+			context: beforeContext,
+			logger,
+			templateVars: {
+				variables: {},
+				reserved: testReserved,
+			},
+		});
+
+		expect(result.ok).toBe(true);
+		expect(executor.calls[0].commands).toEqual(["/home/user/skills/deploy/scripts/setup.sh"]);
+	});
+
+	it("expands variables in after hooks", async () => {
+		const executor = createMockExecutor();
+		const logger = createSpyLogger();
+
+		await runAfterHooks({
+			hookExecutor: executor,
+			hooks: { after: ["echo deployed to {{environment}}"] },
+			context: afterSuccessContext,
+			logger,
+			templateVars: {
+				variables: { environment: "staging" },
+				reserved: testReserved,
+			},
+		});
+
+		expect(executor.calls[0].commands).toEqual(["echo deployed to staging"]);
+	});
+
+	it("expands variables in on_failure hooks", async () => {
+		const executor = createMockExecutor();
+		const logger = createSpyLogger();
+
+		await runOnFailureHooks({
+			hookExecutor: executor,
+			hooks: { on_failure: ["notify {{environment}} failure"] },
+			context: afterFailedContext,
+			logger,
+			templateVars: {
+				variables: { environment: "production" },
+				reserved: testReserved,
+			},
+		});
+
+		expect(executor.calls[0].commands).toEqual(["notify production failure"]);
+	});
+
+	it("returns error when before hook has undefined variable", async () => {
+		const executor = createMockExecutor();
+		const logger = createSpyLogger();
+
+		const result = await runBeforeHooks({
+			hookExecutor: executor,
+			hooks: { before: ["echo {{undefined_var}}"] },
+			context: beforeContext,
+			logger,
+			templateVars: {
+				variables: {},
+				reserved: testReserved,
+			},
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.type).toBe(ErrorType.Execution);
+			expect(result.error.message).toContain("template expansion failed");
+			expect(result.error.message).toContain("echo {{undefined_var}}");
+		}
+		expect(executor.execute).not.toHaveBeenCalled();
+	});
+
+	it("logs warning when after hook has undefined variable", async () => {
+		const executor = createMockExecutor();
+		const logger = createSpyLogger();
+
+		await runAfterHooks({
+			hookExecutor: executor,
+			hooks: { after: ["echo {{undefined_var}}"] },
+			context: afterSuccessContext,
+			logger,
+			templateVars: {
+				variables: {},
+				reserved: testReserved,
+			},
+		});
+
+		expect(logger.warnings).toHaveLength(1);
+		expect(logger.warnings[0]).toContain("template expansion failed");
+		expect(logger.warnings[0]).toContain("echo {{undefined_var}}");
+		expect(executor.execute).not.toHaveBeenCalled();
+	});
+
+	it("logs warning when on_failure hook has undefined variable", async () => {
+		const executor = createMockExecutor();
+		const logger = createSpyLogger();
+
+		await runOnFailureHooks({
+			hookExecutor: executor,
+			hooks: { on_failure: ["notify {{missing_var}}"] },
+			context: afterFailedContext,
+			logger,
+			templateVars: {
+				variables: {},
+				reserved: testReserved,
+			},
+		});
+
+		expect(logger.warnings).toHaveLength(1);
+		expect(logger.warnings[0]).toContain("template expansion failed");
+		expect(logger.warnings[0]).toContain("notify {{missing_var}}");
+		expect(executor.execute).not.toHaveBeenCalled();
+	});
+
+	it("passes commands as-is when templateVars is undefined", async () => {
+		const executor = createMockExecutor();
+		const logger = createSpyLogger();
+
+		const result = await runBeforeHooks({
+			hookExecutor: executor,
+			hooks: { before: ["echo {{literal}}"] },
+			context: beforeContext,
+			logger,
+		});
+
+		expect(result.ok).toBe(true);
+		expect(executor.calls[0].commands).toEqual(["echo {{literal}}"]);
+	});
+
+	it("expands multiple variables in a single command", async () => {
+		const executor = createMockExecutor();
+		const logger = createSpyLogger();
+
+		const result = await runBeforeHooks({
+			hookExecutor: executor,
+			hooks: { before: ["deploy {{branch}} to {{environment}}"] },
+			context: beforeContext,
+			logger,
+			templateVars: {
+				variables: { branch: "main", environment: "production" },
+				reserved: testReserved,
+			},
+		});
+
+		expect(result.ok).toBe(true);
+		expect(executor.calls[0].commands).toEqual(["deploy main to production"]);
+	});
+
+	it("expands conditional blocks in hooks", async () => {
+		const executor = createMockExecutor();
+		const logger = createSpyLogger();
+
+		const result = await runBeforeHooks({
+			hookExecutor: executor,
+			hooks: {
+				before: ["echo {{#if verbose}}--verbose{{else}}--quiet{{/if}}"],
+			},
+			context: beforeContext,
+			logger,
+			templateVars: {
+				variables: { verbose: "true" },
+				reserved: testReserved,
+			},
+		});
+
+		expect(result.ok).toBe(true);
+		expect(executor.calls[0].commands).toEqual(["echo --verbose"]);
+	});
+
+	it("expands conditional blocks with falsy value", async () => {
+		const executor = createMockExecutor();
+		const logger = createSpyLogger();
+
+		const result = await runBeforeHooks({
+			hookExecutor: executor,
+			hooks: {
+				before: ["echo {{#if verbose}}--verbose{{else}}--quiet{{/if}}"],
+			},
+			context: beforeContext,
+			logger,
+			templateVars: {
+				variables: { verbose: "false" },
+				reserved: testReserved,
+			},
+		});
+
+		expect(result.ok).toBe(true);
+		expect(executor.calls[0].commands).toEqual(["echo --quiet"]);
 	});
 });

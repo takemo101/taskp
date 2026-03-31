@@ -3,6 +3,7 @@ import type { Skill } from "../core/skill/skill";
 import type { SkillHooks } from "../core/skill/skill-metadata";
 import { type ExecutionError, executionError } from "../core/types/errors";
 import { err, ok, type Result } from "../core/types/result";
+import { type ReservedVars, renderTemplate } from "../core/variable/template-renderer";
 import type { AfterHookContext, BeforeHookContext, HookExecutorPort } from "./port/hook-executor";
 import type { Logger } from "./port/logger";
 
@@ -16,11 +17,17 @@ export function resolveSkillHooks(
 	return resolveActionConfig(action, skill.metadata).hooks;
 }
 
+export type TemplateVars = {
+	readonly variables: Record<string, string>;
+	readonly reserved: ReservedVars;
+};
+
 type RunBeforeHooksParams = {
 	readonly hookExecutor?: HookExecutorPort;
 	readonly hooks?: SkillHooks;
 	readonly context: BeforeHookContext;
 	readonly logger: Logger;
+	readonly templateVars?: TemplateVars;
 };
 
 type RunAfterHooksParams = {
@@ -28,7 +35,28 @@ type RunAfterHooksParams = {
 	readonly hooks?: SkillHooks;
 	readonly context: AfterHookContext;
 	readonly logger: Logger;
+	readonly templateVars?: TemplateVars;
 };
+
+function renderHookCommands(
+	commands: readonly string[],
+	templateVars?: TemplateVars,
+): Result<readonly string[], ExecutionError> {
+	if (templateVars === undefined) {
+		return ok(commands);
+	}
+	const rendered: string[] = [];
+	for (const cmd of commands) {
+		const result = renderTemplate(cmd, templateVars.variables, templateVars.reserved);
+		if (!result.ok) {
+			return err(
+				executionError(`Skill hook template expansion failed in "${cmd}": ${result.error.message}`),
+			);
+		}
+		rendered.push(result.value);
+	}
+	return ok(rendered);
+}
 
 export async function runBeforeHooks(
 	params: RunBeforeHooksParams,
@@ -43,8 +71,13 @@ export async function runBeforeHooks(
 		return ok(undefined);
 	}
 
+	const renderResult = renderHookCommands(commands, params.templateVars);
+	if (!renderResult.ok) {
+		return renderResult;
+	}
+
 	try {
-		const results = await params.hookExecutor.execute(commands, params.context, "before");
+		const results = await params.hookExecutor.execute(renderResult.value, params.context, "before");
 		const failures = results.filter((r) => !r.success);
 		if (failures.length > 0) {
 			const details = failures
@@ -70,8 +103,14 @@ export async function runAfterHooks(params: RunAfterHooksParams): Promise<void> 
 		return;
 	}
 
+	const renderResult = renderHookCommands(commands, params.templateVars);
+	if (!renderResult.ok) {
+		params.logger.warn(`Skill after hook warning: ${renderResult.error.message}`);
+		return;
+	}
+
 	try {
-		const results = await params.hookExecutor.execute(commands, params.context, "after");
+		const results = await params.hookExecutor.execute(renderResult.value, params.context, "after");
 		const failures = results.filter((r) => !r.success);
 		if (failures.length > 0) {
 			const details = failures
@@ -96,8 +135,18 @@ export async function runOnFailureHooks(params: RunAfterHooksParams): Promise<vo
 		return;
 	}
 
+	const renderResult = renderHookCommands(commands, params.templateVars);
+	if (!renderResult.ok) {
+		params.logger.warn(`Skill on_failure hook warning: ${renderResult.error.message}`);
+		return;
+	}
+
 	try {
-		const results = await params.hookExecutor.execute(commands, params.context, "on_failure");
+		const results = await params.hookExecutor.execute(
+			renderResult.value,
+			params.context,
+			"on_failure",
+		);
 		const failures = results.filter((r) => !r.success);
 		if (failures.length > 0) {
 			const details = failures
