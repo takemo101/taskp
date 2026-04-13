@@ -7,6 +7,7 @@ import {
 	mergeAiConfig,
 	mergeCliConfig,
 	mergeHooksConfig,
+	mergeMcpConfig,
 	mergeOptional,
 	mergeProviders,
 } from "../../src/adapter/config-loader";
@@ -429,6 +430,60 @@ max_agent_steps = 201
 			expect(result.ok).toBe(false);
 		});
 	});
+
+	describe("[mcp] section", () => {
+		it("loads skill description budget settings", async () => {
+			writeConfig(
+				projectRoot,
+				`
+[mcp]
+skill_description_budget = 8000
+max_skill_description_chars = 250
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.mcp?.skill_description_budget).toBe(8000);
+			expect(result.value.mcp?.max_skill_description_chars).toBe(250);
+		});
+
+		it("merges project mcp fields over global while preserving server entries", async () => {
+			writeConfig(
+				globalRoot,
+				`
+[mcp]
+skill_description_budget = 8000
+
+[mcp.servers.global]
+transport = "stdio"
+command = "global-mcp"
+`,
+			);
+			writeConfig(
+				projectRoot,
+				`
+[mcp]
+max_skill_description_chars = 250
+
+[mcp.servers.project]
+transport = "stdio"
+command = "project-mcp"
+`,
+			);
+
+			const result = await createLoader().load();
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.mcp?.skill_description_budget).toBe(8000);
+			expect(result.value.mcp?.max_skill_description_chars).toBe(250);
+			expect(result.value.mcp?.servers?.global?.transport).toBe("stdio");
+			expect(result.value.mcp?.servers?.project?.transport).toBe("stdio");
+		});
+	});
 });
 
 describe("mergeOptional", () => {
@@ -546,5 +601,25 @@ describe("mergeCliConfig", () => {
 		const result = mergeCliConfig({ max_agent_steps: 50 }, {});
 
 		expect(result.max_agent_steps).toBe(50);
+	});
+});
+
+describe("mergeMcpConfig", () => {
+	it("merges budget fields by project priority while preserving merged servers", () => {
+		const result = mergeMcpConfig(
+			{
+				skill_description_budget: 8000,
+				servers: { global: { transport: "stdio", command: "global-mcp" } },
+			},
+			{
+				max_skill_description_chars: 250,
+				servers: { project: { transport: "stdio", command: "project-mcp" } },
+			},
+		);
+
+		expect(result.skill_description_budget).toBe(8000);
+		expect(result.max_skill_description_chars).toBe(250);
+		expect(result.servers?.global?.transport).toBe("stdio");
+		expect(result.servers?.project?.transport).toBe("stdio");
 	});
 });

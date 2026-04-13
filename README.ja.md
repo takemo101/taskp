@@ -362,7 +362,7 @@ actions:                # マルチアクション定義（省略可）
 
 `actions` フィールドで1つのスキルに複数のアクションを定義できます。各アクションは `mode`、`model`、`inputs`、`tools`、`context`、`timeout` を個別に上書き可能で、未指定のフィールドはスキルレベルの値を継承します。
 
-`actions` が定義されている場合、スキルレベルの `inputs` は無視されます。
+アクション側で `inputs` を省略した場合は、スキルレベルの `inputs` を継承します。
 
 アクションの実行手順は本文中の `## action:<name>` セクションで定義します：
 
@@ -604,12 +604,13 @@ taskp は MCP（Model Context Protocol）サーバーとして動作し、Claude
 taskp serve
 ```
 
-公開されるツール:
+公開されるツールは、登録済みスキルとアクションから自動生成されます。
 
-- `taskp_run` — スキルを実行
-- `taskp_list` — スキル一覧を取得
-- `taskp_init` — スキルの雛形を生成
-- `taskp_show` — スキルの詳細を表示
+例:
+
+- `deploy` — `deploy` スキルを実行
+- `review__fix` — `review` スキルの `fix` アクションを実行
+- `task__add` — `task` スキルの `add` アクションを実行
 
 ## ドキュメント
 

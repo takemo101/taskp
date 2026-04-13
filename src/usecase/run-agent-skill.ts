@@ -2,10 +2,11 @@ import type { LanguageModelV3 } from "@ai-sdk/provider";
 import type { ToolSet } from "ai";
 import { DEFAULT_MAX_AGENT_STEPS } from "../core/constants";
 import type { TaskpRunDeps } from "../core/execution/agent-tools";
-import { buildTaskpRunDescription, buildTools } from "../core/execution/agent-tools";
+import { buildTaskpRunDescriptionResult, buildTools } from "../core/execution/agent-tools";
 import type { ContentPart } from "../core/execution/content-part";
 import { partitionToolRefs } from "../core/execution/mcp-tool-ref";
 import type { SessionId } from "../core/execution/session";
+import type { DescriptionBudgetOptions } from "../core/skill/skill-description-budget";
 import { resolveAgentExecution } from "../core/skill/skill-execution-resolver";
 import { configError, type DomainError, domainErrorMessage } from "../core/types/errors";
 import type { Result } from "../core/types/result";
@@ -60,6 +61,7 @@ export type RunAgentSkillDeps = {
 	readonly mcpToolResolver?: McpToolResolverPort;
 	readonly outputFileStore?: OutputFileStorePort;
 	readonly logger?: Logger;
+	readonly skillDescriptionBudget?: DescriptionBudgetOptions;
 };
 
 export async function runAgentSkill(
@@ -137,6 +139,8 @@ export async function runAgentSkill(
 		builtins,
 		deps.skillRepository,
 		skill.metadata.name,
+		deps.skillDescriptionBudget,
+		deps.logger,
 	);
 
 	const taskpRunDeps: TaskpRunDeps = {
@@ -374,11 +378,23 @@ async function buildToolDescriptions(
 	toolNames: readonly string[],
 	skillRepository: SkillRepository,
 	currentSkillName: string,
+	skillDescriptionBudget?: DescriptionBudgetOptions,
+	logger?: Logger,
 ): Promise<Record<string, string> | undefined> {
 	if (!toolNames.includes("taskp_run")) return undefined;
 
 	const { skills } = await skillRepository.listAll();
+	const descriptionResult = buildTaskpRunDescriptionResult(
+		skills,
+		currentSkillName,
+		skillDescriptionBudget,
+	);
+	if (descriptionResult.truncatedEntryCount > 0) {
+		logger?.debug(
+			`[skills] Description budget applied: truncated ${descriptionResult.truncatedEntryCount} entries (phase ${descriptionResult.phase})`,
+		);
+	}
 	return {
-		taskp_run: buildTaskpRunDescription(skills, currentSkillName),
+		taskp_run: descriptionResult.text,
 	};
 }

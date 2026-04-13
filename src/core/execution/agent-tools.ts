@@ -15,6 +15,7 @@ export { MAX_FETCH_LENGTH, validateFetchUrl } from "./tools/fetch-tool";
 export { MAX_GREP_MATCHES } from "./tools/grep-tool";
 export {
 	buildTaskpRunDescription,
+	buildTaskpRunDescriptionResult,
 	MAX_NESTING_DEPTH,
 	resolveSkillMode,
 	validateTaskpRunCall,

@@ -34,6 +34,10 @@ const CONFIG_TEMPLATE = `# taskp — 設定ファイル
 # [cli]
 # command_timeout_ms = 30000
 
+# [mcp]
+# skill_description_budget = 8000
+# max_skill_description_chars = 250
+
 # [hooks]
 # on_success = []
 # on_failure = []
@@ -54,6 +58,10 @@ const GLOBAL_CONFIG_TEMPLATE = `# taskp — グローバル設定ファイル
 
 # [cli]
 # command_timeout_ms = 30000
+
+# [mcp]
+# skill_description_budget = 8000
+# max_skill_description_chars = 250
 
 # [hooks]
 # on_success = []

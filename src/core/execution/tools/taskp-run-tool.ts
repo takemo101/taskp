@@ -11,6 +11,12 @@ import type { SessionId } from "../../execution/session";
 import type { Action } from "../../skill/action";
 import { resolveActionConfig } from "../../skill/action";
 import type { Skill } from "../../skill/skill";
+import {
+	type DescriptionBudgetOptions,
+	type DescriptionBudgetResult,
+	type DescriptionEntry,
+	formatDescriptionEntriesWithinBudget,
+} from "../../skill/skill-description-budget";
 import { parseSkillRef } from "../../skill/skill-ref";
 import { domainErrorMessage } from "../../types/errors";
 import { err, ok, type Result } from "../../types/result";
@@ -158,18 +164,54 @@ const TASKP_RUN_BASE_DESCRIPTION =
 export function buildTaskpRunDescription(
 	skills: readonly Skill[],
 	currentSkillName?: string,
+	budgetOptions?: DescriptionBudgetOptions,
 ): string {
-	const lines = collectSkillLines(skills, currentSkillName);
-
-	if (lines.length === 0) {
-		return TASKP_RUN_BASE_DESCRIPTION;
-	}
-
-	return `${TASKP_RUN_BASE_DESCRIPTION}\n\nAvailable skills:\n${lines.join("\n")}`;
+	return buildTaskpRunDescriptionResult(skills, currentSkillName, budgetOptions).text;
 }
 
-function collectSkillLines(skills: readonly Skill[], currentSkillName?: string): readonly string[] {
-	const lines: string[] = [];
+export function buildTaskpRunDescriptionResult(
+	skills: readonly Skill[],
+	currentSkillName?: string,
+	budgetOptions?: DescriptionBudgetOptions,
+): DescriptionBudgetResult {
+	const entries = collectSkillEntries(skills, currentSkillName);
+	const formatted = formatLines(
+		entries,
+		budgetOptions,
+		TASKP_RUN_BASE_DESCRIPTION.length + "\n\nAvailable skills:\n".length,
+	);
+
+	if (formatted.lines.length === 0) {
+		const baseText = budgetOptions
+			? clampText(TASKP_RUN_BASE_DESCRIPTION, budgetOptions.budgetChars)
+			: TASKP_RUN_BASE_DESCRIPTION;
+		return {
+			text: baseText,
+			phase: budgetOptions ? 4 : 1,
+			truncatedEntryCount: budgetOptions ? entries.length : 0,
+			omittedEntryCount: budgetOptions ? entries.length : 0,
+		};
+	}
+
+	return {
+		text: `${TASKP_RUN_BASE_DESCRIPTION}\n\nAvailable skills:\n${formatted.lines.join("\n")}`,
+		phase: formatted.phase,
+		truncatedEntryCount: formatted.truncatedEntryCount,
+		omittedEntryCount: formatted.omittedEntryCount,
+	};
+}
+
+function clampText(text: string, maxChars: number): string {
+	if (text.length <= maxChars) return text;
+	if (maxChars <= 1) return "…";
+	return `${text.slice(0, maxChars - 1)}…`;
+}
+
+function collectSkillEntries(
+	skills: readonly Skill[],
+	currentSkillName?: string,
+): readonly DescriptionEntry[] {
+	const entries: DescriptionEntry[] = [];
 
 	for (const skill of skills) {
 		if (skill.metadata.name === currentSkillName) continue;
@@ -177,32 +219,75 @@ function collectSkillLines(skills: readonly Skill[], currentSkillName?: string):
 		const hasActions = skill.metadata.actions && Object.keys(skill.metadata.actions).length > 0;
 
 		if (hasActions) {
-			appendSkillWithActions(lines, skill);
+			appendSkillWithActions(entries, skill);
 		} else {
-			appendSimpleSkill(lines, skill);
+			appendSimpleSkill(entries, skill);
 		}
 	}
 
-	return lines;
+	return entries;
 }
 
-function appendSimpleSkill(lines: string[], skill: Skill): void {
+function appendSimpleSkill(entries: DescriptionEntry[], skill: Skill): void {
 	if (skill.metadata.mode === "agent") return;
-	lines.push(`- ${skill.metadata.name}: ${skill.metadata.description}`);
+	entries.push({ label: `- ${skill.metadata.name}`, description: skill.metadata.description });
 }
 
-function appendSkillWithActions(lines: string[], skill: Skill): void {
+function appendSkillWithActions(entries: DescriptionEntry[], skill: Skill): void {
 	const actions = skill.metadata.actions as Record<string, Action>;
-	const actionLines: string[] = [];
+	const actionEntries: DescriptionEntry[] = [];
 
 	for (const [actionName, action] of Object.entries(actions)) {
 		const resolved = resolveActionConfig(action, skill.metadata);
 		if (resolved.mode === "agent") continue;
-		actionLines.push(`  - ${skill.metadata.name}:${actionName}: ${resolved.description}`);
+		actionEntries.push({
+			label: `  - ${skill.metadata.name}:${actionName}`,
+			description: resolved.description,
+		});
 	}
 
-	if (actionLines.length === 0) return;
+	if (actionEntries.length === 0) return;
 
-	lines.push(`- ${skill.metadata.name}: ${skill.metadata.description}`);
-	lines.push(...actionLines);
+	entries.push({ label: `- ${skill.metadata.name}`, description: skill.metadata.description });
+	entries.push(...actionEntries);
+}
+
+function formatLines(
+	entries: readonly DescriptionEntry[],
+	budgetOptions?: DescriptionBudgetOptions,
+	baseLength = 0,
+): {
+	readonly lines: readonly string[];
+	readonly phase: 1 | 2 | 3 | 4;
+	readonly truncatedEntryCount: number;
+	readonly omittedEntryCount: number;
+} {
+	if (budgetOptions === undefined) {
+		return {
+			lines: entries.map((entry) => `${entry.label}: ${entry.description}`),
+			phase: 1,
+			truncatedEntryCount: 0,
+			omittedEntryCount: 0,
+		};
+	}
+
+	if (budgetOptions.budgetChars <= baseLength) {
+		return {
+			lines: [],
+			phase: 4,
+			truncatedEntryCount: entries.length,
+			omittedEntryCount: entries.length,
+		};
+	}
+
+	const result = formatDescriptionEntriesWithinBudget(entries, {
+		...budgetOptions,
+		budgetChars: budgetOptions.budgetChars - baseLength,
+	});
+	return {
+		lines: result.text === "" ? [] : result.text.split("\n"),
+		phase: result.phase,
+		truncatedEntryCount: result.truncatedEntryCount,
+		omittedEntryCount: result.omittedEntryCount,
+	};
 }

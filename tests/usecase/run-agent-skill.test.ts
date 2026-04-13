@@ -255,6 +255,81 @@ describe("runAgentSkill", () => {
 		});
 	});
 
+	it("applies skill description budget to taskp_run tool descriptions", async () => {
+		const skill = createAgentSkill({ tools: ["taskp_run"] });
+		const deps = createMockDeps(skill);
+		deps.skillRepository = {
+			...deps.skillRepository,
+			listAll: vi.fn().mockResolvedValue({
+				skills: [
+					createAgentSkill({
+						name: "deploy",
+						mode: "template",
+						description: "アプリケーションを安全にデプロイするための長い説明文",
+						tools: ["bash"],
+					}),
+					createAgentSkill({
+						name: "release",
+						mode: "template",
+						description: "リリース作業全体を実行するための長い説明文",
+						tools: ["bash"],
+					}),
+				],
+				failures: [],
+			}),
+		};
+
+		await runAgentSkill(
+			{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+			{ ...deps, skillDescriptionBudget: { budgetChars: 120, maxDescriptionChars: 40 } },
+		);
+
+		const executorCall = (deps.agentExecutor.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
+		expect(executorCall.tools.taskp_run.description).toContain("Available skills:");
+		expect(executorCall.tools.taskp_run.description).not.toContain(
+			"アプリケーションを安全にデプロイするための長い説明文",
+		);
+	});
+
+	it("logs when taskp_run descriptions are truncated by budget", async () => {
+		const skill = createAgentSkill({ tools: ["taskp_run"] });
+		const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+		const deps = createMockDeps(skill);
+		deps.skillRepository = {
+			...deps.skillRepository,
+			listAll: vi.fn().mockResolvedValue({
+				skills: [
+					createAgentSkill({
+						name: "deploy",
+						mode: "template",
+						description: "アプリケーションを安全にデプロイするための長い説明文",
+						tools: ["bash"],
+					}),
+					createAgentSkill({
+						name: "release",
+						mode: "template",
+						description: "リリース作業全体を実行するための長い説明文",
+						tools: ["bash"],
+					}),
+				],
+				failures: [],
+			}),
+		};
+
+		await runAgentSkill(
+			{ name: "test-agent", presets: {}, model: mockModel, sessionId: TEST_SESSION_ID },
+			{
+				...deps,
+				logger,
+				skillDescriptionBudget: { budgetChars: 120, maxDescriptionChars: 40 },
+			},
+		);
+
+		expect(logger.debug).toHaveBeenCalledWith(
+			expect.stringContaining("Description budget applied"),
+		);
+	});
+
 	it("skips context collection when no context sources defined", async () => {
 		const skill = createAgentSkill({ context: [] });
 		const deps = createMockDeps(skill);

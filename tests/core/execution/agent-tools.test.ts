@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
 	buildTaskpRunDescription,
+	buildTaskpRunDescriptionResult,
 	buildTools,
 	getPrimaryArgKey,
 	MAX_FETCH_LENGTH,
@@ -775,6 +776,74 @@ describe("buildTaskpRunDescription", () => {
 		const result = buildTaskpRunDescription(skills);
 
 		expect(result).not.toContain("agent-only");
+	});
+
+	it("description budget を指定すると Available skills を段階的に短縮する", () => {
+		const skills = [
+			createSkillFixture({
+				name: "deploy",
+				description: "アプリケーションを安全にデプロイするための長い説明文",
+			}),
+			createSkillFixture({
+				name: "release",
+				description: "リリース作業全体を実行するための長い説明文",
+			}),
+		];
+
+		const result = buildTaskpRunDescription(skills, undefined, {
+			budgetChars: 120,
+			maxDescriptionChars: 40,
+			minDescriptionChars: 12,
+		});
+
+		expect(result).toContain("Available skills:");
+		expect(result).toContain("deploy");
+		expect(result).toContain("release");
+		expect(result).not.toContain("アプリケーションを安全にデプロイするための長い説明文");
+	});
+
+	it("description budget は taskp_run の最終 description 全体に適用される", () => {
+		const skills = [
+			createSkillFixture({
+				name: "deploy",
+				description: "アプリケーションを安全にデプロイするための長い説明文",
+			}),
+			createSkillFixture({
+				name: "release",
+				description: "リリース作業全体を実行するための長い説明文",
+			}),
+		];
+
+		const result = buildTaskpRunDescription(skills, undefined, {
+			budgetChars: 78,
+			maxDescriptionChars: 40,
+			minDescriptionChars: 12,
+		});
+
+		expect(result.length).toBeLessThanOrEqual(78);
+	});
+
+	it("budget がベース description より小さい場合も最終文字数を超えない", () => {
+		const result = buildTaskpRunDescription([], undefined, {
+			budgetChars: 40,
+			maxDescriptionChars: 40,
+		});
+
+		expect(result.length).toBeLessThanOrEqual(40);
+	});
+
+	it("全スキル行が省略された場合は omittedEntryCount に件数を反映する", () => {
+		const skills = [
+			createSkillFixture({ name: "deploy", description: "Deploy the application" }),
+			createSkillFixture({ name: "release", description: "Release the application" }),
+		];
+
+		const result = buildTaskpRunDescriptionResult(skills, undefined, {
+			budgetChars: 40,
+			maxDescriptionChars: 40,
+		});
+
+		expect(result.omittedEntryCount).toBe(2);
 	});
 });
 

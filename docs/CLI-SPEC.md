@@ -228,6 +228,10 @@ interface SetupOutput {
 # [cli]
 # command_timeout_ms = 30000
 
+# [mcp]
+# skill_description_budget = 8000
+# max_skill_description_chars = 250
+
 # [hooks]
 # on_success = []
 # on_failure = []
@@ -395,12 +399,12 @@ MCP サーバーへの接続はスキル実行時に遅延的に行われ、実�
 
 ## MCP サーバーモード
 
-incur により、すべてのコマンドが MCP ツールとしても公開される。
+`taskp serve` は登録済みスキルを MCP ツールとして公開する。
 
 ```bash
 # MCP サーバーとして起動
 taskp serve
 
 # Claude Code / pi から利用
-# → taskp_run, taskp_list, taskp_init, taskp_setup, taskp_show がツールとして利用可能
+# → deploy, review__fix, task__add のようなスキル/アクション単位のツールが利用可能
 ```

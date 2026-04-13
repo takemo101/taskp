@@ -179,6 +179,12 @@ max_agent_steps = 100
 ## `[mcp]` — MCP サーバー設定
 
 外部 MCP サーバーの接続情報を定義する。agent モードで `mcp:` プレフィックス付きのツールを使用する際に必要。
+`taskp serve` の description バジェット設定もこのセクションで扱う。agent モードの `taskp_run` description バジェットは設定値ではなく、選択モデルの推定コンテキスト長から算出する。
+
+| フィールド | 型 | 必須 | デフォルト | 説明 |
+|-----------|-----|:---:|----------|------|
+| `skill_description_budget` | `integer` | - | `8000` | `taskp serve` で公開する MCP ツール description 全体に使う文字数バジェット |
+| `max_skill_description_chars` | `integer` | - | `250` | 1 スキルあたりの description 上限文字数 |
 
 ### `[mcp.servers.<name>]` — サーバー定義
 
@@ -216,6 +222,10 @@ transport の値によって必要なフィールドが異なる（discriminated
 ### 設定例
 
 ```toml
+[mcp]
+skill_description_budget = 8000
+max_skill_description_chars = 250
+
 # stdio: ローカルコマンドで MCP サーバーを起動
 [mcp.servers.github]
 transport = "stdio"

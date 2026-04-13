@@ -17,7 +17,6 @@ import { copyToClipboard } from "./clipboard";
 import { showEmptyState } from "./screens/empty-state";
 import {
 	createPresetPromptCollector,
-	createSingleSkillRepository,
 	type ExecutionDeps,
 	showExecution,
 } from "./screens/execution-view";
@@ -50,8 +49,15 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 			return;
 		}
 
-		const { model, modelSpec, hooksConfig, commandTimeoutMs, maxAgentSteps, mcpServerConfigs } =
-			await resolveModelAndConfig(options);
+		const {
+			model,
+			modelSpec,
+			hooksConfig,
+			commandTimeoutMs,
+			maxAgentSteps,
+			mcpServerConfigs,
+			maxSkillDescriptionChars,
+		} = await resolveModelAndConfig(options);
 
 		const commandExecutor = createCommandRunner({ defaultTimeoutMs: commandTimeoutMs });
 		const logger = createConsoleLogger();
@@ -62,11 +68,13 @@ export async function startTui(options?: TuiOptions): Promise<void> {
 			hookExecutor,
 			hooksConfig,
 			outputFileStore,
-			skillRepositoryFactory: createSingleSkillRepository,
+			skillRepositoryFactory: () => skillRepository,
 			promptCollectorFactory: createPresetPromptCollector,
 			systemPromptResolver: createSystemPromptResolver(process.cwd()),
 			maxAgentSteps,
 			mcpServerConfigs,
+			modelSpec: modelSpec ?? undefined,
+			maxSkillDescriptionChars,
 		};
 
 		while (true) {
@@ -99,6 +107,7 @@ type ModelAndConfig = {
 	readonly commandTimeoutMs: number | undefined;
 	readonly maxAgentSteps: number | undefined;
 	readonly mcpServerConfigs: Readonly<Record<string, McpServerConfig>> | undefined;
+	readonly maxSkillDescriptionChars: number | undefined;
 };
 
 // config.toml からデフォルトの LLM モデルとフック設定を解決する。
@@ -114,12 +123,14 @@ async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConf
 			commandTimeoutMs: undefined,
 			maxAgentSteps: undefined,
 			mcpServerConfigs: undefined,
+			maxSkillDescriptionChars: undefined,
 		};
 
 	const hooksConfig = configResult.value.hooks;
 	const commandTimeoutMs = configResult.value.cli?.command_timeout_ms;
 	const maxAgentSteps = configResult.value.cli?.max_agent_steps;
 	const mcpServerConfigs = configResult.value.mcp?.servers;
+	const maxSkillDescriptionChars = configResult.value.mcp?.max_skill_description_chars;
 
 	const aiConfig = configResult.value.ai ?? {};
 	const specResult = resolveModelSpec({
@@ -134,6 +145,7 @@ async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConf
 			commandTimeoutMs,
 			maxAgentSteps,
 			mcpServerConfigs,
+			maxSkillDescriptionChars,
 		};
 
 	const modelResult = createLanguageModel(specResult.value, aiConfig);
@@ -145,6 +157,7 @@ async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConf
 			commandTimeoutMs,
 			maxAgentSteps,
 			mcpServerConfigs,
+			maxSkillDescriptionChars,
 		};
 
 	return {
@@ -154,6 +167,7 @@ async function resolveModelAndConfig(options?: TuiOptions): Promise<ModelAndConf
 		commandTimeoutMs,
 		maxAgentSteps,
 		mcpServerConfigs,
+		maxSkillDescriptionChars,
 	};
 }
 

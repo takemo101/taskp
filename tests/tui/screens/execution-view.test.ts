@@ -122,7 +122,21 @@ describe("createPresetPromptCollector", () => {
 		const vars = { key: "value" };
 		const collector = createPresetPromptCollector(vars);
 		const result = await collector.collect([], {});
-		expect(result).toEqual(ok({ key: "value" }));
+		expect(result).toEqual(ok({}));
+	});
+
+	it("merges parent variables with taskp_run presets for child inputs", async () => {
+		const collector = createPresetPromptCollector({ parent: "from-parent" });
+		const result = await collector.collect(
+			[
+				{ name: "parent", type: "text", message: "Parent" },
+				{ name: "child", type: "text", message: "Child", default: "fallback" },
+			],
+			{ child: "from-set" },
+			{ noInput: true },
+		);
+
+		expect(result).toEqual(ok({ parent: "from-parent", child: "from-set" }));
 	});
 });
 

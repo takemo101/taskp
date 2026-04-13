@@ -363,7 +363,7 @@ actions:                # Multi-action definitions (optional)
 
 A skill can define multiple actions via the `actions` field. Each action can override `mode`, `model`, `inputs`, `tools`, `context`, and `timeout` — unspecified fields inherit from the skill level.
 
-When `actions` is defined, the skill-level `inputs` is ignored.
+If an action omits `inputs`, it inherits the skill-level `inputs`.
 
 Action bodies are defined in the Markdown body using `## action:<name>` sections:
 
@@ -632,12 +632,13 @@ taskp can run as an MCP (Model Context Protocol) server, making it accessible fr
 taskp serve
 ```
 
-Exposed tools:
+Exposed tools are generated from registered skills and actions.
 
-- `taskp_run` — Run a skill
-- `taskp_list` — List available skills
-- `taskp_init` — Generate a skill scaffold
-- `taskp_show` — Show skill details
+Examples:
+
+- `deploy` — Run the `deploy` skill
+- `review__fix` — Run the `fix` action of the `review` skill
+- `task__add` — Run the `add` action of the `task` skill
 
 ## Documentation
 
