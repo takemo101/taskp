@@ -15,6 +15,6 @@ export type SkillLoadResult = {
 export type SkillRepository = {
 	readonly findByName: (name: string) => Promise<Result<Skill, SkillNotFoundError>>;
 	readonly listAll: () => Promise<SkillLoadResult>;
-	readonly listLocal: () => Promise<SkillLoadResult>;
+	readonly listProject: () => Promise<SkillLoadResult>;
 	readonly listGlobal: () => Promise<SkillLoadResult>;
 };

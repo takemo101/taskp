@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 import { homedir } from "node:os";
-import { dirname, relative } from "node:path";
 import { Writable } from "node:stream";
 import { Cli, z } from "incur";
 import { createAgentExecutor } from "./adapter/agent-executor";
@@ -25,6 +24,7 @@ import { createSystemPromptResolver } from "./adapter/system-prompt-resolver";
 import type { Action } from "./core/skill/action";
 import { resolveActionConfig } from "./core/skill/action";
 import type { ContextSource } from "./core/skill/context-source";
+import { formatSkillSource } from "./core/skill/format-skill-source";
 import type { SkillScope } from "./core/skill/skill";
 import {
 	DEFAULT_MAX_SKILL_DESCRIPTION_CHARS,
@@ -44,6 +44,7 @@ import type { SetupOutput } from "./usecase/setup-project";
 import { setupProject } from "./usecase/setup-project";
 import type { ShowOutput } from "./usecase/show-skill";
 import { showSkill } from "./usecase/show-skill";
+import { VERSION } from "./version";
 
 // --set key=value 形式の引数を Record に変換する。
 // "=" を含む値をサポートするため、最初の "=" のみで分割する
@@ -149,7 +150,7 @@ function unwrapOrThrow<T>(result: Result<T, DomainError>): T {
 }
 
 const cli = Cli.create("taskp", {
-	version: "0.1.14",
+	version: VERSION,
 	description:
 		"Markdown-defined skill runner with interactive argument collection and LLM execution",
 })
@@ -361,6 +362,37 @@ const cli = Cli.create("taskp", {
 		},
 	});
 
+async function buildSharedInfra(verbose: boolean) {
+	const configLoader = createDefaultConfigLoader(process.cwd());
+	const config = exitOnError(await configLoader.load());
+	const logger = createConsoleLogger({ verbose });
+	const commandExecutor = createCommandRunner({
+		defaultTimeoutMs: config.cli?.command_timeout_ms,
+	});
+	const hookExecutor = createHookExecutor(commandExecutor, logger);
+	const outputFileStore = createOutputFileStore();
+	const systemPromptResolver = createSystemPromptResolver(process.cwd());
+	const contextCollectorDeps = await createDefaultContextCollectorDeps();
+	const contextCollector = createContextCollector({ ...contextCollectorDeps, logger });
+	const mcpToolResolver = config.mcp?.servers
+		? (await import("./adapter/mcp-tool-resolver")).createMcpToolResolver(
+				config.mcp.servers,
+				logger,
+			)
+		: undefined;
+
+	return {
+		config,
+		logger,
+		commandExecutor,
+		hookExecutor,
+		outputFileStore,
+		contextCollector,
+		systemPromptResolver,
+		mcpToolResolver,
+	};
+}
+
 type RunCommandContext = {
 	readonly args: { readonly skill: string; readonly action?: string };
 	readonly options: {
@@ -376,8 +408,17 @@ async function runAgentMode(
 	skillRepository: Awaited<ReturnType<typeof createDefaultSkillLoader>>,
 	promptCollector: ReturnType<typeof createPromptRunner>,
 ): Promise<void> {
-	const configLoader = createDefaultConfigLoader(process.cwd());
-	const config = exitOnError(await configLoader.load());
+	const infra = await buildSharedInfra(c.options.verbose ?? false);
+	const {
+		config,
+		logger,
+		commandExecutor,
+		hookExecutor,
+		outputFileStore,
+		contextCollector,
+		systemPromptResolver,
+		mcpToolResolver,
+	} = infra;
 
 	const aiConfig = config.ai ?? {};
 	const modelSpec = exitOnError(
@@ -399,24 +440,7 @@ async function runAgentMode(
 
 	writer.writeHeader();
 
-	const logger = createConsoleLogger({ verbose: c.options.verbose ?? false });
-	const contextCollectorDeps = await createDefaultContextCollectorDeps();
-	const contextCollector = createContextCollector({ ...contextCollectorDeps, logger });
 	const agentExecutor = createAgentExecutor(writer, logger);
-
-	const commandExecutor = createCommandRunner({
-		defaultTimeoutMs: config.cli?.command_timeout_ms,
-	});
-	const hookExecutor = createHookExecutor(commandExecutor, logger);
-	const hooksConfig = config.hooks;
-	const outputFileStore = createOutputFileStore();
-
-	const mcpToolResolver = config.mcp?.servers
-		? (await import("./adapter/mcp-tool-resolver")).createMcpToolResolver(
-				config.mcp.servers,
-				logger,
-			)
-		: undefined;
 
 	const result = await runAgentSkill(
 		{
@@ -433,11 +457,11 @@ async function runAgentMode(
 			promptCollector,
 			contextCollector,
 			agentExecutor,
-			systemPromptResolver: createSystemPromptResolver(process.cwd()),
+			systemPromptResolver,
 			commandExecutor,
 			progressWriter: createCliProgressWriter(process.stdout),
 			hookExecutor,
-			hooksConfig,
+			hooksConfig: config.hooks,
 			mcpToolResolver,
 			outputFileStore,
 			logger,
@@ -452,9 +476,18 @@ async function runAgentMode(
 }
 
 async function runServeMode(verbose: boolean): Promise<void> {
-	const configLoader = createDefaultConfigLoader(process.cwd());
-	const config = exitOnError(await configLoader.load());
-	const logger = createConsoleLogger({ verbose });
+	const infra = await buildSharedInfra(verbose);
+	const {
+		config,
+		logger,
+		commandExecutor,
+		hookExecutor,
+		outputFileStore,
+		contextCollector,
+		systemPromptResolver,
+		mcpToolResolver,
+	} = infra;
+
 	const skillRepository = await createDefaultSkillLoader(process.cwd());
 	const { skills, failures } = await skillRepository.listAll();
 	for (const failure of failures) {
@@ -473,23 +506,9 @@ async function runServeMode(verbose: boolean): Promise<void> {
 			`[skills] Budget exceeded for MCP descriptions. Truncated ${toolBudgetResult.truncatedEntryCount} entries and omitted ${toolBudgetResult.omittedEntryCount} entries (phase ${toolBudgetResult.phase})`,
 		);
 	}
-	const commandExecutor = createCommandRunner({
-		defaultTimeoutMs: config.cli?.command_timeout_ms,
-	});
-	const hookExecutor = createHookExecutor(commandExecutor, logger);
-	const outputFileStore = createOutputFileStore();
-	const systemPromptResolver = createSystemPromptResolver(process.cwd());
-	const contextCollectorDeps = await createDefaultContextCollectorDeps();
-	const contextCollector = createContextCollector({ ...contextCollectorDeps, logger });
-	const mcpToolResolver = config.mcp?.servers
-		? (await import("./adapter/mcp-tool-resolver")).createMcpToolResolver(
-				config.mcp.servers,
-				logger,
-			)
-		: undefined;
 
 	const skillMcpCli = createSkillMcpCli({
-		version: "0.1.14",
+		version: VERSION,
 		skills,
 		budgetOptions,
 		executeSkill: async ({ skillName, actionName, presets }) => {
@@ -618,22 +637,6 @@ function printSkillTable(
 			console.log(`  Actions: ${actionsLabel}`);
 		}
 	}
-}
-
-function formatSkillSource(location: string): string {
-	const skillDir = dirname(location);
-	const home = homedir();
-
-	if (skillDir === home || skillDir.startsWith(`${home}/`)) {
-		return `~${skillDir.slice(home.length)}`;
-	}
-
-	const relativePath = relative(process.cwd(), skillDir);
-	if (relativePath === "") {
-		return ".";
-	}
-
-	return relativePath.startsWith(".") ? relativePath : `./${relativePath}`;
 }
 
 function formatActionsLabel(actions: Record<string, Action> | undefined): string | undefined {

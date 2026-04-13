@@ -4,6 +4,7 @@ import type { Skill } from "../core/skill/skill";
 import type {
 	DescriptionBudgetOptions,
 	DescriptionEntry,
+	FormattedEntry,
 } from "../core/skill/skill-description-budget";
 import { formatDescriptionEntriesWithinBudget } from "../core/skill/skill-description-budget";
 import type { SkillInput } from "../core/skill/skill-input";
@@ -126,20 +127,7 @@ function budgetSkillDescriptions(
 	readonly omittedEntryCount: number;
 } {
 	const result = formatDescriptionEntriesWithinBudget(entries, budgetOptions);
-	const lines = result.text === "" ? [] : result.text.split("\n");
-	const descriptions = new Map<string, string | undefined>();
-
-	for (const entry of entries) {
-		const prefix = `${entry.label}: `;
-		const line = lines.find(
-			(candidate) => candidate === entry.label || candidate.startsWith(prefix),
-		);
-		if (line === undefined || line === entry.label) {
-			descriptions.set(entry.label, undefined);
-			continue;
-		}
-		descriptions.set(entry.label, line.slice(prefix.length));
-	}
+	const descriptions = buildDescriptionMap(entries, result.entries);
 
 	return {
 		descriptions,
@@ -147,6 +135,23 @@ function budgetSkillDescriptions(
 		truncatedEntryCount: result.truncatedEntryCount,
 		omittedEntryCount: result.omittedEntryCount,
 	};
+}
+
+function buildDescriptionMap(
+	original: readonly DescriptionEntry[],
+	formatted: readonly FormattedEntry[],
+): ReadonlyMap<string, string | undefined> {
+	const formattedByLabel = new Map<string, FormattedEntry>();
+	for (const entry of formatted) {
+		formattedByLabel.set(entry.label, entry);
+	}
+
+	const descriptions = new Map<string, string | undefined>();
+	for (const entry of original) {
+		const matched = formattedByLabel.get(entry.label);
+		descriptions.set(entry.label, matched?.description);
+	}
+	return descriptions;
 }
 
 function assertUniqueToolNames(tools: readonly RawSkillMcpTool[]): void {

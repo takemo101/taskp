@@ -382,7 +382,7 @@ async function executeSkill(
     await runAgentSkill(
       { name: skill.metadata.name, presets: variables, model },
       {
-        skillRepository: { findByName: async () => ok(skill), listAll: async () => [], listLocal: async () => [], listGlobal: async () => [] },
+        skillRepository: { findByName: async () => ok(skill), listAll: async () => [], listProject: async () => [], listGlobal: async () => [] },
         promptCollector,
         contextCollector,
         agentExecutor,
@@ -398,7 +398,7 @@ async function executeSkill(
     const result = await runSkill(
       { name: skill.metadata.name, presets: variables, dryRun: false, force: false },
       {
-        skillRepository: { findByName: async () => ok(skill), listAll: async () => [], listLocal: async () => [], listGlobal: async () => [] },
+        skillRepository: { findByName: async () => ok(skill), listAll: async () => [], listProject: async () => [], listGlobal: async () => [] },
         promptCollector,
         commandExecutor,
       },

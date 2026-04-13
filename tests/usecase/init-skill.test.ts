@@ -10,7 +10,7 @@ function stubRepository(skills: Skill[] = []): SkillRepository {
 	return {
 		findByName: () => Promise.resolve(err({ type: ErrorType.SkillNotFound, name: "" })),
 		listAll: () => Promise.resolve({ skills, failures: [] }),
-		listLocal: () => Promise.resolve({ skills: [], failures: [] }),
+		listProject: () => Promise.resolve({ skills: [], failures: [] }),
 		listGlobal: () => Promise.resolve({ skills: [], failures: [] }),
 	};
 }

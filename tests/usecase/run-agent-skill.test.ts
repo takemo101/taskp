@@ -51,7 +51,7 @@ function createMockDeps(skill: Skill) {
 	const skillRepository: SkillRepository = {
 		findByName: vi.fn().mockResolvedValue(ok(skill)),
 		listAll: vi.fn().mockResolvedValue({ skills: [], failures: [] }),
-		listLocal: vi.fn().mockResolvedValue({ skills: [], failures: [] }),
+		listProject: vi.fn().mockResolvedValue({ skills: [], failures: [] }),
 		listGlobal: vi.fn().mockResolvedValue({ skills: [], failures: [] }),
 	};
 
@@ -353,7 +353,7 @@ describe("runAgentSkill", () => {
 						error: { type: "SKILL_NOT_FOUND", name: "missing" },
 					}),
 					listAll: vi.fn().mockResolvedValue({ skills: [], failures: [] }),
-					listLocal: vi.fn().mockResolvedValue({ skills: [], failures: [] }),
+					listProject: vi.fn().mockResolvedValue({ skills: [], failures: [] }),
 					listGlobal: vi.fn().mockResolvedValue({ skills: [], failures: [] }),
 				},
 			},

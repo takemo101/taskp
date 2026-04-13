@@ -43,10 +43,20 @@ export function createSkillLoader(deps: SkillLoaderDeps): SkillRepository {
 	const globalSkillDir = createGlobalSkillDir(canonicalGlobalRoot);
 
 	const { logger } = deps;
+
+	// listAll はエージェントモード実行中に複数回呼ばれるため、
+	// 同一インスタンス内ではキャッシュして I/O を節約する
+	let listAllCache: Promise<SkillLoadResult> | undefined;
+
 	return {
 		findByName: (name) => findByName(name, [...projectSkillDirs, globalSkillDir], logger),
-		listAll: () => loadFromDirectories([...projectSkillDirs, globalSkillDir], logger),
-		listLocal: () => loadFromDirectories(projectSkillDirs, logger),
+		listAll: () => {
+			if (listAllCache === undefined) {
+				listAllCache = loadFromDirectories([...projectSkillDirs, globalSkillDir], logger);
+			}
+			return listAllCache;
+		},
+		listProject: () => loadFromDirectories(projectSkillDirs, logger),
 		listGlobal: () => loadFromDirectories([globalSkillDir], logger),
 	};
 }
