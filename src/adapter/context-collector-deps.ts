@@ -12,6 +12,7 @@ export async function createDefaultContextCollectorDeps(): Promise<ContextCollec
 			try {
 				const result = await execa(command, {
 					shell: true,
+					stdin: "ignore",
 					cwd,
 					reject: false,
 				});

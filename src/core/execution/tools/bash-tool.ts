@@ -29,6 +29,7 @@ export const bashTool: Tool<BashInput, ToolResult<BashData>> = {
 		try {
 			const result = await execa(command, {
 				shell: true,
+				stdin: "ignore",
 				cwd: cwd ?? process.cwd(),
 				timeout: timeout ?? DEFAULT_TOOL_TIMEOUT_MS,
 				reject: false,

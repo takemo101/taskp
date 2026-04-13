@@ -23,6 +23,7 @@ export function createCommandRunner(deps?: CommandRunnerDeps): CommandExecutor {
 				async () => {
 					const result = await execaCommand(command, {
 						shell: true,
+						stdin: "ignore",
 						cwd: options?.cwd,
 						env: options?.env ? { ...options.env } : undefined,
 						timeout: options?.timeout ?? timeoutMs,
