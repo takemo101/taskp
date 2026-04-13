@@ -101,6 +101,18 @@
       "description": "MCP server settings",
       "type": "object",
       "properties": {
+        "skill_description_budget": {
+          "description": "Character budget for skill descriptions exposed by taskp serve MCP tools",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "max_skill_description_chars": {
+          "description": "Maximum characters allowed for a single skill description",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
         "servers": {
           "description": "MCP server definitions keyed by server name",
           "type": "object",

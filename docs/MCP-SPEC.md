@@ -36,6 +36,21 @@ LLM が GitHub でリリースを作成し、Slack に通知する。
 
 グローバル（`~/.taskp/config.toml`）またはプロジェクト（`.taskp/config.toml`）に MCP サーバーの接続情報を定義する。
 
+`taskp serve` では登録スキル（およびアクション付きスキルはアクション単位）が MCP ツールとして公開される。
+このとき各ツール description には、以下のバジェット設定を使う。
+
+```toml
+[mcp]
+skill_description_budget = 8000
+max_skill_description_chars = 250
+```
+
+- `skill_description_budget`: MCP ツール description 全体の文字数上限
+- `max_skill_description_chars`: 1 スキルあたりの description 上限
+- バジェット超過時は段階的に description を短縮し、必要なら名前のみまで縮小する
+
+agent モードの `taskp_run` description は、設定値ではなく選択モデルの推定コンテキスト長からバジェットを算出する。
+
 #### stdio トランスポート
 
 ```toml

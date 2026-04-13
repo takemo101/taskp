@@ -80,6 +80,18 @@ export const mcpServerConfigSchema = z.discriminatedUnion("transport", [
 ]);
 
 export const mcpConfigSchema = z.object({
+	skill_description_budget: z
+		.number()
+		.int()
+		.positive()
+		.optional()
+		.describe("Character budget for skill descriptions exposed by taskp serve MCP tools"),
+	max_skill_description_chars: z
+		.number()
+		.int()
+		.positive()
+		.optional()
+		.describe("Maximum characters allowed for a single skill description"),
 	servers: z
 		.record(z.string(), mcpServerConfigSchema)
 		.optional()
@@ -233,6 +245,7 @@ export function mergeCliConfig(global: CliConfig, project: CliConfig): CliConfig
 // 同名サーバーは project 側が丸ごと上書き（フィールド単位マージしない）
 export function mergeMcpConfig(global: McpConfig, project: McpConfig): McpConfig {
 	return {
+		...mergeByProjectPriority(global, project),
 		servers: mergeOptional(global.servers, project.servers, (g, p) => ({ ...g, ...p })),
 	};
 }
