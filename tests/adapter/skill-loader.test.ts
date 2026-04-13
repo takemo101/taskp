@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createSkillLoader } from "../../src/adapter/skill-loader";
 
 function createSkillFile(baseDir: string, name: string, content: string): void {
@@ -158,6 +158,24 @@ describe("SkillLoader", () => {
 			expect(skills[0].metadata.description).toBe("ローカル版");
 		});
 
+		it("local と global が同じ SKILL.md を指す場合は discovery 順の先頭だけを残す", async () => {
+			createSkillFile(globalRoot, "shared-skill", makeSkillMd("shared-skill", "共有スキル"));
+
+			const localSkillsDir = join(localRoot, ".taskp", "skills");
+			mkdirSync(localSkillsDir, { recursive: true });
+			symlinkSync(
+				join(globalRoot, ".taskp", "skills", "shared-skill"),
+				join(localSkillsDir, "shared-skill"),
+			);
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const { skills } = await loader.listAll();
+
+			expect(skills).toHaveLength(1);
+			expect(skills[0].metadata.name).toBe("shared-skill");
+			expect(skills[0].scope).toBe("local");
+		});
+
 		it("スキルディレクトリが存在しない場合は空配列を返す", async () => {
 			const loader = createSkillLoader({ localRoot, globalRoot });
 
@@ -301,6 +319,30 @@ describe("SkillLoader", () => {
 			expect(skills).toHaveLength(1);
 			expect(skills[0].metadata.name).toBe("lint");
 		});
+
+		it("同じ SKILL.md を指すシンボリックリンクは listGlobal で重複排除する", async () => {
+			const skillsDir = join(globalRoot, ".taskp", "skills");
+			mkdirSync(skillsDir, { recursive: true });
+
+			const actualDir = join(skillsDir, "shared-skill");
+			mkdirSync(actualDir, { recursive: true });
+			writeFileSync(join(actualDir, "SKILL.md"), makeSkillMd("shared-skill", "共有スキル"));
+
+			symlinkSync(actualDir, join(skillsDir, "shared-skill-alias"));
+
+			const debug = vi.fn();
+			const loader = createSkillLoader({
+				localRoot,
+				globalRoot,
+				logger: { debug, warn: vi.fn() },
+			});
+
+			const { skills } = await loader.listGlobal();
+
+			expect(skills).toHaveLength(1);
+			expect(skills[0].metadata.name).toBe("shared-skill");
+			expect(debug).toHaveBeenCalledWith(expect.stringContaining("Skipping duplicate skill file"));
+		});
 	});
 
 	describe("failures", () => {
@@ -402,6 +444,24 @@ describe("SkillLoader", () => {
 			expect(failures.some((failure) => failure.path.includes("broken-local"))).toBe(true);
 			expect(failures.some((failure) => failure.path.includes("broken-parent"))).toBe(true);
 			expect(failures.some((failure) => failure.path.includes("broken-global"))).toBe(true);
+		});
+
+		it("同じ壊れた SKILL.md を指すシンボリックリンクは failures でも重複排除する", async () => {
+			const skillsDir = join(globalRoot, ".taskp", "skills");
+			mkdirSync(skillsDir, { recursive: true });
+
+			const actualDir = join(skillsDir, "broken-shared");
+			mkdirSync(actualDir, { recursive: true });
+			writeFileSync(join(actualDir, "SKILL.md"), "---\ninvalid: :\n  bad: [\n---\n# Broken");
+
+			symlinkSync(actualDir, join(skillsDir, "broken-shared-alias"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const { skills, failures } = await loader.listGlobal();
+
+			expect(skills).toHaveLength(0);
+			expect(failures).toHaveLength(1);
+			expect(failures[0].path).toContain("broken-shared");
 		});
 
 		it("ホームディレクトリ配下でもグローバルスコープを二重に数えない", async () => {

@@ -12,6 +12,7 @@ import type { SkillMetadata } from "./skill-metadata";
 import { parseSkillMetadata } from "./skill-metadata";
 
 export type SkillLogger = {
+	readonly debug?: (message: string) => void;
 	readonly warn: (message: string) => void;
 };
 
@@ -28,7 +29,7 @@ export function parseSkill(
 	raw: string,
 	location: string,
 	scope?: SkillScope,
-	logger?: SkillLogger,
+	_logger?: SkillLogger,
 ): Result<Skill, ParseError> {
 	// gray-matter は不正な frontmatter に対して例外を投げるため、
 	// try-catch で捕捉して Result 型に変換する

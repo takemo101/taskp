@@ -31,6 +31,11 @@ type SkillDirectory = {
 	readonly scope: SkillScope;
 };
 
+type SkillCandidate = {
+	readonly path: string;
+	readonly scope: SkillScope;
+};
+
 export function createSkillLoader(deps: SkillLoaderDeps): SkillRepository {
 	const canonicalLocalRoot = canonicalizePath(deps.localRoot);
 	const canonicalGlobalRoot = canonicalizePath(deps.globalRoot);
@@ -40,9 +45,9 @@ export function createSkillLoader(deps: SkillLoaderDeps): SkillRepository {
 	const { logger } = deps;
 	return {
 		findByName: (name) => findByName(name, [...projectSkillDirs, globalSkillDir], logger),
-		listAll: () => listAll([...projectSkillDirs, globalSkillDir], logger),
-		listLocal: () => listAll(projectSkillDirs, logger),
-		listGlobal: () => scanDirectory(globalSkillDir.path, globalSkillDir.scope, logger),
+		listAll: () => loadFromDirectories([...projectSkillDirs, globalSkillDir], logger),
+		listLocal: () => loadFromDirectories(projectSkillDirs, logger),
+		listGlobal: () => loadFromDirectories([globalSkillDir], logger),
 	};
 }
 
@@ -74,30 +79,46 @@ async function findByName(
 	return err(skillNotFoundError(name));
 }
 
-async function listAll(
+async function loadFromDirectories(
 	skillDirs: readonly SkillDirectory[],
 	logger?: SkillLogger,
 ): Promise<SkillLoadResult> {
-	const results = await Promise.all(
-		skillDirs.map((skillDir) => scanDirectory(skillDir.path, skillDir.scope, logger)),
+	const candidateGroups = await Promise.all(
+		skillDirs.map((skillDir) => collectSkillCandidates(skillDir.path, skillDir.scope, logger)),
+	);
+	const candidates = deduplicateSkillCandidates(candidateGroups.flat(), logger);
+	const attempts = await Promise.all(
+		candidates.map((candidate) => tryLoadSkill(candidate.path, candidate.scope, logger)),
 	);
 
-	return mergeSkillLoadResults(results);
+	return createSkillLoadResult(candidates, attempts);
 }
 
-function mergeSkillLoadResults(results: readonly SkillLoadResult[]): SkillLoadResult {
+function createSkillLoadResult(
+	candidates: readonly SkillCandidate[],
+	attempts: readonly SkillLoadAttempt[],
+): SkillLoadResult {
 	const skills: Skill[] = [];
-	const failures = results.flatMap((result) => result.failures);
+	const failures: { path: string; error: string }[] = [];
 	const seen = new Set<string>();
 
-	for (const result of results) {
-		for (const skill of result.skills) {
-			if (seen.has(skill.metadata.name)) {
-				continue;
-			}
-			seen.add(skill.metadata.name);
-			skills.push(skill);
+	for (const [index, attempt] of attempts.entries()) {
+		if (attempt.type === "not_found") {
+			continue;
 		}
+
+		if (attempt.type === "error") {
+			failures.push({ path: candidates[index]?.path ?? "", error: attempt.error.message });
+			continue;
+		}
+
+		const skill = attempt.value;
+		if (seen.has(skill.metadata.name)) {
+			continue;
+		}
+
+		seen.add(skill.metadata.name);
+		skills.push(skill);
 	}
 
 	return { skills, failures };
@@ -151,15 +172,13 @@ function isWithinPath(path: string, boundary: string): boolean {
 	return relation === "" || (!relation.startsWith("..") && relation !== "..");
 }
 
-async function scanDirectory(
+async function collectSkillCandidates(
 	skillsDir: string,
 	scope: SkillScope,
 	logger?: SkillLogger,
-): Promise<SkillLoadResult> {
+): Promise<readonly SkillCandidate[]> {
 	const entries = await readdir(skillsDir, { withFileTypes: true }).catch(() => []);
-
-	const skills: Skill[] = [];
-	const failures: { path: string; error: string }[] = [];
+	const candidates: SkillCandidate[] = [];
 
 	// Node.js の readdir({ withFileTypes: true }) はシンボリックリンクを stat-follow しないため、
 	// symlink 先がディレクトリでも isDirectory() が false を返す。isSymbolicLink() を併用して
@@ -178,19 +197,46 @@ async function scanDirectory(
 			if (!isDir) continue;
 		}
 
-		const skillPath = join(skillsDir, entry.name, SKILL_FILE_NAME);
-		const result = await tryLoadSkill(skillPath, scope, logger);
-		if (result.type === "not_found") {
-			continue;
-		}
-		if (result.type === "found") {
-			skills.push(result.value);
-		} else {
-			failures.push({ path: skillPath, error: result.error.message });
-		}
+		candidates.push({ path: join(skillsDir, entry.name, SKILL_FILE_NAME), scope });
 	}
 
-	return { skills, failures };
+	return candidates;
+}
+
+function deduplicateSkillCandidates(
+	candidates: readonly SkillCandidate[],
+	logger?: SkillLogger,
+): readonly SkillCandidate[] {
+	const uniqueCandidates: SkillCandidate[] = [];
+	const seenCanonicalPaths = new Set<string>();
+
+	for (const candidate of candidates) {
+		const canonicalPath = getCanonicalPath(candidate.path);
+		if (canonicalPath === null) {
+			uniqueCandidates.push(candidate);
+			continue;
+		}
+
+		if (seenCanonicalPaths.has(canonicalPath)) {
+			logger?.debug?.(
+				`Skipping duplicate skill file: ${candidate.path} (canonical: ${canonicalPath})`,
+			);
+			continue;
+		}
+
+		seenCanonicalPaths.add(canonicalPath);
+		uniqueCandidates.push(candidate);
+	}
+
+	return uniqueCandidates;
+}
+
+function getCanonicalPath(path: string): string | null {
+	try {
+		return realpathSync(path);
+	} catch {
+		return null;
+	}
 }
 
 async function tryLoadSkill(
