@@ -62,13 +62,13 @@ describe("taskp list E2E", () => {
 		expect(skills[0].metadata.name).toBe("lint");
 	});
 
-	it("--local フィルタでローカルスキルのみ表示する", async () => {
+	it("project フィルタでプロジェクトスキルのみ表示する", async () => {
 		createSkillFile(localRoot, "deploy", "アプリをデプロイする");
 		createSkillFile(globalRoot, "lint", "コードをリントする");
 
 		const repository = createSkillLoader({ localRoot, globalRoot });
 		const usecase = createListSkillsUseCase(repository);
-		const { skills } = await usecase.execute({ scope: "local" });
+		const { skills } = await usecase.execute({ scope: "project" });
 
 		expect(skills).toHaveLength(1);
 		expect(skills[0].metadata.name).toBe("deploy");
@@ -85,6 +85,56 @@ describe("taskp list E2E", () => {
 		expect(skills).toHaveLength(1);
 		expect(skills[0].scope).toBe("local");
 		expect(skills[0].metadata.description).toBe("ローカル版デプロイ");
+	});
+
+	it("親ディレクトリのスキルは parent scope として一覧に含まれる", async () => {
+		globalRoot = mkdtempSync(join(tmpdir(), "taskp-list-home-"));
+		localRoot = join(globalRoot, "workspace", "packages", "frontend", "src");
+		mkdirSync(localRoot, { recursive: true });
+
+		createSkillFile(
+			join(globalRoot, "workspace", "packages", "frontend"),
+			"deploy",
+			"フロントエンド版",
+		);
+		createSkillFile(join(globalRoot, "workspace"), "review", "ワークスペース版");
+		createSkillFile(globalRoot, "lint", "グローバル版");
+
+		const repository = createSkillLoader({ localRoot, globalRoot });
+		const usecase = createListSkillsUseCase(repository);
+		const { skills } = await usecase.execute({});
+
+		expect(skills.map((skill) => [skill.metadata.name, skill.scope])).toEqual([
+			["deploy", "parent"],
+			["review", "parent"],
+			["lint", "global"],
+		]);
+		expect(skills[0].location).toContain(
+			"workspace/packages/frontend/.taskp/skills/deploy/SKILL.md",
+		);
+	});
+
+	it("project フィルタは親ディレクトリのスキルも含む", async () => {
+		globalRoot = mkdtempSync(join(tmpdir(), "taskp-list-home-"));
+		localRoot = join(globalRoot, "workspace", "packages", "frontend", "src");
+		mkdirSync(localRoot, { recursive: true });
+
+		createSkillFile(
+			join(globalRoot, "workspace", "packages", "frontend"),
+			"deploy",
+			"フロントエンド版",
+		);
+		createSkillFile(join(globalRoot, "workspace"), "review", "ワークスペース版");
+		createSkillFile(globalRoot, "lint", "グローバル版");
+
+		const repository = createSkillLoader({ localRoot, globalRoot });
+		const usecase = createListSkillsUseCase(repository);
+		const { skills } = await usecase.execute({ scope: "project" });
+
+		expect(skills.map((skill) => [skill.metadata.name, skill.scope])).toEqual([
+			["deploy", "parent"],
+			["review", "parent"],
+		]);
 	});
 
 	it("スキルが存在しない場合は空配列を返す", async () => {

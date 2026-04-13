@@ -235,6 +235,10 @@ taskp list --global
 taskp list --local
 ```
 
+- `taskp list` は現在の作業ディレクトリから `.taskp/skills` を探索します。作業ディレクトリがホーム/グローバル境界の配下にある場合は、その境界まで親ディレクトリも探索し、最後に `~/.taskp/skills` を探索します。
+- `taskp list --local` は現在の作業ディレクトリから見つかったプロジェクトスコープのみを表示します。
+- `taskp list --global` は `~/.taskp/skills` のみを表示します。
+
 ### `taskp init <name>`
 
 スキルの雛形を生成します。
@@ -300,10 +304,12 @@ MCP サーバーとして起動します（詳細は [MCP サーバーとして�
 
 | 場所 | スコープ | 用途 |
 |------|---------|------|
-| `.taskp/skills/<name>/SKILL.md` | プロジェクトローカル | プロジェクト固有のタスク |
+| `<cwd>/.taskp/skills/<name>/SKILL.md` | local | 現在の作業ディレクトリ固有のタスク |
+| `<ancestor>/.taskp/skills/<name>/SKILL.md` | parent | 親プロジェクトやワークスペースで共有するタスク |
 | `~/.taskp/skills/<name>/SKILL.md` | グローバル | 個人で共通利用するタスク |
 
-プロジェクトローカルが優先されます。
+探索順序は近いスコープが優先され、`local` → `parent` → `global` の順に解決されます。
+親ディレクトリのスコープは、現在の作業ディレクトリが同じホーム/グローバル境界の配下にある場合のみ探索対象になります。
 
 ### フロントマター
 

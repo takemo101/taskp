@@ -37,13 +37,17 @@ function createInMemoryRepository(skills: readonly Skill[]): SkillRepository {
 			return found ? ok(found) : err(skillNotFoundError(name));
 		},
 		listAll: async () => ({ skills: [...skills], failures: [] }),
-		listLocal: async () => ({ skills: skills.filter((s) => s.scope === "local"), failures: [] }),
+		listLocal: async () => ({
+			skills: skills.filter((s) => s.scope !== "global"),
+			failures: [],
+		}),
 		listGlobal: async () => ({ skills: skills.filter((s) => s.scope === "global"), failures: [] }),
 	};
 }
 
 describe("ListSkillsUseCase", () => {
 	const localDeploy = createSkill("deploy", "local");
+	const parentDeploy = createSkill("deploy", "parent");
 	const globalDeploy = createSkill("deploy", "global");
 	const globalLint = createSkill("lint", "global");
 	const localTest = createSkill("test", "local");
@@ -61,7 +65,7 @@ describe("ListSkillsUseCase", () => {
 	});
 
 	it("同名スキルはローカルを優先する", async () => {
-		const repo = createInMemoryRepository([globalDeploy, localDeploy, globalLint]);
+		const repo = createInMemoryRepository([localDeploy, globalDeploy, globalLint]);
 		const usecase = createListSkillsUseCase(repo);
 
 		const result = await usecase.execute({});
@@ -83,16 +87,36 @@ describe("ListSkillsUseCase", () => {
 		}
 	});
 
-	it("--local フィルタでローカルスキルのみ返す", async () => {
+	it("project フィルタでプロジェクトスキルのみ返す", async () => {
 		const repo = createInMemoryRepository([localTest, globalLint, localDeploy]);
 		const usecase = createListSkillsUseCase(repo);
 
-		const result = await usecase.execute({ scope: "local" });
+		const result = await usecase.execute({ scope: "project" });
 
 		expect(result.skills).toHaveLength(2);
 		for (const skill of result.skills) {
-			expect(skill.scope).toBe("local");
+			expect(skill.scope).not.toBe("global");
 		}
+	});
+
+	it("project フィルタで親スコープのスキルも返す", async () => {
+		const repo = createInMemoryRepository([localTest, parentDeploy, globalLint]);
+		const usecase = createListSkillsUseCase(repo);
+
+		const result = await usecase.execute({ scope: "project" });
+
+		expect(result.skills).toHaveLength(2);
+		expect(result.skills.map((skill) => skill.scope)).toEqual(["local", "parent"]);
+	});
+
+	it("同名スキルは先に返された順序を維持して重複排除する", async () => {
+		const repo = createInMemoryRepository([parentDeploy, localDeploy, globalLint]);
+		const usecase = createListSkillsUseCase(repo);
+
+		const result = await usecase.execute({});
+
+		expect(result.skills).toHaveLength(2);
+		expect(result.skills[0].scope).toBe("parent");
 	});
 
 	it("スキルが0件の場合は空配列を返す", async () => {

@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseSkill } from "../../../src/core/skill/skill";
@@ -46,6 +47,30 @@ describe("parseSkill", () => {
 		if (!result.ok) return;
 
 		expect(result.value.scope).toBe("local");
+	});
+
+	it("ホーム配下の .taskp/skills は global scope として推論される", () => {
+		const raw = ["---", "name: test", 'description: "テスト"', "---", "", "# Test"].join("\n");
+
+		const result = parseSkill(raw, `${homedir()}/.taskp/skills/test/SKILL.md`);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.value.scope).toBe("global");
+	});
+
+	it("明示的に parent scope を渡した場合はその値を保持する", () => {
+		const raw = ["---", "name: test", 'description: "テスト"', "---", "", "# Test"].join("\n");
+
+		const result = parseSkill(
+			raw,
+			"/project/packages/frontend/.taskp/skills/test/SKILL.md",
+			"parent",
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.value.scope).toBe("parent");
 	});
 
 	it("フロントマターエラーが伝播する", () => {

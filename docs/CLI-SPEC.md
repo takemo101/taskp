@@ -96,19 +96,27 @@ taskp list --local
 | オプション | 型 | デフォルト | 説明 |
 |-----------|-----|----------|------|
 | `--global` | `boolean` | `false` | グローバルスキルのみ表示 |
-| `--local` | `boolean` | `false` | プロジェクトローカルスキルのみ表示 |
+| `--local` | `boolean` | `false` | 現在の作業ディレクトリから見つかったプロジェクトスコープを表示 |
 
 #### 出力
 
 ```
-Name          Description                    Location
-task          タスクを管理する                ./.taskp/skills/task
+task (local)
+  タスクを管理する
+  Source: ./.taskp/skills/task
   Actions: add, delete, list
-deploy        アプリをデプロイする             ./.taskp/skills/deploy
-code-review   コードレビューを実行する         ~/.taskp/skills/code-review
+deploy (parent)
+  パッケージ専用のデプロイスキル
+  Source: ../.taskp/skills/deploy
+code-review (global)
+  コードレビューを実行する
+  Source: ~/.taskp/skills/code-review
 ```
 
 アクション付きスキルは `Actions` 行にアクション一覧を表示する。
+`local` は cwd 直下の `.taskp/skills`、`parent` は親ディレクトリで見つかったプロジェクトスキル、`global` は `~/.taskp/skills` を表す。
+`Source` 行には実際に採用されたスキルディレクトリを表示するため、複数の親ディレクトリで同名スキルが競合した場合でも、どこから解決されたかを確認できる。
+ホーム配下のパスは `~/...` で短縮表示し、それ以外はカレントディレクトリからの相対パスで表示する。
 
 ### taskp init \<name\>
 
@@ -241,7 +249,7 @@ taskp show task:add          # アクションの詳細を表示
 Skill: deploy
 Description: アプリケーションをデプロイする
 Mode: template
-Location: ./.taskp/skills/deploy/SKILL.md
+Location: ../.taskp/skills/deploy/SKILL.md
 
 Inputs:
   environment  select   デプロイ先を選んでください  [staging, production]

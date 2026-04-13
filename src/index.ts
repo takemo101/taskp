@@ -39,7 +39,12 @@ export { err, flatMap, isErr, isOk, map, ok } from "./core/types/result";
 export type { InitOutput, InitSkillInput } from "./usecase/init-skill";
 // Use cases
 export { initSkill } from "./usecase/init-skill";
-export type { ListOutput, ListSkillsFilter, ListSkillsUseCase } from "./usecase/list-skills";
+export type {
+	ListOutput,
+	ListSkillScopeFilter,
+	ListSkillsFilter,
+	ListSkillsUseCase,
+} from "./usecase/list-skills";
 export { createListSkillsUseCase } from "./usecase/list-skills";
 export type {
 	AgentExecutorInput,

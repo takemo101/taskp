@@ -25,6 +25,7 @@ function makeSkillMd(name: string, description: string): string {
 describe("SkillLoader", () => {
 	let localRoot: string;
 	let globalRoot: string;
+	const extraCleanup: string[] = [];
 
 	beforeEach(() => {
 		localRoot = mkdtempSync(join(tmpdir(), "taskp-local-"));
@@ -34,6 +35,10 @@ describe("SkillLoader", () => {
 	afterEach(() => {
 		rmSync(localRoot, { recursive: true, force: true });
 		rmSync(globalRoot, { recursive: true, force: true });
+		for (const path of extraCleanup) {
+			rmSync(path, { recursive: true, force: true });
+		}
+		extraCleanup.length = 0;
 	});
 
 	describe("findByName", () => {
@@ -84,6 +89,48 @@ describe("SkillLoader", () => {
 			expect(result.error.type).toBe("SKILL_NOT_FOUND");
 			expect(result.error.name).toBe("nonexistent");
 		});
+
+		it("複数の親ディレクトリに同名スキルがある場合は最も近いものを優先する", async () => {
+			globalRoot = mkdtempSync(join(tmpdir(), "taskp-home-"));
+			localRoot = join(globalRoot, "workspace", "packages", "frontend", "src");
+			mkdirSync(localRoot, { recursive: true });
+
+			createSkillFile(
+				join(globalRoot, "workspace"),
+				"deploy",
+				makeSkillMd("deploy", "ワークスペース版"),
+			);
+			createSkillFile(
+				join(globalRoot, "workspace", "packages", "frontend"),
+				"deploy",
+				makeSkillMd("deploy", "フロントエンド版"),
+			);
+			createSkillFile(globalRoot, "deploy", makeSkillMd("deploy", "グローバル版"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const result = await loader.findByName("deploy");
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.metadata.description).toBe("フロントエンド版");
+			expect(result.value.scope).toBe("parent");
+		});
+
+		it("プロジェクト側で見つからない場合は最後にグローバルへフォールバックする", async () => {
+			globalRoot = mkdtempSync(join(tmpdir(), "taskp-home-"));
+			localRoot = join(globalRoot, "workspace", "packages", "frontend", "src");
+			mkdirSync(localRoot, { recursive: true });
+
+			createSkillFile(globalRoot, "lint", makeSkillMd("lint", "グローバル版"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const result = await loader.findByName("lint");
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.value.metadata.description).toBe("グローバル版");
+			expect(result.value.scope).toBe("global");
+		});
 	});
 
 	describe("listAll", () => {
@@ -119,6 +166,89 @@ describe("SkillLoader", () => {
 			expect(skills).toEqual([]);
 			expect(failures).toEqual([]);
 		});
+
+		it("親ディレクトリをまたいだ同名スキルは最初に見つかったものだけを残す", async () => {
+			globalRoot = mkdtempSync(join(tmpdir(), "taskp-home-"));
+			localRoot = join(globalRoot, "workspace", "packages", "frontend", "src");
+			mkdirSync(localRoot, { recursive: true });
+
+			createSkillFile(
+				join(globalRoot, "workspace"),
+				"deploy",
+				makeSkillMd("deploy", "ワークスペース版"),
+			);
+			createSkillFile(
+				join(globalRoot, "workspace", "packages", "frontend"),
+				"deploy",
+				makeSkillMd("deploy", "フロントエンド版"),
+			);
+			createSkillFile(
+				join(globalRoot, "workspace"),
+				"review",
+				makeSkillMd("review", "親ディレクトリ固有"),
+			);
+			createSkillFile(globalRoot, "deploy", makeSkillMd("deploy", "グローバル版"));
+			createSkillFile(globalRoot, "lint", makeSkillMd("lint", "グローバル固有"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const { skills } = await loader.listAll();
+
+			expect(skills.map((skill) => [skill.metadata.name, skill.metadata.description])).toEqual([
+				["deploy", "フロントエンド版"],
+				["review", "親ディレクトリ固有"],
+				["lint", "グローバル固有"],
+			]);
+		});
+
+		it("globalRoot 配下にいない場合は無関係な親ディレクトリまで探索しない", async () => {
+			globalRoot = mkdtempSync(join(tmpdir(), "taskp-home-"));
+			const outsideRoot = mkdtempSync(join(tmpdir(), "taskp-outside-"));
+			extraCleanup.push(outsideRoot);
+			localRoot = join(outsideRoot, "project", "src");
+			mkdirSync(localRoot, { recursive: true });
+
+			createSkillFile(localRoot, "build", makeSkillMd("build", "カレントディレクトリ版"));
+			createSkillFile(
+				join(outsideRoot, "project"),
+				"review",
+				makeSkillMd("review", "親ディレクトリ版"),
+			);
+			createSkillFile(globalRoot, "lint", makeSkillMd("lint", "グローバル版"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const { skills } = await loader.listAll();
+
+			expect(skills.map((skill) => [skill.metadata.name, skill.scope])).toEqual([
+				["build", "local"],
+				["lint", "global"],
+			]);
+		});
+
+		it("シンボリックリンク経由の cwd でもグローバルスキルを parent と誤分類しない", async () => {
+			const realHome = mkdtempSync(join(tmpdir(), "taskp-real-home-"));
+			const linkedHome = join(tmpdir(), `taskp-linked-home-${Date.now()}`);
+			extraCleanup.push(realHome, linkedHome);
+			mkdirSync(join(realHome, "workspace", "packages", "app", "src"), { recursive: true });
+			symlinkSync(realHome, linkedHome);
+
+			globalRoot = linkedHome;
+			localRoot = join(linkedHome, "workspace", "packages", "app", "src");
+
+			createSkillFile(
+				join(realHome, "workspace", "packages", "app"),
+				"deploy",
+				makeSkillMd("deploy", "アプリ版"),
+			);
+			createSkillFile(realHome, "lint", makeSkillMd("lint", "グローバル版"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const { skills } = await loader.listAll();
+
+			expect(skills.map((skill) => [skill.metadata.name, skill.scope])).toEqual([
+				["deploy", "parent"],
+				["lint", "global"],
+			]);
+		});
 	});
 
 	describe("listLocal", () => {
@@ -131,6 +261,32 @@ describe("SkillLoader", () => {
 
 			expect(skills).toHaveLength(1);
 			expect(skills[0].metadata.name).toBe("deploy");
+		});
+
+		it("現在地に近いスコープと親スコープを含み、グローバルは含めない", async () => {
+			globalRoot = mkdtempSync(join(tmpdir(), "taskp-home-"));
+			localRoot = join(globalRoot, "workspace", "packages", "frontend", "src");
+			mkdirSync(localRoot, { recursive: true });
+
+			createSkillFile(
+				join(globalRoot, "workspace", "packages", "frontend"),
+				"deploy",
+				makeSkillMd("deploy", "フロントエンド版"),
+			);
+			createSkillFile(
+				join(globalRoot, "workspace"),
+				"review",
+				makeSkillMd("review", "ワークスペース版"),
+			);
+			createSkillFile(globalRoot, "lint", makeSkillMd("lint", "グローバル版"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const { skills } = await loader.listLocal();
+
+			expect(skills.map((skill) => [skill.metadata.name, skill.scope])).toEqual([
+				["deploy", "parent"],
+				["review", "parent"],
+			]);
 		});
 	});
 
@@ -224,6 +380,42 @@ describe("SkillLoader", () => {
 			const { failures } = await loader.listGlobal();
 
 			expect(failures).toHaveLength(1);
+		});
+
+		it("複数の親スコープとグローバルの failures をまとめて返す", async () => {
+			globalRoot = mkdtempSync(join(tmpdir(), "taskp-home-"));
+			localRoot = join(globalRoot, "workspace", "packages", "frontend", "src");
+			mkdirSync(localRoot, { recursive: true });
+
+			createSkillFile(join(globalRoot, "workspace"), "broken-parent", "---\nbad: [\n---\n# Broken");
+			createSkillFile(
+				join(globalRoot, "workspace", "packages", "frontend"),
+				"broken-local",
+				"---\nbad: [\n---\n# Broken",
+			);
+			createSkillFile(globalRoot, "broken-global", "---\nbad: [\n---\n# Broken");
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const { failures } = await loader.listAll();
+
+			expect(failures).toHaveLength(3);
+			expect(failures.some((failure) => failure.path.includes("broken-local"))).toBe(true);
+			expect(failures.some((failure) => failure.path.includes("broken-parent"))).toBe(true);
+			expect(failures.some((failure) => failure.path.includes("broken-global"))).toBe(true);
+		});
+
+		it("ホームディレクトリ配下でもグローバルスコープを二重に数えない", async () => {
+			globalRoot = mkdtempSync(join(tmpdir(), "taskp-home-"));
+			localRoot = join(globalRoot, "workspace", "packages", "frontend", "src");
+			mkdirSync(localRoot, { recursive: true });
+
+			createSkillFile(globalRoot, "deploy", makeSkillMd("deploy", "グローバル版"));
+
+			const loader = createSkillLoader({ localRoot, globalRoot });
+			const { skills } = await loader.listAll();
+
+			expect(skills).toHaveLength(1);
+			expect(skills[0].scope).toBe("global");
 		});
 	});
 
