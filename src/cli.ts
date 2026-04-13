@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { homedir } from "node:os";
 import { dirname, relative } from "node:path";
+import { Writable } from "node:stream";
 import { Cli, z } from "incur";
 import { createAgentExecutor } from "./adapter/agent-executor";
 import { createLanguageModel, resolveModelSpec } from "./adapter/ai-provider";
@@ -16,11 +17,17 @@ import { createCliProgressWriter } from "./adapter/progress-formatter";
 import { createProjectInitializer } from "./adapter/project-initializer";
 import { createPromptRunner } from "./adapter/prompt-runner";
 import { generateSessionId } from "./adapter/session-id-generator";
+import { buildSkillMcpToolsResult, createSkillMcpCli } from "./adapter/skill-mcp-server";
 import { createSkillInitializer } from "./adapter/skill-initializer";
 import { createDefaultSkillLoader } from "./adapter/skill-loader";
 import { createStreamWriter } from "./adapter/stream-writer";
 import { createSystemPromptResolver } from "./adapter/system-prompt-resolver";
 import type { Action } from "./core/skill/action";
+import {
+	deriveAgentSkillDescriptionBudget,
+	DEFAULT_MAX_SKILL_DESCRIPTION_CHARS,
+	DEFAULT_SKILL_DESCRIPTION_BUDGET,
+} from "./core/skill/skill-description-budget";
 import { resolveActionConfig } from "./core/skill/action";
 import type { ContextSource } from "./core/skill/context-source";
 import type { SkillScope } from "./core/skill/skill";
@@ -136,6 +143,11 @@ function exitOnError<T>(result: Result<T, DomainError>): T {
 	process.exit(EXIT_CODE[result.error.type]);
 }
 
+function unwrapOrThrow<T>(result: Result<T, DomainError>): T {
+	if (result.ok) return result.value;
+	throw new Error(domainErrorMessage(result.error));
+}
+
 const cli = Cli.create("taskp", {
 	version: "0.1.14",
 	description:
@@ -198,7 +210,7 @@ const cli = Cli.create("taskp", {
 			const progressWriter = createCliProgressWriter(process.stdout);
 
 			const hooksConfig = config?.hooks;
-			const logger = createConsoleLogger();
+			const logger = createConsoleLogger({ verbose: c.options.verbose ?? false });
 			const hookExecutor = createHookExecutor(commandExecutor, logger);
 			const outputFileStore = createOutputFileStore();
 
@@ -341,8 +353,11 @@ const cli = Cli.create("taskp", {
 	})
 	.command("serve", {
 		description: "Start as MCP stdio server",
-		async run() {
-			await cli.serve(["--mcp"]);
+		options: z.object({
+			verbose: z.boolean().optional().describe("Show detailed logs"),
+		}),
+		async run(c) {
+			await runServeMode(c.options.verbose ?? false);
 		},
 	});
 
@@ -384,7 +399,7 @@ async function runAgentMode(
 
 	writer.writeHeader();
 
-	const logger = createConsoleLogger();
+	const logger = createConsoleLogger({ verbose: c.options.verbose ?? false });
 	const contextCollectorDeps = await createDefaultContextCollectorDeps();
 	const contextCollector = createContextCollector({ ...contextCollectorDeps, logger });
 	const agentExecutor = createAgentExecutor(writer, logger);
@@ -426,9 +441,142 @@ async function runAgentMode(
 			mcpToolResolver,
 			outputFileStore,
 			logger,
+			skillDescriptionBudget: {
+				budgetChars: deriveAgentSkillDescriptionBudget(modelSpec),
+				maxDescriptionChars:
+					config.mcp?.max_skill_description_chars ?? DEFAULT_MAX_SKILL_DESCRIPTION_CHARS,
+			},
 		},
 	);
 	exitOnError(result);
+}
+
+async function runServeMode(verbose: boolean): Promise<void> {
+	const configLoader = createDefaultConfigLoader(process.cwd());
+	const config = exitOnError(await configLoader.load());
+	const logger = createConsoleLogger({ verbose });
+	const skillRepository = await createDefaultSkillLoader(process.cwd());
+	const { skills, failures } = await skillRepository.listAll();
+	for (const failure of failures) {
+		logger.warn(`Failed to load skill for MCP server: ${failure.path} (${failure.error})`);
+	}
+
+	const promptCollector = createPromptRunner();
+	const budgetOptions = {
+		budgetChars: config.mcp?.skill_description_budget ?? DEFAULT_SKILL_DESCRIPTION_BUDGET,
+		maxDescriptionChars:
+			config.mcp?.max_skill_description_chars ?? DEFAULT_MAX_SKILL_DESCRIPTION_CHARS,
+	};
+	const toolBudgetResult = buildSkillMcpToolsResult(skills, budgetOptions);
+	if (toolBudgetResult.truncatedEntryCount > 0 || toolBudgetResult.omittedEntryCount > 0) {
+		logger.debug(
+			`[skills] Budget exceeded for MCP descriptions. Truncated ${toolBudgetResult.truncatedEntryCount} entries and omitted ${toolBudgetResult.omittedEntryCount} entries (phase ${toolBudgetResult.phase})`,
+		);
+	}
+	const commandExecutor = createCommandRunner({
+		defaultTimeoutMs: config.cli?.command_timeout_ms,
+	});
+	const hookExecutor = createHookExecutor(commandExecutor, logger);
+	const outputFileStore = createOutputFileStore();
+	const systemPromptResolver = createSystemPromptResolver(process.cwd());
+	const contextCollectorDeps = await createDefaultContextCollectorDeps();
+	const contextCollector = createContextCollector({ ...contextCollectorDeps, logger });
+	const mcpToolResolver = config.mcp?.servers
+		? (await import("./adapter/mcp-tool-resolver")).createMcpToolResolver(
+				config.mcp.servers,
+				logger,
+			)
+		: undefined;
+
+	const skillMcpCli = createSkillMcpCli({
+		version: "0.1.14",
+		skills,
+		budgetOptions,
+		executeSkill: async ({ skillName, actionName, presets }) => {
+			const skill = unwrapOrThrow(await skillRepository.findByName(skillName));
+			const action = actionName
+				? unwrapOrThrow(validateActionExists(skill, actionName))
+				: undefined;
+			const resolvedAction = action ? resolveActionConfig(action, skill.metadata) : undefined;
+			const effectiveMode = resolvedAction?.mode ?? skill.metadata.mode;
+
+			if (effectiveMode === "agent") {
+				const modelSpec = unwrapOrThrow(
+					resolveModelSpec({
+						cliModel: resolvedAction?.model ?? skill.metadata.model,
+						config: config.ai ?? {},
+					}),
+				);
+				const languageModel = unwrapOrThrow(createLanguageModel(modelSpec, config.ai ?? {}));
+				const sessionId = generateSessionId();
+				const writer = createStreamWriter({
+					verbose: false,
+					output: new Writable({
+						write(_chunk, _encoding, callback) {
+							callback();
+						},
+					}),
+					sessionId,
+				});
+				const agentExecutor = createAgentExecutor(writer, logger);
+				const result = await runAgentSkill(
+					{
+						name: skillName,
+						action: actionName,
+						presets,
+						model: languageModel,
+						noInput: true,
+						maxAgentSteps: config.cli?.max_agent_steps,
+						sessionId,
+					},
+					{
+						skillRepository,
+						promptCollector,
+						contextCollector,
+						agentExecutor,
+						systemPromptResolver,
+						commandExecutor,
+						hookExecutor,
+						hooksConfig: config.hooks,
+						mcpToolResolver,
+						outputFileStore,
+						logger,
+						skillDescriptionBudget: {
+							budgetChars: deriveAgentSkillDescriptionBudget(modelSpec),
+							maxDescriptionChars:
+								config.mcp?.max_skill_description_chars ?? DEFAULT_MAX_SKILL_DESCRIPTION_CHARS,
+						},
+					},
+				);
+				return { output: unwrapOrThrow(result).result.output };
+			}
+
+			const result = await runSkill(
+				{
+					name: skillName,
+					action: actionName,
+					presets,
+					dryRun: false,
+					force: false,
+					noInput: true,
+					sessionId: generateSessionId(),
+				},
+				{
+					skillRepository,
+					promptCollector,
+					commandExecutor,
+					hookExecutor,
+					hooksConfig: config.hooks,
+					outputFileStore,
+					logger,
+				},
+			);
+
+			return { output: formatRunOutput(unwrapOrThrow(result)) };
+		},
+	});
+
+	await skillMcpCli.serve(["--mcp"]);
 }
 
 function resolveScope(

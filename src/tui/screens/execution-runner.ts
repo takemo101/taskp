@@ -4,8 +4,14 @@ import type { McpServerConfig } from "../../adapter/config-loader";
 import { createConsoleLogger } from "../../adapter/console-logger";
 import { createContextCollector } from "../../adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "../../adapter/context-collector-deps";
+import { createPromptRunner } from "../../adapter/prompt-runner";
+import type { ModelSpec } from "../../adapter/ai-provider";
 import type { SessionId } from "../../core/execution/session";
 import { resolveActionConfig } from "../../core/skill/action";
+import {
+	DEFAULT_MAX_SKILL_DESCRIPTION_CHARS,
+	deriveAgentSkillDescriptionBudget,
+} from "../../core/skill/skill-description-budget";
 import type { Skill } from "../../core/skill/skill";
 import { domainErrorMessage } from "../../core/types/errors";
 import { ok } from "../../core/types/result";
@@ -39,6 +45,8 @@ export type ExecutionDeps = {
 	readonly systemPromptResolver: SystemPromptResolver;
 	readonly maxAgentSteps?: number;
 	readonly mcpServerConfigs?: Readonly<Record<string, McpServerConfig>>;
+	readonly modelSpec?: ModelSpec;
+	readonly maxSkillDescriptionChars?: number;
 };
 
 export async function runExecution(
@@ -84,8 +92,14 @@ export function createSingleSkillRepository(skill: Skill): SkillRepository {
 export function createPresetPromptCollector(
 	variables: Readonly<Record<string, string>>,
 ): PromptCollector {
+	const promptRunner = createPromptRunner();
 	return {
-		collect: async () => ok(variables),
+		collect: async (inputs, presets, options) =>
+			promptRunner.collect(
+				inputs,
+				{ ...variables, ...presets },
+				{ noInput: options?.noInput ?? true },
+			),
 	};
 }
 
@@ -142,6 +156,13 @@ async function executeAgentMode(
 			systemPromptResolver: deps.systemPromptResolver,
 			mcpToolResolver,
 			logger,
+			skillDescriptionBudget: deps.modelSpec
+				? {
+						budgetChars: deriveAgentSkillDescriptionBudget(deps.modelSpec),
+						maxDescriptionChars:
+							deps.maxSkillDescriptionChars ?? DEFAULT_MAX_SKILL_DESCRIPTION_CHARS,
+					}
+				: undefined,
 		},
 	);
 

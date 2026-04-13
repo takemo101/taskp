@@ -58,7 +58,7 @@ npm run deploy:{{environment}}
 | フィールド | 型 | デフォルト | 説明 |
 |-----------|-----|----------|------|
 | `mode` | `"template" \| "agent"` | `"template"` | 実行モード |
-| `inputs` | `Input[]` | `[]` | 入力定義（質問リスト）。`actions` が定義されている場合は無視される |
+| `inputs` | `Input[]` | `[]` | 入力定義（質問リスト）。アクションが `inputs` を省略した場合の共通デフォルトとして使われる |
 | `model` | `string` | 設定ファイルのデフォルト | 使用する LLM モデル。`provider/model` 形式でプロバイダも同時に指定可能 |
 | `timeout` | `number` | `30000` | template モードのコマンド実行タイムアウト（ミリ秒、最大: 3,600,000）。agent モードでは無視される |
 | `tools` | `string[]` | `["bash", "read", "write"]` | agent モードで使用するツール。組み込み: `bash`, `read`, `write`, `edit`, `glob`, `grep`, `fetch`, `ask_user`, `taskp_run`。MCP: `mcp:<server>`, `mcp:<server>/<tool>` |
@@ -68,14 +68,14 @@ npm run deploy:{{environment}}
 
 ### Action 型
 
-`actions` フィールドで定義する各アクションの型。すべてのフィールドは省略可能で、省略時はスキルレベルの値を継承する（`inputs` を除く）。
+`actions` フィールドで定義する各アクションの型。すべてのフィールドは省略可能で、省略時はスキルレベルの値を継承する。
 
 | フィールド | 型 | 継承元 | 説明 |
 |-----------|-----|--------|------|
 | `description` | `string` | **必須** | アクションの説明 |
 | `mode` | `"template" \| "agent"` | `skill.mode` → `"template"` | 実行モード |
 | `model` | `string` | `skill.model` → config default | LLM モデル |
-| `inputs` | `Input[]` | なし（デフォルト: `[]`） | 入力定義。アクション間で共有しない |
+| `inputs` | `Input[]` | `skill.inputs` → `[]` | 入力定義。未指定時はスキルレベルの入力を継承 |
 | `context` | `ContextSource[]` | `skill.context` → `[]` | コンテキストソース |
 | `tools` | `string[]` | `skill.tools` → `["bash", "read", "write"]` | agent モード用ツール |
 | `timeout` | `number` | `skill.timeout` → コマンドランナーのデフォルト | template モードのタイムアウト（ms） |
@@ -86,19 +86,20 @@ npm run deploy:{{environment}}
 ```
 action.mode    ?? skill.mode    ?? "template"
 action.model   ?? skill.model   ?? undefined
+action.inputs  ?? skill.inputs  ?? []
 action.context ?? skill.context ?? []
 action.tools   ?? skill.tools   ?? ["bash", "read", "write"]
 action.timeout ?? skill.timeout ?? undefined
 action.hooks   ?? skill.hooks   ?? undefined
 ```
 
-`inputs` は継承しない。各アクションが独立した入力セットを持つため、スキルレベルの `inputs` からの暗黙の継承は混乱を招く。
+`inputs` は明示定義がなければスキルレベルから継承される。アクションごとに個別入力が必要な場合だけ `action.inputs` を定義する。
 
 `hooks` はオブジェクト単位で置き換える。アクションが `hooks` を定義した場合、スキルレベルの `hooks` は完全に無視される（フィールド単位マージはしない）。これは `tools`, `context` と同じ戦略。
 
-#### スキルレベルの `inputs` との排他
+#### スキルレベルの `inputs` との関係
 
-`actions` が定義されている場合、スキルレベルの `inputs` は無視される（警告をログ出力）。
+`actions` が定義されていても、スキルレベルの `inputs` は各アクションのデフォルト入力セットとして有効である。アクション側で `inputs` を定義した場合のみ、そのアクションでは上書きされる。
 
 ### アクションセクション
 
