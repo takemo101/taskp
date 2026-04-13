@@ -1,3 +1,5 @@
+import { homedir } from "node:os";
+import { resolve } from "node:path";
 import matter from "gray-matter";
 import type { ParseError } from "../types/errors";
 import { parseError } from "../types/errors";
@@ -13,7 +15,7 @@ export type SkillLogger = {
 	readonly warn: (message: string) => void;
 };
 
-export type SkillScope = "local" | "global";
+export type SkillScope = "local" | "parent" | "global";
 
 export type Skill = {
 	readonly metadata: SkillMetadata;
@@ -114,5 +116,10 @@ function validateActionSections(
 }
 
 function inferScope(location: string): SkillScope {
+	const globalSkillsRoot = resolve(homedir(), ".taskp", "skills");
+	const resolvedLocation = resolve(location);
+	if (resolvedLocation.startsWith(`${globalSkillsRoot}/`)) {
+		return "global";
+	}
 	return location.includes("/.taskp/skills/") ? "local" : "global";
 }

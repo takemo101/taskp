@@ -1,6 +1,7 @@
+import { realpathSync } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import type { Skill, SkillLogger, SkillScope } from "../core/skill/skill";
 import { parseSkill } from "../core/skill/skill";
 import type { ParseError } from "../core/types/errors";
@@ -25,16 +26,23 @@ type SkillLoaderDeps = {
 	readonly logger?: SkillLogger;
 };
 
+type SkillDirectory = {
+	readonly path: string;
+	readonly scope: SkillScope;
+};
+
 export function createSkillLoader(deps: SkillLoaderDeps): SkillRepository {
-	const localSkillsDir = resolve(deps.localRoot, SKILL_DIR_NAME);
-	const globalSkillsDir = resolve(deps.globalRoot, SKILL_DIR_NAME);
+	const canonicalLocalRoot = canonicalizePath(deps.localRoot);
+	const canonicalGlobalRoot = canonicalizePath(deps.globalRoot);
+	const projectSkillDirs = discoverProjectSkillDirs(canonicalLocalRoot, canonicalGlobalRoot);
+	const globalSkillDir = createGlobalSkillDir(canonicalGlobalRoot);
 
 	const { logger } = deps;
 	return {
-		findByName: (name) => findByName(name, localSkillsDir, globalSkillsDir, logger),
-		listAll: () => listAll(localSkillsDir, globalSkillsDir, logger),
-		listLocal: () => scanDirectory(localSkillsDir, "local", logger),
-		listGlobal: () => scanDirectory(globalSkillsDir, "global", logger),
+		findByName: (name) => findByName(name, [...projectSkillDirs, globalSkillDir], logger),
+		listAll: () => listAll([...projectSkillDirs, globalSkillDir], logger),
+		listLocal: () => listAll(projectSkillDirs, logger),
+		listGlobal: () => scanDirectory(globalSkillDir.path, globalSkillDir.scope, logger),
 	};
 }
 
@@ -47,48 +55,100 @@ export async function createDefaultSkillLoader(projectRoot: string): Promise<Ski
 
 async function findByName(
 	name: string,
-	localSkillsDir: string,
-	globalSkillsDir: string,
+	skillDirs: readonly SkillDirectory[],
 	logger?: SkillLogger,
 ): Promise<Result<Skill, SkillNotFoundError>> {
-	const localPath = join(localSkillsDir, name, SKILL_FILE_NAME);
-	const localResult = await tryLoadSkill(localPath, "local", logger);
-	if (localResult.type === "found") {
-		return localResult;
-	}
-	if (localResult.type === "error") {
-		logger?.warn(`Failed to load skill "${name}" from local: ${localResult.error.message}`);
-	}
-
-	const globalPath = join(globalSkillsDir, name, SKILL_FILE_NAME);
-	const globalResult = await tryLoadSkill(globalPath, "global", logger);
-	if (globalResult.type === "found") {
-		return globalResult;
-	}
-	if (globalResult.type === "error") {
-		logger?.warn(`Failed to load skill "${name}" from global: ${globalResult.error.message}`);
+	for (const skillDir of skillDirs) {
+		const skillPath = join(skillDir.path, name, SKILL_FILE_NAME);
+		const result = await tryLoadSkill(skillPath, skillDir.scope, logger);
+		if (result.type === "found") {
+			return result;
+		}
+		if (result.type === "error") {
+			logger?.warn(
+				`Failed to load skill "${name}" from ${skillDir.scope}: ${result.error.message}`,
+			);
+		}
 	}
 
 	return err(skillNotFoundError(name));
 }
 
 async function listAll(
-	localSkillsDir: string,
-	globalSkillsDir: string,
+	skillDirs: readonly SkillDirectory[],
 	logger?: SkillLogger,
 ): Promise<SkillLoadResult> {
-	const [localResult, globalResult] = await Promise.all([
-		scanDirectory(localSkillsDir, "local", logger),
-		scanDirectory(globalSkillsDir, "global", logger),
-	]);
+	const results = await Promise.all(
+		skillDirs.map((skillDir) => scanDirectory(skillDir.path, skillDir.scope, logger)),
+	);
 
-	const localNames = new Set(localResult.skills.map((s) => s.metadata.name));
-	const uniqueGlobalSkills = globalResult.skills.filter((s) => !localNames.has(s.metadata.name));
+	return mergeSkillLoadResults(results);
+}
 
+function mergeSkillLoadResults(results: readonly SkillLoadResult[]): SkillLoadResult {
+	const skills: Skill[] = [];
+	const failures = results.flatMap((result) => result.failures);
+	const seen = new Set<string>();
+
+	for (const result of results) {
+		for (const skill of result.skills) {
+			if (seen.has(skill.metadata.name)) {
+				continue;
+			}
+			seen.add(skill.metadata.name);
+			skills.push(skill);
+		}
+	}
+
+	return { skills, failures };
+}
+
+function createGlobalSkillDir(globalRoot: string): SkillDirectory {
 	return {
-		skills: [...localResult.skills, ...uniqueGlobalSkills],
-		failures: [...localResult.failures, ...globalResult.failures],
+		path: join(globalRoot, SKILL_DIR_NAME),
+		scope: "global",
 	};
+}
+
+function discoverProjectSkillDirs(
+	localRoot: string,
+	globalRoot: string,
+): readonly SkillDirectory[] {
+	if (!isWithinPath(localRoot, globalRoot)) {
+		return [{ path: join(localRoot, SKILL_DIR_NAME), scope: "local" }];
+	}
+
+	const discovered: SkillDirectory[] = [];
+	let current = localRoot;
+	let scope: Exclude<SkillScope, "global"> = "local";
+
+	while (current !== globalRoot) {
+		discovered.push({ path: join(current, SKILL_DIR_NAME), scope });
+
+		const parent = dirname(current);
+		if (parent === current) {
+			break;
+		}
+
+		current = parent;
+		scope = "parent";
+	}
+
+	return discovered;
+}
+
+function canonicalizePath(path: string): string {
+	const resolvedPath = resolve(path);
+	try {
+		return realpathSync(resolvedPath);
+	} catch {
+		return resolvedPath;
+	}
+}
+
+function isWithinPath(path: string, boundary: string): boolean {
+	const relation = relative(boundary, path);
+	return relation === "" || (!relation.startsWith("..") && relation !== "..");
 }
 
 async function scanDirectory(
