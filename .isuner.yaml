@@ -4,35 +4,35 @@
 # Worktree設定
 # =====================================
 worktree:
-  base_dir: ".worktrees"
-  base_branch: "origin/main"
+  base_dir: '.worktrees'
+  base_branch: 'origin/main'
   copy_files:
-    - ".env"
-    - ".env.local"
+    - '.env'
+    - '.env.local'
   setup_commands:
-    - command: "bun install"
-      description: "依存関係インストール"
-      on_error: "stop"
+    - command: 'bun install'
+      description: '依存関係インストール'
+      on_error: 'stop'
 
 # =====================================
 # マルチプレクサ設定
 # =====================================
 multiplexer:
-  type: "tmux"
-  session_prefix: "taskp"
+  type: 'tmux'
+  session_prefix: 'taskp'
   start_in_session: true
 
 # =====================================
 # エージェント設定（デフォルト: pi）
 # =====================================
 agent:
-  type: "pi"
+  type: 'pi'
 
 # =====================================
 # Faceted Prompting（グローバルデフォルト）
 # =====================================
-persona: "preset:coder"
-policy: "preset:coding"
+persona: 'preset:coder'
+policy: 'preset:coding'
 
 # =====================================
 # GitHub設定
@@ -48,14 +48,14 @@ parallel:
   max_concurrent: 2
   conflict_detection:
     enabled: true
-    strategy: "sequentialize"
+    strategy: 'sequentialize'
 
 # =====================================
 # auto ワークフロー選択設定
 # =====================================
 auto:
-  provider: anthropic
-  model: claude-haiku-4-5
+  provider: kimi-coding
+  model: k2p5
 
 # =====================================
 # ワークフロー定義
@@ -65,10 +65,10 @@ workflows:
   feature:
     description: 新機能実装（Plan → Implement → Test → Review → Merge）
     agent:
-      type: "opencode"
+      type: 'opencode'
     steps:
       - agent: plan
-        instruction: "preset:plan"
+        instruction: 'preset:plan'
         context: |
           新機能の実装計画を立ててください。
 
@@ -85,7 +85,7 @@ workflows:
           - Vitest（テスト）
           - Biome（Lint/Format）
       - agent: implement
-        instruction: "preset:implement"
+        instruction: 'preset:implement'
         context: |
           計画に従って新機能を実装してください。
 
@@ -95,8 +95,8 @@ workflows:
           - docs/arch/error-handling.md — Result型使用、Error/Defect分類
           - strict: true、any型禁止、1ファイル500行以下
           - インデント: Tab / 引用符: ダブルクォート / セミコロン必須
-      - run: "bun run typecheck"
-        description: "型チェック"
+      - run: 'bun run typecheck'
+        description: '型チェック'
       - agent: test
         context: |
           Vitestでテストを作成してください。
@@ -105,11 +105,11 @@ workflows:
           - docs/arch/testing-strategy.md に従ったテスト分類
           - `bun run test` がパスすること
           - カバレッジ80%以上を目標
-      - run: "bun run test"
-        description: "テスト実行"
+      - run: 'bun run test'
+        description: 'テスト実行'
       - name: review
         max_loops: 3
-        approval_policy: "on-request"
+        approval_policy: 'on-request'
         rules:
           - condition: needs_fix
             next: implement
@@ -118,20 +118,20 @@ workflows:
         context: |
           新機能のレビューを行ってください。
           ARCHITECTURE.md準拠・コーディングルール準拠・テストカバレッジ・型安全性を確認してください。
-      - run: "bun run check"
-        description: "Biome lintチェック"
-      - run: "bun run build"
-        description: "ビルド確認"
+      - run: 'bun run check'
+        description: 'Biome lintチェック'
+      - run: 'bun run build'
+        description: 'ビルド確認'
       - merge
 
   # バグ修正（opencode使用）
   bugfix:
     description: バグ修正（根本原因特定 → 修正 → 回帰テスト → Merge）
     agent:
-      type: "opencode"
+      type: 'opencode'
     steps:
       - agent: implement
-        instruction: "preset:fix"
+        instruction: 'preset:fix'
         context: |
           バグを修正してください。
 
@@ -143,13 +143,13 @@ workflows:
           ## 遵守事項
           - docs/arch/error-handling.md — Result型、エラー分類
           - strict: true、any型禁止
-      - run: "bun run typecheck"
-        description: "型チェック"
-      - run: "bun run test"
-        description: "テスト実行"
+      - run: 'bun run typecheck'
+        description: '型チェック'
+      - run: 'bun run test'
+        description: 'テスト実行'
       - name: review
         max_loops: 3
-        approval_policy: "on-request"
+        approval_policy: 'on-request'
         rules:
           - condition: needs_fix
             next: implement
@@ -158,20 +158,20 @@ workflows:
         context: |
           バグ修正のレビューを行ってください。
           根本原因の修正・回帰テスト追加・副作用なしを確認してください。
-      - run: "bun run check"
-        description: "Biome lintチェック"
-      - run: "bun run build"
-        description: "ビルド確認"
+      - run: 'bun run check'
+        description: 'Biome lintチェック'
+      - run: 'bun run build'
+        description: 'ビルド確認'
       - merge
 
   # リファクタリング（opencode使用）
   refactor:
     description: リファクタリング（コード分割・責務整理・型改善）
     agent:
-      type: "opencode"
+      type: 'opencode'
     steps:
       - agent: implement
-        instruction: "preset:implement"
+        instruction: 'preset:implement'
         context: |
           TypeScript/Bunプロジェクトのリファクタリングを行ってください。
 
@@ -180,13 +180,13 @@ workflows:
           - docs/arch/design-principles.md — Tell Don't Ask、デメテルの法則
           - strict: true、any型禁止、1ファイル500行以下
           - 機能変更なし（純粋なリファクタリング）
-      - run: "bun run typecheck"
-        description: "型チェック"
-      - run: "bun run test"
-        description: "テスト実行"
+      - run: 'bun run typecheck'
+        description: '型チェック'
+      - run: 'bun run test'
+        description: 'テスト実行'
       - name: review
         max_loops: 3
-        approval_policy: "on-request"
+        approval_policy: 'on-request'
         rules:
           - condition: needs_fix
             next: implement
@@ -195,10 +195,10 @@ workflows:
         context: |
           リファクタリングのレビューを行ってください。
           機能変更がないこと・型安全性・コーディングルール準拠を確認してください。
-      - run: "bun run check"
-        description: "Biome lintチェック"
-      - run: "bun run build"
-        description: "ビルド確認"
+      - run: 'bun run check'
+        description: 'Biome lintチェック'
+      - run: 'bun run build'
+        description: 'ビルド確認'
       - merge
 
   # ドキュメント更新（pi使用）
@@ -206,7 +206,7 @@ workflows:
     description: ドキュメント更新（docs/配下、AGENTS.md、仕様書等）
     steps:
       - agent: implement
-        instruction: "preset:implement"
+        instruction: 'preset:implement'
         context: |
           ドキュメントを更新してください。
 
@@ -222,13 +222,13 @@ workflows:
     description: 軽微な修正（typo・設定値・コメント等）
     steps:
       - agent: implement
-        instruction: "preset:implement"
+        instruction: 'preset:implement'
         context: |
           軽微な修正を行ってください。変更は最小限に留めてください。
-      - run: "bun run typecheck"
-        description: "型チェック"
-      - run: "bun run build"
-        description: "ビルド確認"
+      - run: 'bun run typecheck'
+        description: '型チェック'
+      - run: 'bun run build'
+        description: 'ビルド確認'
       - name: merge
         # approval_policy: "on-request"  # 有効にするとマージ前に人間の承認待ちになる
 
@@ -236,7 +236,7 @@ workflows:
 # Improve設定
 # =====================================
 improve:
-  review_timeout_ms: 1200000  # 20分（デフォルト: 600000 = 10分）
+  review_timeout_ms: 1200000 # 20分（デフォルト: 600000 = 10分）
 
 # =====================================
 # Self-Healing設定
@@ -273,9 +273,9 @@ retry:
 # =====================================
 intervention:
   stall_timeout: 300
-  stall_action: "nudge"
+  stall_action: 'nudge'
   max_nudges: 3
-  escalation_action: "stop"
+  escalation_action: 'stop'
 
 # =====================================
 # Hook設定
