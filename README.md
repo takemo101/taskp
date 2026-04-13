@@ -236,6 +236,10 @@ taskp list --global
 taskp list --local
 ```
 
+- `taskp list` discovers `.taskp/skills` from the current working directory. When the working directory is under the home/global boundary, it also walks ancestor directories up to that boundary, then falls back to `~/.taskp/skills`.
+- `taskp list --local` shows only project scopes discovered from the current working directory.
+- `taskp list --global` shows only `~/.taskp/skills`.
+
 ### `taskp init <name>`
 
 Generate a skill scaffold.
@@ -301,10 +305,12 @@ Skills are defined as Markdown files named `SKILL.md`.
 
 | Location | Scope | Use Case |
 |----------|-------|----------|
-| `.taskp/skills/<name>/SKILL.md` | Project-local | Project-specific tasks |
+| `<cwd>/.taskp/skills/<name>/SKILL.md` | Local | Tasks specific to the current working directory |
+| `<ancestor>/.taskp/skills/<name>/SKILL.md` | Parent | Tasks shared by a parent project or workspace |
 | `~/.taskp/skills/<name>/SKILL.md` | Global | Personal tasks shared across projects |
 
-Project-local skills take priority.
+Discovery prefers nearer scopes first: `local` → `parent` → `global`.
+Ancestor scopes are included only when the current working directory is inside the same home/global boundary.
 
 ### Frontmatter
 
