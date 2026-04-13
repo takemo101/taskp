@@ -1,8 +1,10 @@
-import type { Skill, SkillScope } from "../core/skill/skill";
+import type { Skill } from "../core/skill/skill";
 import type { SkillLoadFailure, SkillLoadResult, SkillRepository } from "./port/skill-repository";
 
+export type ListSkillScopeFilter = "project" | "global";
+
 export type ListSkillsFilter = {
-	readonly scope?: SkillScope;
+	readonly scope?: ListSkillScopeFilter;
 };
 
 export type ListOutput = {
@@ -19,7 +21,7 @@ export function createListSkillsUseCase(repository: SkillRepository): ListSkills
 		execute: async (filter) => {
 			const result = await fetchByScope(repository, filter.scope);
 			return {
-				skills: deduplicateByLocalPriority(result.skills),
+				skills: deduplicateByDiscoveryOrder(result.skills),
 				failures: result.failures,
 			};
 		},
@@ -28,10 +30,10 @@ export function createListSkillsUseCase(repository: SkillRepository): ListSkills
 
 async function fetchByScope(
 	repository: SkillRepository,
-	scope: SkillScope | undefined,
+	scope: ListSkillScopeFilter | undefined,
 ): Promise<SkillLoadResult> {
 	switch (scope) {
-		case "local":
+		case "project":
 			return repository.listLocal();
 		case "global":
 			return repository.listGlobal();
@@ -41,12 +43,11 @@ async function fetchByScope(
 }
 
 // listAll は loader 側でも重複除去しているが、usecase 層でも保証する
-// （ポートの実装が変わっても usecase の契約を維持するため）
-function deduplicateByLocalPriority(skills: readonly Skill[]): readonly Skill[] {
+// （ポートの実装が変わっても discovery 順序の契約を維持するため）
+function deduplicateByDiscoveryOrder(skills: readonly Skill[]): readonly Skill[] {
 	const seen = new Map<string, Skill>();
 	for (const skill of skills) {
-		const existing = seen.get(skill.metadata.name);
-		if (!existing || skill.scope === "local") {
+		if (!seen.has(skill.metadata.name)) {
 			seen.set(skill.metadata.name, skill);
 		}
 	}
