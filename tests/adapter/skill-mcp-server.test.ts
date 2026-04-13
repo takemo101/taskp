@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Skill } from "../../src/core/skill/skill";
 import { buildSkillMcpTools, createSkillMcpCli } from "../../src/adapter/skill-mcp-server";
+import type { Skill } from "../../src/core/skill/skill";
 
 function createSkill(
 	overrides: Partial<Skill["metadata"]> & { name: string; description: string },

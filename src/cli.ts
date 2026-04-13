@@ -17,20 +17,20 @@ import { createCliProgressWriter } from "./adapter/progress-formatter";
 import { createProjectInitializer } from "./adapter/project-initializer";
 import { createPromptRunner } from "./adapter/prompt-runner";
 import { generateSessionId } from "./adapter/session-id-generator";
-import { buildSkillMcpToolsResult, createSkillMcpCli } from "./adapter/skill-mcp-server";
 import { createSkillInitializer } from "./adapter/skill-initializer";
 import { createDefaultSkillLoader } from "./adapter/skill-loader";
+import { buildSkillMcpToolsResult, createSkillMcpCli } from "./adapter/skill-mcp-server";
 import { createStreamWriter } from "./adapter/stream-writer";
 import { createSystemPromptResolver } from "./adapter/system-prompt-resolver";
 import type { Action } from "./core/skill/action";
-import {
-	deriveAgentSkillDescriptionBudget,
-	DEFAULT_MAX_SKILL_DESCRIPTION_CHARS,
-	DEFAULT_SKILL_DESCRIPTION_BUDGET,
-} from "./core/skill/skill-description-budget";
 import { resolveActionConfig } from "./core/skill/action";
 import type { ContextSource } from "./core/skill/context-source";
 import type { SkillScope } from "./core/skill/skill";
+import {
+	DEFAULT_MAX_SKILL_DESCRIPTION_CHARS,
+	DEFAULT_SKILL_DESCRIPTION_BUDGET,
+	deriveAgentSkillDescriptionBudget,
+} from "./core/skill/skill-description-budget";
 import { parseSkillRef } from "./core/skill/skill-ref";
 import { validateActionExists, validateActionRequired } from "./core/skill/validate-skill-action";
 import { type DomainError, domainErrorMessage, EXIT_CODE } from "./core/types/errors";

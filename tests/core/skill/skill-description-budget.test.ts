@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+	type DescriptionEntry,
 	deriveAgentSkillDescriptionBudget,
 	formatDescriptionEntriesWithinBudget,
-	type DescriptionEntry,
 } from "../../../src/core/skill/skill-description-budget";
 
 function createEntry(label: string, description: string, protectedEntry = false): DescriptionEntry {

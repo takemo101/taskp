@@ -1,18 +1,18 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { createAgentExecutor } from "../../adapter/agent-executor";
+import type { ModelSpec } from "../../adapter/ai-provider";
 import type { McpServerConfig } from "../../adapter/config-loader";
 import { createConsoleLogger } from "../../adapter/console-logger";
 import { createContextCollector } from "../../adapter/context-collector";
 import { createDefaultContextCollectorDeps } from "../../adapter/context-collector-deps";
 import { createPromptRunner } from "../../adapter/prompt-runner";
-import type { ModelSpec } from "../../adapter/ai-provider";
 import type { SessionId } from "../../core/execution/session";
 import { resolveActionConfig } from "../../core/skill/action";
+import type { Skill } from "../../core/skill/skill";
 import {
 	DEFAULT_MAX_SKILL_DESCRIPTION_CHARS,
 	deriveAgentSkillDescriptionBudget,
 } from "../../core/skill/skill-description-budget";
-import type { Skill } from "../../core/skill/skill";
 import { domainErrorMessage } from "../../core/types/errors";
 import { ok } from "../../core/types/result";
 import type { HooksConfig } from "../../usecase/hook-runner";

@@ -1,11 +1,11 @@
 import { Cli } from "incur";
 import { z } from "zod";
+import type { Skill } from "../core/skill/skill";
 import type {
 	DescriptionBudgetOptions,
 	DescriptionEntry,
 } from "../core/skill/skill-description-budget";
 import { formatDescriptionEntriesWithinBudget } from "../core/skill/skill-description-budget";
-import type { Skill } from "../core/skill/skill";
 import type { SkillInput } from "../core/skill/skill-input";
 
 export type SkillMcpTool = {

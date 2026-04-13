@@ -9,14 +9,14 @@ import type { SkillRepository } from "../../../usecase/port/skill-repository";
 import { type RunOutput, runSkill } from "../../../usecase/run-skill";
 import type { SessionId } from "../../execution/session";
 import type { Action } from "../../skill/action";
-import {
-	formatDescriptionEntriesWithinBudget,
-	type DescriptionBudgetResult,
-	type DescriptionBudgetOptions,
-	type DescriptionEntry,
-} from "../../skill/skill-description-budget";
 import { resolveActionConfig } from "../../skill/action";
 import type { Skill } from "../../skill/skill";
+import {
+	type DescriptionBudgetOptions,
+	type DescriptionBudgetResult,
+	type DescriptionEntry,
+	formatDescriptionEntriesWithinBudget,
+} from "../../skill/skill-description-budget";
 import { parseSkillRef } from "../../skill/skill-ref";
 import { domainErrorMessage } from "../../types/errors";
 import { err, ok, type Result } from "../../types/result";
