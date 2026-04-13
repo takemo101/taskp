@@ -1125,7 +1125,7 @@ async function executeSkill(
         skillRepository: {
           findByName: async () => ok(skill),
           listAll: async () => [],
-          listLocal: async () => [],
+          listProject: async () => [],
           listGlobal: async () => [],
         },
         promptCollector: dummyPromptCollector,
@@ -1146,7 +1146,7 @@ async function executeSkill(
         skillRepository: {
           findByName: async () => ok(skill),
           listAll: async () => [],
-          listLocal: async () => [],
+          listProject: async () => [],
           listGlobal: async () => [],
         },
         promptCollector: dummyPromptCollector,

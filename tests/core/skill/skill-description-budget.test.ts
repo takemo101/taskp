@@ -93,6 +93,19 @@ describe("formatDescriptionEntriesWithinBudget", () => {
 		expect(result.phase).toBe(4);
 		expect(result.text).toBe("- very-long-skill-name");
 	});
+
+	it("skips phase 2 when all entries are protected", () => {
+		const result = formatDescriptionEntriesWithinBudget(
+			[
+				createEntry("- alpha", "Alpha description is very long", true),
+				createEntry("- beta", "Beta description is also very long", true),
+			],
+			{ budgetChars: 35, maxDescriptionChars: 80, minDescriptionChars: 12 },
+		);
+
+		// Phase 2 cannot reduce protected entries, so it falls to phase 3
+		expect(result.phase).toBeGreaterThanOrEqual(3);
+	});
 });
 
 describe("deriveAgentSkillDescriptionBudget", () => {

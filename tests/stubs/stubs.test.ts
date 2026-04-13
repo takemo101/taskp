@@ -46,14 +46,14 @@ describe("InMemorySkillRepository", () => {
 		expect(result.failures).toHaveLength(0);
 	});
 
-	it("listLocal/listGlobal filters by scope", async () => {
+	it("listProject/listGlobal filters by scope", async () => {
 		const skills = [
 			makeSkill({ name: "local-one", scope: "local" }),
 			makeSkill({ name: "global-one", scope: "global" }),
 		];
 		const repo = createInMemorySkillRepository(skills);
 
-		const localResult = await repo.listLocal();
+		const localResult = await repo.listProject();
 		const globalResult = await repo.listGlobal();
 		expect(localResult.skills).toHaveLength(1);
 		expect(globalResult.skills).toHaveLength(1);

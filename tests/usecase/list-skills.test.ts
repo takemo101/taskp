@@ -37,7 +37,7 @@ function createInMemoryRepository(skills: readonly Skill[]): SkillRepository {
 			return found ? ok(found) : err(skillNotFoundError(name));
 		},
 		listAll: async () => ({ skills: [...skills], failures: [] }),
-		listLocal: async () => ({
+		listProject: async () => ({
 			skills: skills.filter((s) => s.scope !== "global"),
 			failures: [],
 		}),

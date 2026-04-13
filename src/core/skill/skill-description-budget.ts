@@ -10,8 +10,14 @@ export type DescriptionBudgetOptions = {
 	readonly minDescriptionChars?: number;
 };
 
+export type FormattedEntry = {
+	readonly label: string;
+	readonly description?: string;
+};
+
 export type DescriptionBudgetResult = {
 	readonly text: string;
+	readonly entries: readonly FormattedEntry[];
 	readonly phase: 1 | 2 | 3 | 4;
 	readonly truncatedEntryCount: number;
 	readonly omittedEntryCount: number;
@@ -40,6 +46,7 @@ export function formatDescriptionEntriesWithinBudget(
 	if (fullText.length <= options.budgetChars) {
 		return {
 			text: fullText,
+			entries: toFormattedEntries(prepared, "full"),
 			phase: 1,
 			truncatedEntryCount: initiallyTruncated,
 			omittedEntryCount: 0,
@@ -48,20 +55,24 @@ export function formatDescriptionEntriesWithinBudget(
 
 	const phase2 = formatPhase2(prepared, options);
 	if (phase2 !== undefined) {
+		const phase2Entries = parseFormattedEntries(prepared, phase2);
 		return {
 			text: phase2,
+			entries: toFormattedEntries(phase2Entries, "full"),
 			phase: 2,
-			truncatedEntryCount: countChanged(entries, parseFormattedEntries(prepared, phase2)),
+			truncatedEntryCount: countChanged(entries, phase2Entries),
 			omittedEntryCount: 0,
 		};
 	}
 
 	const phase3 = formatPhase3(prepared, options);
 	if (phase3 !== undefined) {
+		const phase3Entries = parseFormattedEntries(prepared, phase3);
 		return {
 			text: phase3,
+			entries: toFormattedEntries(phase3Entries, "full"),
 			phase: 3,
-			truncatedEntryCount: countChanged(entries, parseFormattedEntries(prepared, phase3)),
+			truncatedEntryCount: countChanged(entries, phase3Entries),
 			omittedEntryCount: 0,
 		};
 	}
@@ -70,6 +81,7 @@ export function formatDescriptionEntriesWithinBudget(
 
 	return {
 		text: formatEntries(labelOnly.entries, "label-only"),
+		entries: toFormattedEntries(labelOnly.entries, "label-only"),
 		phase: 4,
 		truncatedEntryCount: prepared.length,
 		omittedEntryCount: prepared.length - labelOnly.entries.length,
@@ -213,6 +225,16 @@ function countChanged(
 		}
 	}
 	return changed;
+}
+
+function toFormattedEntries(
+	entries: readonly PreparedEntry[],
+	mode: "full" | "label-only",
+): readonly FormattedEntry[] {
+	return entries.map((entry) => ({
+		label: entry.label,
+		description: mode === "full" ? entry.description : undefined,
+	}));
 }
 
 function parseFormattedEntries(

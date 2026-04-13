@@ -112,7 +112,7 @@ describe("createSingleSkillRepository", () => {
 		const skill = createSkill("test", "template");
 		const repo = createSingleSkillRepository(skill);
 		expect(await repo.listAll()).toEqual({ skills: [], failures: [] });
-		expect(await repo.listLocal()).toEqual({ skills: [], failures: [] });
+		expect(await repo.listProject()).toEqual({ skills: [], failures: [] });
 		expect(await repo.listGlobal()).toEqual({ skills: [], failures: [] });
 	});
 });

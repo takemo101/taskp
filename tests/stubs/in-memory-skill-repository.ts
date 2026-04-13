@@ -14,7 +14,7 @@ export function createInMemorySkillRepository(skills: readonly Skill[]): SkillRe
 			return found ? ok(found) : err(skillNotFoundError(name));
 		},
 		listAll: async (): Promise<SkillLoadResult> => ({ skills: [...store], failures: [] }),
-		listLocal: async (): Promise<SkillLoadResult> => ({
+		listProject: async (): Promise<SkillLoadResult> => ({
 			skills: store.filter((s) => s.scope === "local"),
 			failures: [],
 		}),

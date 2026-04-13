@@ -15,6 +15,7 @@ import {
 	type DescriptionBudgetOptions,
 	type DescriptionBudgetResult,
 	type DescriptionEntry,
+	type FormattedEntry,
 	formatDescriptionEntriesWithinBudget,
 } from "../../skill/skill-description-budget";
 import { parseSkillRef } from "../../skill/skill-ref";
@@ -187,6 +188,7 @@ export function buildTaskpRunDescriptionResult(
 			: TASKP_RUN_BASE_DESCRIPTION;
 		return {
 			text: baseText,
+			entries: [],
 			phase: budgetOptions ? 4 : 1,
 			truncatedEntryCount: budgetOptions ? entries.length : 0,
 			omittedEntryCount: budgetOptions ? entries.length : 0,
@@ -195,6 +197,7 @@ export function buildTaskpRunDescriptionResult(
 
 	return {
 		text: `${TASKP_RUN_BASE_DESCRIPTION}\n\nAvailable skills:\n${formatted.lines.join("\n")}`,
+		entries: formatted.entries,
 		phase: formatted.phase,
 		truncatedEntryCount: formatted.truncatedEntryCount,
 		omittedEntryCount: formatted.omittedEntryCount,
@@ -258,6 +261,7 @@ function formatLines(
 	baseLength = 0,
 ): {
 	readonly lines: readonly string[];
+	readonly entries: readonly FormattedEntry[];
 	readonly phase: 1 | 2 | 3 | 4;
 	readonly truncatedEntryCount: number;
 	readonly omittedEntryCount: number;
@@ -265,6 +269,7 @@ function formatLines(
 	if (budgetOptions === undefined) {
 		return {
 			lines: entries.map((entry) => `${entry.label}: ${entry.description}`),
+			entries: entries.map((entry) => ({ label: entry.label, description: entry.description })),
 			phase: 1,
 			truncatedEntryCount: 0,
 			omittedEntryCount: 0,
@@ -274,6 +279,7 @@ function formatLines(
 	if (budgetOptions.budgetChars <= baseLength) {
 		return {
 			lines: [],
+			entries: [],
 			phase: 4,
 			truncatedEntryCount: entries.length,
 			omittedEntryCount: entries.length,
@@ -286,6 +292,7 @@ function formatLines(
 	});
 	return {
 		lines: result.text === "" ? [] : result.text.split("\n"),
+		entries: result.entries,
 		phase: result.phase,
 		truncatedEntryCount: result.truncatedEntryCount,
 		omittedEntryCount: result.omittedEntryCount,

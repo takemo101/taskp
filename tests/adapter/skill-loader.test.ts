@@ -269,13 +269,13 @@ describe("SkillLoader", () => {
 		});
 	});
 
-	describe("listLocal", () => {
+	describe("listProject", () => {
 		it("ローカルスキルのみリストする", async () => {
 			createSkillFile(localRoot, "deploy", makeSkillMd("deploy", "デプロイ"));
 			createSkillFile(globalRoot, "lint", makeSkillMd("lint", "リント"));
 			const loader = createSkillLoader({ localRoot, globalRoot });
 
-			const { skills } = await loader.listLocal();
+			const { skills } = await loader.listProject();
 
 			expect(skills).toHaveLength(1);
 			expect(skills[0].metadata.name).toBe("deploy");
@@ -299,7 +299,7 @@ describe("SkillLoader", () => {
 			createSkillFile(globalRoot, "lint", makeSkillMd("lint", "グローバル版"));
 
 			const loader = createSkillLoader({ localRoot, globalRoot });
-			const { skills } = await loader.listLocal();
+			const { skills } = await loader.listProject();
 
 			expect(skills.map((skill) => [skill.metadata.name, skill.scope])).toEqual([
 				["deploy", "parent"],
@@ -376,7 +376,7 @@ describe("SkillLoader", () => {
 			chmodSync(filePath, 0o000);
 			const loader = createSkillLoader({ localRoot, globalRoot });
 
-			const { skills, failures } = await loader.listLocal();
+			const { skills, failures } = await loader.listProject();
 
 			chmodSync(filePath, 0o644);
 			expect(skills).toHaveLength(0);
@@ -406,11 +406,11 @@ describe("SkillLoader", () => {
 			expect(failures.some((f) => f.path.includes("broken-global"))).toBe(true);
 		});
 
-		it("listLocal で failures を返す", async () => {
+		it("listProject で failures を返す", async () => {
 			createSkillFile(localRoot, "broken", "---\nbad: [\n---\n# Broken");
 			const loader = createSkillLoader({ localRoot, globalRoot });
 
-			const { failures } = await loader.listLocal();
+			const { failures } = await loader.listProject();
 
 			expect(failures).toHaveLength(1);
 		});
@@ -500,7 +500,7 @@ describe("SkillLoader", () => {
 			symlinkSync(actualDir, join(skillsDir, "my-skill"));
 
 			const loader = createSkillLoader({ localRoot, globalRoot });
-			const { skills } = await loader.listLocal();
+			const { skills } = await loader.listProject();
 
 			const mySkill = skills.find((s) => s.metadata.name === "my-skill");
 			expect(mySkill).toBeDefined();
@@ -554,7 +554,7 @@ describe("SkillLoader", () => {
 			symlinkSync("/nonexistent/path/to/skill", join(skillsDir, "broken-link"));
 
 			const loader = createSkillLoader({ localRoot, globalRoot });
-			const { skills, failures } = await loader.listLocal();
+			const { skills, failures } = await loader.listProject();
 
 			expect(skills).toHaveLength(0);
 			expect(failures).toHaveLength(0);
@@ -606,7 +606,7 @@ describe("SkillLoader", () => {
 			symlinkSync(externalSkillDir, join(skillsDir, "external-skill"));
 
 			const loader = createSkillLoader({ localRoot, globalRoot });
-			const { skills, failures } = await loader.listLocal();
+			const { skills, failures } = await loader.listProject();
 
 			expect(skills).toHaveLength(1);
 			expect(skills[0].metadata.name).toBe("external-skill");
@@ -629,7 +629,7 @@ describe("SkillLoader", () => {
 			createSkillFile(localRoot, "valid-skill", makeSkillMd("valid-skill", "正常スキル"));
 
 			const loader = createSkillLoader({ localRoot, globalRoot });
-			const { skills, failures } = await loader.listLocal();
+			const { skills, failures } = await loader.listProject();
 
 			expect(skills).toHaveLength(2);
 			const names = skills.map((s) => s.metadata.name);
@@ -695,7 +695,7 @@ describe("SkillLoader", () => {
 			symlinkSync(innerDir, join(skillsDir, "inner-skill"));
 
 			const loader = createSkillLoader({ localRoot, globalRoot });
-			const { skills } = await loader.listLocal();
+			const { skills } = await loader.listProject();
 
 			const innerSkill = skills.find((s) => s.metadata.name === "inner-skill");
 			expect(innerSkill).toBeDefined();
@@ -712,10 +712,56 @@ describe("SkillLoader", () => {
 			symlinkSync(externalFile, join(skillsDir, "file-link"));
 
 			const loader = createSkillLoader({ localRoot, globalRoot });
-			const { skills, failures } = await loader.listLocal();
+			const { skills, failures } = await loader.listProject();
 
 			expect(skills).toHaveLength(0);
 			expect(failures).toHaveLength(0);
+		});
+	});
+
+	describe("localRoot equals globalRoot", () => {
+		it("listProject returns empty when localRoot equals globalRoot", async () => {
+			createSkillFile(globalRoot, "home-skill", makeSkillMd("home-skill", "Home skill"));
+			const loader = createSkillLoader({ localRoot: globalRoot, globalRoot });
+
+			const projectResult = await loader.listProject();
+			expect(projectResult.skills).toHaveLength(0);
+
+			const allResult = await loader.listAll();
+			expect(allResult.skills).toHaveLength(1);
+			expect(allResult.skills[0]?.scope).toBe("global");
+		});
+	});
+
+	describe("multi-scope symlink dedup", () => {
+		it("deduplicates when parent and local both symlink to the same global skill", async () => {
+			// Create nested: globalRoot/projects/team/app (localRoot = app)
+			const teamDir = join(globalRoot, "projects", "team");
+			const appDir = join(teamDir, "app");
+			mkdirSync(appDir, { recursive: true });
+
+			// Global has the real skill
+			createSkillFile(globalRoot, "shared", makeSkillMd("shared", "Shared skill"));
+			const globalSkillDir = join(globalRoot, ".taskp", "skills", "shared");
+
+			// Team-level (parent) symlinks to global skill
+			const teamSkillsDir = join(teamDir, ".taskp", "skills");
+			mkdirSync(teamSkillsDir, { recursive: true });
+			symlinkSync(globalSkillDir, join(teamSkillsDir, "shared"));
+
+			// App-level (local) also symlinks to same global skill
+			const appSkillsDir = join(appDir, ".taskp", "skills");
+			mkdirSync(appSkillsDir, { recursive: true });
+			symlinkSync(globalSkillDir, join(appSkillsDir, "shared"));
+
+			const loader = createSkillLoader({ localRoot: appDir, globalRoot });
+			const { skills } = await loader.listAll();
+
+			// Should have only one "shared" skill (deduplicated)
+			const sharedSkills = skills.filter((s) => s.metadata.name === "shared");
+			expect(sharedSkills).toHaveLength(1);
+			// Local scope wins (first discovered)
+			expect(sharedSkills[0]?.scope).toBe("local");
 		});
 	});
 });

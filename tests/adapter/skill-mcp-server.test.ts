@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildSkillMcpTools, createSkillMcpCli } from "../../src/adapter/skill-mcp-server";
+import {
+	buildSkillMcpTools,
+	buildSkillMcpToolsResult,
+	createSkillMcpCli,
+} from "../../src/adapter/skill-mcp-server";
 import type { Skill } from "../../src/core/skill/skill";
 
 function createSkill(
@@ -120,6 +124,71 @@ describe("buildSkillMcpTools", () => {
 				{ budgetChars: 200, maxDescriptionChars: 80 },
 			),
 		).toThrow("Duplicate MCP tool name after normalization");
+	});
+
+	it("returns phase and count metadata from buildSkillMcpToolsResult", () => {
+		const result = buildSkillMcpToolsResult(
+			[
+				createSkill({ name: "deploy", description: "Deploy app with very long description text" }),
+				createSkill({ name: "release", description: "Release with another very long description" }),
+			],
+			{ budgetChars: 20, maxDescriptionChars: 40, minDescriptionChars: 12 },
+		);
+
+		expect(result.phase).toBeGreaterThanOrEqual(2);
+		expect(result.tools).toHaveLength(2);
+		expect(typeof result.truncatedEntryCount).toBe("number");
+		expect(typeof result.omittedEntryCount).toBe("number");
+	});
+
+	it("maps number, confirm, and select input types to correct schemas", async () => {
+		const cli = createSkillMcpCli({
+			version: "0.1.14",
+			skills: [
+				createSkill({
+					name: "typed-skill",
+					description: "Test types",
+					inputs: [
+						{ name: "count", type: "number", message: "How many?" },
+						{ name: "confirm", type: "confirm", message: "Are you sure?" },
+						{
+							name: "env",
+							type: "select",
+							message: "Environment",
+							choices: ["dev", "staging", "prod"],
+						},
+						{ name: "name", type: "text", message: "Name" },
+					],
+				}),
+			],
+			budgetOptions: { budgetChars: 500, maxDescriptionChars: 80 },
+			executeSkill: vi.fn().mockResolvedValue({ ok: true }),
+		});
+
+		const sessionId = await initSession(cli);
+		const res = await mcpRequest(
+			cli,
+			{ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
+			sessionId,
+		);
+		const body = (await res.json()) as {
+			result: {
+				tools: Array<{
+					name: string;
+					inputSchema: {
+						properties: Record<string, { type?: string; enum?: string[]; description?: string }>;
+					};
+				}>;
+			};
+		};
+		const tool = body.result.tools[0];
+		expect(tool).toBeDefined();
+
+		const props = tool?.inputSchema?.properties ?? {};
+		expect(props.count?.description).toBe("How many?");
+		expect(props.confirm?.description).toBe("Are you sure?");
+		expect(props.env?.enum).toEqual(["dev", "staging", "prod"]);
+		expect(props.name?.description).toBe("Name");
 	});
 });
 

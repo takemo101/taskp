@@ -1,5 +1,3 @@
-import { homedir } from "node:os";
-import { dirname, relative } from "node:path";
 import {
 	BoxRenderable,
 	type CliRenderer,
@@ -10,6 +8,7 @@ import {
 	SelectRenderable,
 	SelectRenderableEvents,
 } from "@opentui/core";
+import { formatSkillSource } from "../../core/skill/format-skill-source";
 import type { Skill } from "../../core/skill/skill";
 import {
 	buildSkillOptionsWithActions,
@@ -172,22 +171,6 @@ export async function showSkillSelector(
 
 		searchInput.focus();
 	});
-}
-
-function formatSkillSource(location: string): string {
-	const skillDir = dirname(location);
-	const home = homedir();
-
-	if (skillDir === home || skillDir.startsWith(`${home}/`)) {
-		return `~${skillDir.slice(home.length)}`;
-	}
-
-	const relativePath = relative(process.cwd(), skillDir);
-	if (relativePath === "") {
-		return ".";
-	}
-
-	return relativePath.startsWith(".") ? relativePath : `./${relativePath}`;
 }
 
 function getExpandIndicator(

@@ -34,7 +34,7 @@ async function fetchByScope(
 ): Promise<SkillLoadResult> {
 	switch (scope) {
 		case "project":
-			return repository.listLocal();
+			return repository.listProject();
 		case "global":
 			return repository.listGlobal();
 		default:

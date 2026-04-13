@@ -84,7 +84,7 @@ export function createSingleSkillRepository(skill: Skill): SkillRepository {
 	return {
 		findByName: async () => ok(skill),
 		listAll: async () => ({ skills: [], failures: [] }),
-		listLocal: async () => ({ skills: [], failures: [] }),
+		listProject: async () => ({ skills: [], failures: [] }),
 		listGlobal: async () => ({ skills: [], failures: [] }),
 	};
 }
