@@ -50,8 +50,9 @@ taskp run code-review
 
 ```bash
 taskp list
-# → deploy     - アプリをデプロイする        (~/.taskp/skills/deploy)
-# → review     - コードレビューを実行する     (./.taskp/skills/review)
+# → deploy (parent) - パッケージ専用のデプロイスキル
+# → review (local)  - 現在地直下のレビュー用スキル
+# → lint   (global) - 個人用の共通スキル
 ```
 
 ### UC-4: スキルの雛形生成
@@ -100,9 +101,14 @@ agent:    マークダウン全体を LLM に渡し、ツール呼び出しで�
 
 ```
 探索順序:
-  1. ./.taskp/skills/<name>/SKILL.md   ← プロジェクト固有
-  2. ~/.taskp/skills/<name>/SKILL.md   ← グローバル（個人）
+  1. <cwd>/.taskp/skills/<name>/SKILL.md
+  2. 親ディレクトリを上方向にたどった各 .taskp/skills/<name>/SKILL.md
+  3. ~/.taskp/skills/<name>/SKILL.md   ← グローバル（個人）
 ```
+
+- cwd に近いスキルほど優先される
+- `--local` は現在の作業ディレクトリから見つかったプロジェクトスキルを含む
+- 親ディレクトリのスコープは、現在の作業ディレクトリがホーム/グローバル境界の配下にある場合のみ探索される
 
 ### 5. MCP サーバー自動生成
 

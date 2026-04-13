@@ -331,18 +331,21 @@ MCP サーバーの接続設定は `config.toml` の `[mcp.servers]` で定義�
 ### 探索順序
 
 ```
-1. ./.taskp/skills/<name>/SKILL.md     ← プロジェクトローカル
-2. ~/.taskp/skills/<name>/SKILL.md     ← グローバル
+1. <cwd>/.taskp/skills/<name>/SKILL.md            ← 現在地直下
+2. 親ディレクトリを上方向にたどった各 .taskp/skills/<name>/SKILL.md
+3. ~/.taskp/skills/<name>/SKILL.md                ← グローバル（最後）
 ```
 
-- プロジェクトローカルが優先される（上書きセマンティクス）
+- cwd に近いスキルほど優先される（深い方が勝つ）
+- `~/.taskp/skills` は常に最低優先度
 - 見つからない場合はエラー
 
 ### 一覧取得時
 
-- 両方のディレクトリをスキャン
-- 同名スキルはプロジェクトローカルを優先表示
-- グローバルのみのスキルも表示（ソース表示で区別）
+- `<cwd>` から見つかった `.taskp/skills` をスキャンし、ホーム/グローバル境界の配下にある場合は上方向の親ディレクトリもスキャンしたうえで、最後に `~/.taskp/skills` をスキャンする
+- 同名スキルは探索順序で最初に見つかったものだけを表示する
+- スコープは `local` / `parent` / `global` として区別される
+- `taskp list --local` は現在の作業ディレクトリから見つかったプロジェクトスコープ（必要に応じて `local` と `parent`）を含み、`--global` は `global` のみを表示する
 
 ## 変数展開
 
