@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { homedir } from "node:os";
+import { dirname, relative } from "node:path";
 import { Cli, z } from "incur";
 import { createAgentExecutor } from "./adapter/agent-executor";
 import { createLanguageModel, resolveModelSpec } from "./adapter/ai-provider";
@@ -28,7 +29,7 @@ import { validateActionExists, validateActionRequired } from "./core/skill/valid
 import { type DomainError, domainErrorMessage, EXIT_CODE } from "./core/types/errors";
 import type { Result } from "./core/types/result";
 import { type InitOutput, initSkill } from "./usecase/init-skill";
-import { createListSkillsUseCase } from "./usecase/list-skills";
+import { createListSkillsUseCase, type ListSkillScopeFilter } from "./usecase/list-skills";
 import { runAgentSkill } from "./usecase/run-agent-skill";
 import type { RunOutput } from "./usecase/run-skill";
 import { runSkill } from "./usecase/run-skill";
@@ -230,7 +231,10 @@ const cli = Cli.create("taskp", {
 		description: "List available skills",
 		options: z.object({
 			global: z.boolean().optional().describe("Show global skills only"),
-			local: z.boolean().optional().describe("Show project-local skills only"),
+			local: z
+				.boolean()
+				.optional()
+				.describe("Show project skills discovered from the current working directory"),
 		}),
 		async run(c) {
 			const scope = resolveScope(c.options.global, c.options.local);
@@ -430,9 +434,9 @@ async function runAgentMode(
 function resolveScope(
 	global: boolean | undefined,
 	local: boolean | undefined,
-): SkillScope | undefined {
+): ListSkillScopeFilter | undefined {
 	if (global) return "global";
-	if (local) return "local";
+	if (local) return "project";
 	return undefined;
 }
 
@@ -461,10 +465,27 @@ function printSkillTable(
 		const actionsLabel = formatActionsLabel(skill.metadata.actions);
 		console.log(`${ansi.bold(ansi.cyan(skill.metadata.name))} ${scopeLabel}`);
 		console.log(`  ${skill.metadata.description}`);
+		console.log(`  Source: ${formatSkillSource(skill.location)}`);
 		if (actionsLabel) {
 			console.log(`  Actions: ${actionsLabel}`);
 		}
 	}
+}
+
+function formatSkillSource(location: string): string {
+	const skillDir = dirname(location);
+	const home = homedir();
+
+	if (skillDir === home || skillDir.startsWith(`${home}/`)) {
+		return `~${skillDir.slice(home.length)}`;
+	}
+
+	const relativePath = relative(process.cwd(), skillDir);
+	if (relativePath === "") {
+		return ".";
+	}
+
+	return relativePath.startsWith(".") ? relativePath : `./${relativePath}`;
 }
 
 function formatActionsLabel(actions: Record<string, Action> | undefined): string | undefined {

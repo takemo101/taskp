@@ -1,3 +1,5 @@
+import { homedir } from "node:os";
+import { dirname, relative } from "node:path";
 import {
 	BoxRenderable,
 	type CliRenderer,
@@ -35,7 +37,7 @@ export async function showSkillSelector(
 		const allOptions = buildSkillOptionsWithActions(
 			skills.map((s) => ({
 				name: s.metadata.name,
-				description: s.metadata.description,
+				description: `${s.metadata.description} (${s.scope}) — ${formatSkillSource(s.location)}`,
 				actions: s.metadata.actions,
 			})),
 		);
@@ -170,6 +172,22 @@ export async function showSkillSelector(
 
 		searchInput.focus();
 	});
+}
+
+function formatSkillSource(location: string): string {
+	const skillDir = dirname(location);
+	const home = homedir();
+
+	if (skillDir === home || skillDir.startsWith(`${home}/`)) {
+		return `~${skillDir.slice(home.length)}`;
+	}
+
+	const relativePath = relative(process.cwd(), skillDir);
+	if (relativePath === "") {
+		return ".";
+	}
+
+	return relativePath.startsWith(".") ? relativePath : `./${relativePath}`;
 }
 
 function getExpandIndicator(
