@@ -57,6 +57,8 @@ path = ".taskp/config.schema.json"
 | `google` | クラウド | Google AI API | `GOOGLE_GENERATIVE_AI_KEY` |
 | `kimi` | クラウド | `https://api.moonshot.ai/v1` | `MOONSHOT_API_KEY` |
 | `kimi-coding` | クラウド | `https://api.kimi.com/coding/v1` | `KIMI_CODING_API_KEY` |
+| `zai` | クラウド | `https://api.z.ai/api/paas/v4` | `ZAI_API_KEY` |
+| `zai-coding` | クラウド | `https://api.z.ai/api/coding/paas/v4` | `ZAI_CODING_API_KEY` |
 | `ollama` | ローカル | `http://localhost:11434/v1` | 不要 |
 | `omlx` | ローカル | `http://localhost:8000/v1` | 不要 |
 | `lmstudio` | ローカル | `http://localhost:1234/v1` | 不要 |
@@ -71,7 +73,7 @@ path = ".taskp/config.schema.json"
 | `default_model` | `string` | - | なし | プロバイダ別デフォルトモデル ※ |
 | `api_type` | `"chat" \| "responses"` | - | `"chat"` | カスタムプロバイダの API 形式。`chat` = Chat Completions API、`responses` = Responses API。組み込みプロバイダでは無視される |
 
-> ※ `default_model` はスキーマ上定義されているが、現在の実装（`resolveModelSpec`）では `ai.default_model` のみが参照される。プロバイダ別デフォルトモデルは将来対応予定。
+> ※ `default_provider` が設定されている場合、実装（`resolveModelSpec`）は `ai.providers.<default_provider>.default_model` を優先し、未設定時のみ `ai.default_model` にフォールバックする。
 
 ## モデル解決の優先順位
 
@@ -158,6 +160,28 @@ default_model = "kimi-for-coding"
 
 [ai.providers.kimi-coding]
 api_key_env = "KIMI_CODING_API_KEY"
+```
+
+### z.ai（通常エンドポイント）
+
+```toml
+[ai]
+default_provider = "zai"
+default_model = "glm-5.1"
+
+[ai.providers.zai]
+api_key_env = "ZAI_API_KEY"
+```
+
+### z.ai Coding（coding エンドポイント）
+
+```toml
+[ai]
+default_provider = "zai-coding"
+default_model = "glm-5.1"
+
+[ai.providers.zai-coding]
+api_key_env = "ZAI_CODING_API_KEY"
 ```
 
 ### カスタム OpenAI 互換サーバー

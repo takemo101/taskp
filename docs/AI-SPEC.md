@@ -16,6 +16,8 @@ taskp の `agent` モードでは、Vercel AI SDK を使用して LLM と連携�
 | Google | `@ai-sdk/google` | `GOOGLE_GENERATIVE_AI_KEY` |
 | Kimi | `@ai-sdk/openai`（OpenAI 互換） | `MOONSHOT_API_KEY` |
 | Kimi Coding | `@ai-sdk/openai`（OpenAI 互換） | `KIMI_CODING_API_KEY` |
+| z.ai | `@ai-sdk/openai`（OpenAI 互換） | `ZAI_API_KEY` |
+| z.ai Coding | `@ai-sdk/openai`（OpenAI 互換） | `ZAI_CODING_API_KEY` |
 | Ollama | `@ai-sdk/openai`（OpenAI 互換） | 不要 |
 
 ### モデル指定の形式
@@ -26,6 +28,8 @@ taskp の `agent` モードでは、Vercel AI SDK を使用して LLM と連携�
 # provider/model 形式（推奨）
 taskp run review --model anthropic/claude-sonnet-4-20250514
 taskp run review --model openai/gpt-4o
+taskp run review --model zai/glm-5.1
+taskp run review --model zai-coding/glm-5.1
 taskp run review --model ollama/qwen2.5-coder:32b
 
 # provider を省略（設定ファイルの ai.default_provider を使用）
@@ -35,6 +39,8 @@ taskp run review --model claude-sonnet-4-20250514
 ```yaml
 # SKILL.md フロントマター（同じ形式）
 model: anthropic/claude-sonnet-4-20250514
+model: zai/glm-5.1
+model: zai-coding/glm-5.1
 model: ollama/qwen2.5-coder:32b
 model: claude-sonnet-4-20250514          # default_provider を使用
 ```
@@ -49,6 +55,9 @@ model: claude-sonnet-4-20250514          # default_provider を使用
 
 "ollama/qwen2.5-coder:32b"
   → provider: "ollama", model: "qwen2.5-coder:32b"
+
+"zai-coding/glm-5.1"
+  → provider: "zai-coding", model: "glm-5.1"
 
 "claude-sonnet-4-20250514"
   → provider: ai.default_provider, model: "claude-sonnet-4-20250514"

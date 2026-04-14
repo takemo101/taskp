@@ -215,7 +215,7 @@ interface SetupOutput {
 # 詳細: https://github.com/your-repo/taskp/docs/CONFIG-SPEC.md
 
 [ai]
-# default_provider = "anthropic"     # anthropic | openai | google | ollama | omlx | lmstudio
+# default_provider = "anthropic"     # anthropic | openai | google | kimi | kimi-coding | zai | zai-coding | ollama | omlx | lmstudio
 # default_model = "claude-sonnet-4-20250514"
 
 # [ai.providers.anthropic]
