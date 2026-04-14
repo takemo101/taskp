@@ -14,6 +14,8 @@ taskp の `agent` モードでは、Vercel AI SDK を使用して LLM と連携�
 | Anthropic | `@ai-sdk/anthropic` | `ANTHROPIC_API_KEY` |
 | OpenAI | `@ai-sdk/openai` | `OPENAI_API_KEY` |
 | Google | `@ai-sdk/google` | `GOOGLE_GENERATIVE_AI_KEY` |
+| Kimi | `@ai-sdk/openai`（OpenAI 互換） | `MOONSHOT_API_KEY` |
+| Kimi Coding | `@ai-sdk/openai`（OpenAI 互換） | `KIMI_CODING_API_KEY` |
 | Ollama | `@ai-sdk/openai`（OpenAI 互換） | 不要 |
 
 ### モデル指定の形式

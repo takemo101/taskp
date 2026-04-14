@@ -35,6 +35,7 @@ export type ProviderRegistry = ReadonlyMap<string, ProviderFactory>;
 function createCloudFactory(
 	defaultEnvVar: string,
 	sdkFactory: (opts: { apiKey: string; baseURL?: string }) => (model: string) => LanguageModelV3,
+	defaultBaseUrl?: string,
 ): ProviderFactory {
 	return (model, config) => {
 		const apiKey = resolveApiKey(config?.api_key_env, defaultEnvVar);
@@ -42,9 +43,11 @@ function createCloudFactory(
 			return apiKey;
 		}
 
+		const baseURL = config?.base_url ?? defaultBaseUrl;
+
 		const provider = sdkFactory({
 			apiKey: apiKey.value,
-			...(config?.base_url !== undefined && { baseURL: config.base_url }),
+			...(baseURL !== undefined && { baseURL }),
 		});
 
 		return ok(provider(model));
@@ -108,6 +111,25 @@ export function createDefaultProviderRegistry(): ProviderRegistry {
 			const p = createGoogleGenerativeAI(opts);
 			return (model) => p(model);
 		}),
+	);
+
+	// Kimi (Moonshot AI) — OpenAI 互換 Chat Completions API
+	const openAIChatSdkFactory = (opts: { apiKey: string; baseURL?: string }) => {
+		const p = createOpenAI(opts);
+		return (model: string) => p.chat(model);
+	};
+
+	registry.set(
+		"kimi",
+		createCloudFactory("MOONSHOT_API_KEY", openAIChatSdkFactory, "https://api.moonshot.ai/v1"),
+	);
+	registry.set(
+		"kimi-coding",
+		createCloudFactory(
+			"KIMI_CODING_API_KEY",
+			openAIChatSdkFactory,
+			"https://api.kimi.com/coding/v1",
+		),
 	);
 
 	// Ollama はステートレス実装のため item_reference 非対応 → Chat Completions API を使う
