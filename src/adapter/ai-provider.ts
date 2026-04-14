@@ -131,6 +131,18 @@ export function createDefaultProviderRegistry(): ProviderRegistry {
 			"https://api.kimi.com/coding/v1",
 		),
 	);
+	registry.set(
+		"zai",
+		createCloudFactory("ZAI_API_KEY", openAIChatSdkFactory, "https://api.z.ai/api/paas/v4"),
+	);
+	registry.set(
+		"zai-coding",
+		createCloudFactory(
+			"ZAI_CODING_API_KEY",
+			openAIChatSdkFactory,
+			"https://api.z.ai/api/coding/paas/v4",
+		),
+	);
 
 	// Ollama はステートレス実装のため item_reference 非対応 → Chat Completions API を使う
 	registry.set("ollama", createLocalFactory("http://localhost:11434/v1"));

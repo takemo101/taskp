@@ -162,6 +162,17 @@ describe("resolveModelSpec", () => {
 		expect(result.error.type).toBe("CONFIG_ERROR");
 		expect(result.error.message).toContain("no provider prefix");
 	});
+
+	it("preserves zai-coding provider when model spec is explicit", () => {
+		const result = resolveModelSpec({
+			cliModel: "zai-coding/glm-5.1",
+			config: { default_provider: "anthropic" },
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toEqual({ provider: "zai-coding", model: "glm-5.1" });
+	});
 });
 
 describe("createLanguageModel", () => {
@@ -173,6 +184,8 @@ describe("createLanguageModel", () => {
 		process.env.GOOGLE_GENERATIVE_AI_KEY = "test-google-key";
 		process.env.MOONSHOT_API_KEY = "test-moonshot-key";
 		process.env.KIMI_CODING_API_KEY = "test-kimi-coding-key";
+		process.env.ZAI_API_KEY = "test-zai-key";
+		process.env.ZAI_CODING_API_KEY = "test-zai-coding-key";
 	});
 
 	afterEach(() => {
@@ -389,6 +402,68 @@ describe("createLanguageModel", () => {
 		if (result.ok) return;
 		expect(result.error.type).toBe("CONFIG_ERROR");
 		expect(result.error.message).toContain("KIMI_CODING_API_KEY");
+	});
+
+	it("creates zai model with default base URL", () => {
+		const result = createLanguageModel({ provider: "zai", model: "glm-5.1" }, {});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.modelId).toBe("glm-5.1");
+		expect(result.value.provider).toBe("openai.chat");
+	});
+
+	it("creates zai model with custom api_key_env", () => {
+		process.env.MY_ZAI_KEY = "custom-zai-key";
+
+		const result = createLanguageModel(
+			{ provider: "zai", model: "glm-5.1" },
+			{ providers: { zai: { api_key_env: "MY_ZAI_KEY" } } },
+		);
+
+		expect(result.ok).toBe(true);
+	});
+
+	it("returns error when zai API key is missing", () => {
+		delete process.env.ZAI_API_KEY;
+
+		const result = createLanguageModel({ provider: "zai", model: "glm-5.1" }, {});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("CONFIG_ERROR");
+		expect(result.error.message).toContain("ZAI_API_KEY");
+	});
+
+	it("creates zai-coding model with default base URL", () => {
+		const result = createLanguageModel({ provider: "zai-coding", model: "glm-5.1" }, {});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.modelId).toBe("glm-5.1");
+		expect(result.value.provider).toBe("openai.chat");
+	});
+
+	it("creates zai-coding model with custom api_key_env", () => {
+		process.env.MY_ZAI_CODING_KEY = "custom-zai-coding-key";
+
+		const result = createLanguageModel(
+			{ provider: "zai-coding", model: "glm-5.1" },
+			{ providers: { "zai-coding": { api_key_env: "MY_ZAI_CODING_KEY" } } },
+		);
+
+		expect(result.ok).toBe(true);
+	});
+
+	it("returns error when zai-coding API key is missing", () => {
+		delete process.env.ZAI_CODING_API_KEY;
+
+		const result = createLanguageModel({ provider: "zai-coding", model: "glm-5.1" }, {});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("CONFIG_ERROR");
+		expect(result.error.message).toContain("ZAI_CODING_API_KEY");
 	});
 
 	it("returns error for unknown provider without base_url", () => {

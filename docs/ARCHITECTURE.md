@@ -152,6 +152,9 @@ api_key_env = "ANTHROPIC_API_KEY"    # 環境変数名
 [ai.providers.openai]
 api_key_env = "OPENAI_API_KEY"
 
+[ai.providers.zai]
+api_key_env = "ZAI_API_KEY"
+
 [ai.providers.ollama]
 base_url = "http://localhost:11434/v1"
 default_model = "qwen2.5-coder:32b"

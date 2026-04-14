@@ -9,7 +9,7 @@ A CLI tool that runs skills (task procedures) defined in Markdown — collecting
 - **Skills defined in Markdown** — Human-readable, easy to write, and Git-friendly
 - **Two execution modes** — Template rendering (no LLM required) and AI agent execution
 - **Multi-action skills** — Group related operations (add/delete/list) into a single skill
-- **Multi-provider support** — Anthropic / OpenAI / Google / Ollama
+- **Multi-provider support** — Anthropic / OpenAI / Google / Ollama / Kimi / z.ai
 - **Skill hooks** — Run setup/teardown commands before and after skill execution
 - **Session ID & output forwarding** — Track executions and pipe results to hooks
 - **MCP server** — Usable from AI tools like Claude Code and pi
