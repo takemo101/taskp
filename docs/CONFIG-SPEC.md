@@ -55,6 +55,8 @@ path = ".taskp/config.schema.json"
 | `anthropic` | クラウド | Anthropic API | `ANTHROPIC_API_KEY` |
 | `openai` | クラウド | OpenAI API | `OPENAI_API_KEY` |
 | `google` | クラウド | Google AI API | `GOOGLE_GENERATIVE_AI_KEY` |
+| `kimi` | クラウド | `https://api.moonshot.ai/v1` | `MOONSHOT_API_KEY` |
+| `kimi-coding` | クラウド | `https://api.kimi.com/coding/v1` | `KIMI_CODING_API_KEY` |
 | `ollama` | ローカル | `http://localhost:11434/v1` | 不要 |
 | `omlx` | ローカル | `http://localhost:8000/v1` | 不要 |
 | `lmstudio` | ローカル | `http://localhost:1234/v1` | 不要 |
@@ -134,6 +136,28 @@ taskp run code-review
 
 # Ollama に切り替え
 taskp run code-review --model ollama/qwen2.5-coder:32b
+```
+
+### Kimi（Moonshot AI 従量課金 API）
+
+```toml
+[ai]
+default_provider = "kimi"
+default_model = "kimi-k2.5"
+
+[ai.providers.kimi]
+api_key_env = "MOONSHOT_API_KEY"
+```
+
+### Kimi Coding プラン（サブスクリプション）
+
+```toml
+[ai]
+default_provider = "kimi-coding"
+default_model = "kimi-for-coding"
+
+[ai.providers.kimi-coding]
+api_key_env = "KIMI_CODING_API_KEY"
 ```
 
 ### カスタム OpenAI 互換サーバー

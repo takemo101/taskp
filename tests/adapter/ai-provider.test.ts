@@ -171,6 +171,8 @@ describe("createLanguageModel", () => {
 		process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
 		process.env.OPENAI_API_KEY = "test-openai-key";
 		process.env.GOOGLE_GENERATIVE_AI_KEY = "test-google-key";
+		process.env.MOONSHOT_API_KEY = "test-moonshot-key";
+		process.env.KIMI_CODING_API_KEY = "test-kimi-coding-key";
 	});
 
 	afterEach(() => {
@@ -325,6 +327,68 @@ describe("createLanguageModel", () => {
 		if (!result.ok) return;
 		expect(result.value.modelId).toBe("llama3");
 		expect(result.value.provider).toBe("openai.chat");
+	});
+
+	it("creates kimi model with default base URL", () => {
+		const result = createLanguageModel({ provider: "kimi", model: "kimi-k2.5" }, {});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.modelId).toBe("kimi-k2.5");
+		expect(result.value.provider).toBe("openai.chat");
+	});
+
+	it("creates kimi model with custom api_key_env", () => {
+		process.env.MY_MOONSHOT_KEY = "custom-moonshot-key";
+
+		const result = createLanguageModel(
+			{ provider: "kimi", model: "kimi-k2.5" },
+			{ providers: { kimi: { api_key_env: "MY_MOONSHOT_KEY" } } },
+		);
+
+		expect(result.ok).toBe(true);
+	});
+
+	it("returns error when kimi API key is missing", () => {
+		delete process.env.MOONSHOT_API_KEY;
+
+		const result = createLanguageModel({ provider: "kimi", model: "kimi-k2.5" }, {});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("CONFIG_ERROR");
+		expect(result.error.message).toContain("MOONSHOT_API_KEY");
+	});
+
+	it("creates kimi-coding model with default base URL", () => {
+		const result = createLanguageModel({ provider: "kimi-coding", model: "kimi-for-coding" }, {});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.modelId).toBe("kimi-for-coding");
+		expect(result.value.provider).toBe("openai.chat");
+	});
+
+	it("creates kimi-coding model with custom api_key_env", () => {
+		process.env.MY_KIMI_KEY = "custom-kimi-key";
+
+		const result = createLanguageModel(
+			{ provider: "kimi-coding", model: "kimi-for-coding" },
+			{ providers: { "kimi-coding": { api_key_env: "MY_KIMI_KEY" } } },
+		);
+
+		expect(result.ok).toBe(true);
+	});
+
+	it("returns error when kimi-coding API key is missing", () => {
+		delete process.env.KIMI_CODING_API_KEY;
+
+		const result = createLanguageModel({ provider: "kimi-coding", model: "kimi-for-coding" }, {});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.type).toBe("CONFIG_ERROR");
+		expect(result.error.message).toContain("KIMI_CODING_API_KEY");
 	});
 
 	it("returns error for unknown provider without base_url", () => {
