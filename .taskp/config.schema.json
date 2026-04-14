@@ -7,7 +7,7 @@
       "type": "object",
       "properties": {
         "default_provider": {
-          "description": "Default provider (anthropic | openai | google | ollama | omlx | lmstudio)",
+          "description": "Default provider (anthropic | openai | google | kimi | kimi-coding | zai | zai-coding | ollama | omlx | lmstudio)",
           "type": "string",
           "minLength": 1
         },

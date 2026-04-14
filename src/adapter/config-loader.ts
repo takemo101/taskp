@@ -26,7 +26,9 @@ export const aiConfigSchema = z.object({
 		.string()
 		.min(1)
 		.optional()
-		.describe("Default provider (anthropic | openai | google | ollama | omlx | lmstudio)"),
+		.describe(
+			"Default provider (anthropic | openai | google | kimi | kimi-coding | zai | zai-coding | ollama | omlx | lmstudio)",
+		),
 	default_model: z.string().min(1).optional().describe("Default model name"),
 	providers: z
 		.record(z.string(), providerConfigSchema)
